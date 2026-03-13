@@ -38,7 +38,12 @@ app.post('/api/chat', async (req, res) => {
         if (retrievedContent.length === 0) {
             console.log('No relevant content found.');
             context = '未找到相关原文片段。请尝试根据通用知识回答，但需说明这可能不在本书范围内。';
+            // Send empty references
+            res.write(`data: ${JSON.stringify({ references: [] })}\n\n`);
         } else {
+            // Send references first
+            res.write(`data: ${JSON.stringify({ references: retrievedContent })}\n\n`);
+            
             context = retrievedContent.map((item, i) => `
 [片段${i+1}]
 书名：${item.book_name}

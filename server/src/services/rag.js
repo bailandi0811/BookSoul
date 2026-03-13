@@ -1,6 +1,6 @@
 import { OpenAIEmbeddings, ChatOpenAI } from '@langchain/openai';
 import { MetricType } from '@zilliz/milvus2-sdk-node';
-import { config } from './config.js';
+import { config } from '../config.js';
 import { milvusClient } from '../db/milvus.js';
 
 const embeddings = new OpenAIEmbeddings({

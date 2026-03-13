@@ -72,16 +72,38 @@ async function insertChunksBatch(chunks, bookId, chapterNum) {
     // Batch processing to avoid rate limits if necessary, but for simplicity:
     for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i];
-        const vector = await getEmbedding(chunk);
-        data.push({
-            id: `${bookId}_${chapterNum}_${i}`,
-            book_id: String(bookId),
-            book_name: BOOK_NAME,
-            chapter_num: chapterNum,
-            index: i,
-            content: chunk,
-            vector: vector
-        });
+        
+        // Add retry logic for getEmbedding
+        let vector = null;
+        let retries = 3;
+        while (retries > 0) {
+            try {
+                vector = await getEmbedding(chunk);
+                break;
+            } catch (err) {
+                console.log(`Embedding failed for chunk ${i}, retrying... (${3 - retries + 1}/3)`);
+                retries--;
+                if (retries === 0) {
+                    console.error(`Failed to get embedding for chunk ${i} after 3 attempts.`);
+                    // Skip this chunk or throw error depending on requirement. 
+                    // Here we skip to avoid crashing the whole process.
+                }
+                // Wait a bit before retrying
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+        }
+        
+        if (vector) {
+            data.push({
+                id: `${bookId}_${chapterNum}_${i}`,
+                book_id: String(bookId),
+                book_name: BOOK_NAME,
+                chapter_num: chapterNum,
+                index: i,
+                content: chunk,
+                vector: vector
+            });
+        }
     }
 
     const insertResult = await milvusClient.insert({
@@ -109,7 +131,16 @@ async function processEpub(bookId) {
 
     let totalInserted = 0;
     
+    // Check if we need to resume
+    // Ideally we should query Milvus to see max chapter_num, but for simplicity:
+    // User can manually set START_CHAPTER
+    const START_CHAPTER = parseInt(process.env.START_CHAPTER || '0', 10);
+    
     for (let i = 0; i < documents.length; i++) {
+        if (i < START_CHAPTER) {
+            continue;
+        }
+
         const chapter = documents[i];
         const content = chapter.pageContent;
         if (!content || content.trim().length < 10) continue;
@@ -117,9 +148,16 @@ async function processEpub(bookId) {
         console.log(`处理第 ${i + 1}/${documents.length} 章...`);
         const chunks = await textSplitter.splitText(content);
         
-        const inserted = await insertChunksBatch(chunks, bookId, i + 1);
-        totalInserted += inserted;
-        console.log(`  -> 插入 ${inserted} 个片段`);
+        try {
+            const inserted = await insertChunksBatch(chunks, bookId, i + 1);
+            totalInserted += inserted;
+            console.log(`  -> 插入 ${inserted} 个片段`);
+        } catch (err) {
+            console.error(`处理第 ${i + 1} 章失败:`, err.message);
+            console.log(`请记录当前章节号 ${i}，稍后可以通过设置环境变量 START_CHAPTER=${i} 继续运行`);
+    
+            throw err;
+        }
     }
     
     return totalInserted;

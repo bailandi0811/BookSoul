@@ -3,34 +3,44 @@ import { create } from 'zustand';
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  references?: Array<{
+    book_name: string;
+    chapter_num: number;
+    content: string;
+  }>;
 }
 
 interface ChatState {
   messages: Message[];
   isLoading: boolean;
   addMessage: (message: Message) => void;
-  updateLastMessage: (content: string) => void;
+  updateLastMessage: (content: string, references?: Message['references']) => void;
   setLoading: (loading: boolean) => void;
   sendMessage: (content: string) => Promise<void>;
+  clearMessages: () => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
-  messages: [
-    { role: 'assistant', content: '你好！我是你的《天龙八部》阅读伴侣。有什么想问的吗？你可以问我关于书中人物、情节或武功的问题。' }
-  ],
+  messages: [],
   isLoading: false,
 
   addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
 
-  updateLastMessage: (content) => set((state) => {
+  updateLastMessage: (content, references) => set((state) => {
     const newMessages = [...state.messages];
     if (newMessages.length > 0) {
-      newMessages[newMessages.length - 1].content = content;
+      const lastMsg = newMessages[newMessages.length - 1];
+      lastMsg.content = content;
+      if (references) {
+        lastMsg.references = references;
+      }
     }
     return { messages: newMessages };
   }),
 
   setLoading: (loading) => set({ isLoading: loading }),
+
+  clearMessages: () => set({ messages: [] }),
 
   sendMessage: async (content) => {
     const { addMessage, updateLastMessage, setLoading } = get();
@@ -72,6 +82,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
               
               try {
                 const data = JSON.parse(dataStr);
+                
+                // Handle references data
+                if (data.references) {
+                  updateLastMessage(assistantMessage, data.references);
+                }
+                
+                // Handle content stream
                 if (data.content) {
                   assistantMessage += data.content;
                   updateLastMessage(assistantMessage);
