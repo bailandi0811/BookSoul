@@ -1,0 +1,26 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "ingest": "node scripts/ingest.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@langchain/community": "^1.1.23",
+    "@langchain/openai": "^1.2.13",
+    "@zilliz/milvus2-sdk-node": "^2.6.10",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "epub2": "^3.0.2",
+    "express": "^5.2.1",
+    "html-to-text": "^9.0.5",
+    "multer": "^2.1.1"
+  }
+}
