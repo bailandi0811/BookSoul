@@ -1,5 +1,5 @@
 import { MilvusClient } from '@zilliz/milvus2-sdk-node';
-import { config } from './config.js';
+import { config } from '../config.js';
 
 export const milvusClient = new MilvusClient({
     address: config.milvus.address,
