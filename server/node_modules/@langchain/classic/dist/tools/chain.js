@@ -1,0 +1,28 @@
+import { __exportAll } from "../_virtual/_rolldown/runtime.js";
+import { DynamicTool } from "@langchain/core/tools";
+
+//#region src/tools/chain.ts
+var chain_exports = /* @__PURE__ */ __exportAll({ ChainTool: () => ChainTool });
+/**
+* Class that extends DynamicTool for creating tools that can run chains.
+* Takes an instance of a class that extends BaseChain as a parameter in
+* its constructor and uses it to run the chain when its 'func' method is
+* called.
+*/
+var ChainTool = class extends DynamicTool {
+	static lc_name() {
+		return "ChainTool";
+	}
+	chain;
+	constructor({ chain, ...rest }) {
+		super({
+			...rest,
+			func: async (input, runManager) => chain.run(input, runManager?.getChild())
+		});
+		this.chain = chain;
+	}
+};
+
+//#endregion
+export { ChainTool, chain_exports };
+//# sourceMappingURL=chain.js.map

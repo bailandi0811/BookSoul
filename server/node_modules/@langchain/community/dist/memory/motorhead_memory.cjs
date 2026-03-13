@@ -1,0 +1,117 @@
+Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+const require_runtime = require('../_virtual/_rolldown/runtime.cjs');
+const require_memory_chat_memory = require('./chat_memory.cjs');
+let _langchain_core_messages = require("@langchain/core/messages");
+let _langchain_core_utils_async_caller = require("@langchain/core/utils/async_caller");
+let _langchain_core_memory = require("@langchain/core/memory");
+
+//#region src/memory/motorhead_memory.ts
+var motorhead_memory_exports = /* @__PURE__ */ require_runtime.__exportAll({ MotorheadMemory: () => MotorheadMemory });
+const MANAGED_URL = "https://api.getmetal.io/v1/motorhead";
+/**
+* Class for managing chat message memory using the Motorhead service. It
+* extends BaseChatMemory and includes methods for initializing the
+* memory, loading memory variables, and saving the context.
+*/
+var MotorheadMemory = class extends require_memory_chat_memory.chat_memory_exports.BaseChatMemory {
+	url = MANAGED_URL;
+	timeout = 3e3;
+	memoryKey = "history";
+	sessionId;
+	context;
+	caller;
+	apiKey;
+	clientId;
+	constructor(fields) {
+		const { sessionId, url, memoryKey, timeout, returnMessages, inputKey, outputKey, chatHistory, apiKey, clientId, ...rest } = fields;
+		super({
+			returnMessages,
+			inputKey,
+			outputKey,
+			chatHistory
+		});
+		this.caller = new _langchain_core_utils_async_caller.AsyncCaller(rest);
+		this.sessionId = sessionId;
+		this.url = url ?? this.url;
+		this.memoryKey = memoryKey ?? this.memoryKey;
+		this.timeout = timeout ?? this.timeout;
+		this.apiKey = apiKey;
+		this.clientId = clientId;
+	}
+	get memoryKeys() {
+		return [this.memoryKey];
+	}
+	_getHeaders() {
+		const isManaged = this.url === MANAGED_URL;
+		const headers = { "Content-Type": "application/json" };
+		if (isManaged && !(this.apiKey && this.clientId)) throw new Error("apiKey and clientId are required for managed motorhead. Visit https://getmetal.io to get your keys.");
+		if (isManaged && this.apiKey && this.clientId) {
+			headers["x-metal-api-key"] = this.apiKey;
+			headers["x-metal-client-id"] = this.clientId;
+		}
+		return headers;
+	}
+	/**
+	* Method that initializes the memory by fetching the session memory from
+	* the Motorhead service. It adds the messages to the chat history and
+	* sets the context if it is not 'NONE'.
+	*/
+	async init() {
+		const json = await (await this.caller.call(fetch, `${this.url}/sessions/${this.sessionId}/memory`, {
+			signal: this.timeout ? AbortSignal.timeout(this.timeout) : void 0,
+			headers: this._getHeaders()
+		})).json();
+		const { messages = [], context = "NONE" } = json?.data || json;
+		await Promise.all(messages.reverse().map(async (message) => {
+			if (message.role === "AI") await this.chatHistory.addAIChatMessage(message.content);
+			else await this.chatHistory.addUserMessage(message.content);
+		}));
+		if (context && context !== "NONE") this.context = context;
+	}
+	/**
+	* Method that loads the memory variables. It gets the chat messages and
+	* returns them as a string or an array based on the returnMessages flag.
+	* @param _values The input values.
+	* @returns A promise that resolves with the memory variables.
+	*/
+	async loadMemoryVariables(_values) {
+		const messages = await this.chatHistory.getMessages();
+		if (this.returnMessages) return { [this.memoryKey]: messages };
+		return { [this.memoryKey]: (0, _langchain_core_messages.getBufferString)(messages) };
+	}
+	/**
+	* Method that saves the context to the Motorhead service and the base
+	* chat memory. It sends a POST request to the Motorhead service with the
+	* input and output messages, and calls the saveContext method of the base
+	* chat memory.
+	* @param inputValues The input values.
+	* @param outputValues The output values.
+	* @returns A promise that resolves when the context is saved.
+	*/
+	async saveContext(inputValues, outputValues) {
+		const input = (0, _langchain_core_memory.getInputValue)(inputValues, this.inputKey);
+		const output = (0, _langchain_core_memory.getOutputValue)(outputValues, this.outputKey);
+		await Promise.all([this.caller.call(fetch, `${this.url}/sessions/${this.sessionId}/memory`, {
+			signal: this.timeout ? AbortSignal.timeout(this.timeout) : void 0,
+			method: "POST",
+			body: JSON.stringify({ messages: [{
+				role: "Human",
+				content: `${input}`
+			}, {
+				role: "AI",
+				content: `${output}`
+			}] }),
+			headers: this._getHeaders()
+		}), super.saveContext(inputValues, outputValues)]);
+	}
+};
+
+//#endregion
+exports.MotorheadMemory = MotorheadMemory;
+Object.defineProperty(exports, 'motorhead_memory_exports', {
+  enumerable: true,
+  get: function () {
+    return motorhead_memory_exports;
+  }
+});
+//# sourceMappingURL=motorhead_memory.cjs.map

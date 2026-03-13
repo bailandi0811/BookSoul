@@ -1,0 +1,1 @@
+{"version":3,"file":"memgraph_graph.d.ts","names":[],"sources":["../../src/graphs/memgraph_graph.ts"],"mappings":";;;UAEU,mBAAA;EACR,GAAA;EACA,QAAA;EACA,QAAA;EACA,QAAA;AAAA;;;;;;;AAAQ;;;;;;;;cAuBJ,aAAA,SAAsB,UAAA;EAC1B,WAAA,CAAA;IACE,GAAA;IACA,QAAA;IACA,QAAA;IACA;EAAA,GACC,mBAAA;EAAA,OAIU,UAAA,CAAW,MAAA,EAAQ,mBAAA,GAAsB,OAAA,CAAQ,aAAA;EAoBxD,aAAA,CAAA,GAAa,OAAA;AAAA"}

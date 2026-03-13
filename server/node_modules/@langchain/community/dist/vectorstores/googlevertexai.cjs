@@ -1,0 +1,371 @@
+Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+const require_runtime = require('../_virtual/_rolldown/runtime.cjs');
+const require_googlevertexai_connection = require('../utils/googlevertexai-connection.cjs');
+let _langchain_core_utils_async_caller = require("@langchain/core/utils/async_caller");
+let _langchain_core_documents = require("@langchain/core/documents");
+let google_auth_library = require("google-auth-library");
+let uuid = require("uuid");
+uuid = require_runtime.__toESM(uuid);
+let _langchain_core_vectorstores = require("@langchain/core/vectorstores");
+let flat = require("flat");
+flat = require_runtime.__toESM(flat);
+
+//#region src/vectorstores/googlevertexai.ts
+var googlevertexai_exports = /* @__PURE__ */ require_runtime.__exportAll({
+	IdDocument: () => IdDocument,
+	MatchingEngine: () => MatchingEngine
+});
+/**
+* A Document that optionally includes the ID of the document.
+*/
+var IdDocument = class extends _langchain_core_documents.Document {
+	id;
+	constructor(fields) {
+		super(fields);
+		this.id = fields.id;
+	}
+};
+var IndexEndpointConnection = class extends require_googlevertexai_connection.GoogleVertexAIConnection {
+	indexEndpoint;
+	constructor(fields, caller) {
+		super(fields, caller, new google_auth_library.GoogleAuth(fields.authOptions));
+		this.indexEndpoint = fields.indexEndpoint;
+	}
+	async buildUrl() {
+		const projectId = await this.client.getProjectId();
+		return `https://${this.endpoint}/${this.apiVersion}/projects/${projectId}/locations/${this.location}/indexEndpoints/${this.indexEndpoint}`;
+	}
+	buildMethod() {
+		return "GET";
+	}
+	async request(options) {
+		return this._request(void 0, options);
+	}
+};
+var RemoveDatapointConnection = class extends require_googlevertexai_connection.GoogleVertexAIConnection {
+	index;
+	constructor(fields, caller) {
+		super(fields, caller, new google_auth_library.GoogleAuth(fields.authOptions));
+		this.index = fields.index;
+	}
+	async buildUrl() {
+		const projectId = await this.client.getProjectId();
+		return `https://${this.endpoint}/${this.apiVersion}/projects/${projectId}/locations/${this.location}/indexes/${this.index}:removeDatapoints`;
+	}
+	buildMethod() {
+		return "POST";
+	}
+	async request(datapointIds, options) {
+		const data = { datapointIds };
+		return this._request(data, options);
+	}
+};
+var UpsertDatapointConnection = class extends require_googlevertexai_connection.GoogleVertexAIConnection {
+	index;
+	constructor(fields, caller) {
+		super(fields, caller, new google_auth_library.GoogleAuth(fields.authOptions));
+		this.index = fields.index;
+	}
+	async buildUrl() {
+		const projectId = await this.client.getProjectId();
+		return `https://${this.endpoint}/${this.apiVersion}/projects/${projectId}/locations/${this.location}/indexes/${this.index}:upsertDatapoints`;
+	}
+	buildMethod() {
+		return "POST";
+	}
+	async request(datapoints, options) {
+		const data = { datapoints };
+		return this._request(data, options);
+	}
+};
+var FindNeighborsConnection = class extends require_googlevertexai_connection.GoogleVertexAIConnection {
+	indexEndpoint;
+	deployedIndexId;
+	constructor(params, caller) {
+		super(params, caller, new google_auth_library.GoogleAuth(params.authOptions));
+		this.indexEndpoint = params.indexEndpoint;
+		this.deployedIndexId = params.deployedIndexId;
+	}
+	async buildUrl() {
+		const projectId = await this.client.getProjectId();
+		return `https://${this.endpoint}/${this.apiVersion}/projects/${projectId}/locations/${this.location}/indexEndpoints/${this.indexEndpoint}:findNeighbors`;
+	}
+	buildMethod() {
+		return "POST";
+	}
+	async request(request, options) {
+		return this._request(request, options);
+	}
+};
+/**
+* A class that represents a connection to a Google Vertex AI Matching Engine
+* instance.
+*/
+var MatchingEngine = class MatchingEngine extends _langchain_core_vectorstores.VectorStore {
+	/**
+	* Docstore that retains the document, stored by ID
+	*/
+	docstore;
+	/**
+	* The host to connect to for queries and upserts.
+	*/
+	apiEndpoint;
+	apiVersion = "v1";
+	endpoint = "us-central1-aiplatform.googleapis.com";
+	location = "us-central1";
+	/**
+	* The id for the index endpoint
+	*/
+	indexEndpoint;
+	/**
+	* The id for the index
+	*/
+	index;
+	/**
+	* Explicitly set Google Auth credentials if you cannot get them from google auth application-default login
+	* This is useful for serverless or autoscaling environments like Fargate
+	*/
+	authOptions;
+	/**
+	* The id for the "deployed index", which is an identifier in the
+	* index endpoint that references the index (but is not the index id)
+	*/
+	deployedIndexId;
+	callerParams;
+	callerOptions;
+	caller;
+	indexEndpointClient;
+	removeDatapointClient;
+	upsertDatapointClient;
+	constructor(embeddings, args) {
+		super(embeddings, args);
+		this.embeddings = embeddings;
+		this.docstore = args.docstore;
+		this.apiEndpoint = args.apiEndpoint ?? this.apiEndpoint;
+		this.deployedIndexId = args.deployedIndexId ?? this.deployedIndexId;
+		this.apiVersion = args.apiVersion ?? this.apiVersion;
+		this.endpoint = args.endpoint ?? this.endpoint;
+		this.location = args.location ?? this.location;
+		this.indexEndpoint = args.indexEndpoint ?? this.indexEndpoint;
+		this.index = args.index ?? this.index;
+		this.authOptions = args.authOptions ?? this.authOptions;
+		this.callerParams = args.callerParams ?? this.callerParams;
+		this.callerOptions = args.callerOptions ?? this.callerOptions;
+		this.caller = new _langchain_core_utils_async_caller.AsyncCaller(this.callerParams || {});
+		this.indexEndpointClient = new IndexEndpointConnection({
+			endpoint: this.endpoint,
+			location: this.location,
+			apiVersion: this.apiVersion,
+			indexEndpoint: this.indexEndpoint,
+			authOptions: this.authOptions
+		}, this.caller);
+		this.removeDatapointClient = new RemoveDatapointConnection({
+			endpoint: this.endpoint,
+			location: this.location,
+			apiVersion: this.apiVersion,
+			index: this.index,
+			authOptions: this.authOptions
+		}, this.caller);
+		this.upsertDatapointClient = new UpsertDatapointConnection({
+			endpoint: this.endpoint,
+			location: this.location,
+			apiVersion: this.apiVersion,
+			index: this.index,
+			authOptions: this.authOptions
+		}, this.caller);
+	}
+	_vectorstoreType() {
+		return "googlevertexai";
+	}
+	async addDocuments(documents) {
+		const texts = documents.map((doc) => doc.pageContent);
+		const vectors = await this.embeddings.embedDocuments(texts);
+		return this.addVectors(vectors, documents);
+	}
+	async addVectors(vectors, documents) {
+		if (vectors.length !== documents.length) throw new Error(`Vectors and metadata must have the same length`);
+		const datapoints = vectors.map((vector, idx) => this.buildDatapoint(vector, documents[idx]));
+		const response = await this.upsertDatapointClient.request(datapoints, {});
+		if (Object.keys(response?.data ?? {}).length === 0) {
+			const idDoc = documents;
+			const docsToStore = {};
+			idDoc.forEach((doc) => {
+				if (doc.id) docsToStore[doc.id] = doc;
+			});
+			await this.docstore.add(docsToStore);
+		}
+	}
+	cleanMetadata(documentMetadata) {
+		function getStringArrays(prefix, m) {
+			let ret = {};
+			Object.keys(m).forEach((key) => {
+				const newPrefix = prefix.length > 0 ? `${prefix}.${key}` : key;
+				const val = m[key];
+				if (!val) {} else if (Array.isArray(val)) ret[newPrefix] = val.map((v) => `${v}`);
+				else if (typeof val === "object") {
+					const subArrays = getStringArrays(newPrefix, val);
+					ret = {
+						...ret,
+						...subArrays
+					};
+				}
+			});
+			return ret;
+		}
+		const stringArrays = getStringArrays("", documentMetadata);
+		const flatMetadata = (0, flat.default)(documentMetadata);
+		Object.keys(flatMetadata).forEach((key) => {
+			Object.keys(stringArrays).forEach((arrayKey) => {
+				const matchKey = `${arrayKey}.`;
+				if (key.startsWith(matchKey)) delete flatMetadata[key];
+			});
+		});
+		return {
+			...flatMetadata,
+			...stringArrays
+		};
+	}
+	/**
+	* Given the metadata from a document, convert it to an array of Restriction
+	* objects that may be passed to the Matching Engine and stored.
+	* The default implementation flattens any metadata and includes it as
+	* an "allowList". Subclasses can choose to convert some of these to
+	* "denyList" items or to add additional restrictions (for example, to format
+	* dates into a different structure or to add additional restrictions
+	* based on the date).
+	* @param documentMetadata - The metadata from a document
+	* @returns a Restriction[] (or an array of a subclass, from the FilterType)
+	*/
+	metadataToRestrictions(documentMetadata) {
+		const metadata = this.cleanMetadata(documentMetadata);
+		const restrictions = [];
+		for (const key of Object.keys(metadata)) {
+			let valArray;
+			const val = metadata[key];
+			if (val === null) valArray = null;
+			else if (Array.isArray(val) && val.length > 0) valArray = val;
+			else valArray = [`${val}`];
+			if (valArray) {
+				const restriction = {
+					namespace: key,
+					["allowList"]: valArray
+				};
+				restrictions.push(restriction);
+			}
+		}
+		return restrictions;
+	}
+	/**
+	* Create an index datapoint for the vector and document id.
+	* If an id does not exist, create it and set the document to its value.
+	* @param vector
+	* @param document
+	*/
+	buildDatapoint(vector, document) {
+		if (!document.id) document.id = uuid.v4();
+		const ret = {
+			datapointId: document.id,
+			featureVector: vector
+		};
+		const restrictions = this.metadataToRestrictions(document.metadata);
+		if (restrictions?.length > 0) ret.restricts = restrictions;
+		return ret;
+	}
+	async delete(params) {
+		await this.removeDatapointClient.request(params.ids, {});
+	}
+	async similaritySearchVectorWithScore(query, k, filter) {
+		const deployedIndexId = await this.getDeployedIndexId();
+		const requestQuery = {
+			neighborCount: k,
+			datapoint: {
+				datapointId: `0`,
+				featureVector: query
+			}
+		};
+		if (filter) requestQuery.datapoint.restricts = filter;
+		const request = {
+			deployedIndexId,
+			queries: [requestQuery]
+		};
+		const neighbors = ((await new FindNeighborsConnection({
+			endpoint: await this.getPublicAPIEndpoint(),
+			indexEndpoint: this.indexEndpoint,
+			apiVersion: this.apiVersion,
+			location: this.location,
+			deployedIndexId,
+			authOptions: this.authOptions
+		}, this.caller).request(request, {}))?.data?.nearestNeighbors ?? [])[0]?.neighbors ?? [];
+		return await Promise.all(neighbors.map(async (neighbor) => {
+			const id = neighbor?.datapoint?.datapointId;
+			const distance = neighbor?.distance;
+			let doc;
+			try {
+				doc = await this.docstore.search(id);
+			} catch (xx) {
+				console.error(xx);
+				console.warn([
+					`Document with id "${id}" is missing from the backing docstore.`,
+					`This can occur if you clear the docstore without deleting from the corresponding Matching Engine index.`,
+					`To resolve this, you should call .delete() with this id as part of the "ids" parameter.`
+				].join("\n"));
+				doc = new _langchain_core_documents.Document({ pageContent: `Missing document ${id}` });
+			}
+			doc.id ??= id;
+			return [doc, distance];
+		}));
+	}
+	/**
+	* For this index endpoint, figure out what API Endpoint URL and deployed
+	* index ID should be used to do upserts and queries.
+	* Also sets the `apiEndpoint` and `deployedIndexId` property for future use.
+	* @return The URL
+	*/
+	async determinePublicAPIEndpoint() {
+		const response = await this.indexEndpointClient.request(this.callerOptions);
+		this.apiEndpoint = response?.data?.publicEndpointDomainName;
+		const indexPathPattern = /projects\/.+\/locations\/.+\/indexes\/(.+)$/;
+		const deployedIndex = (response?.data?.deployedIndexes ?? []).find((index) => {
+			const match = index.index.match(indexPathPattern);
+			if (match) {
+				const [, potentialIndexId] = match;
+				if (potentialIndexId === this.index) return true;
+			}
+			return false;
+		});
+		if (deployedIndex) this.deployedIndexId = deployedIndex.id;
+		return {
+			apiEndpoint: this.apiEndpoint,
+			deployedIndexId: this.deployedIndexId
+		};
+	}
+	async getPublicAPIEndpoint() {
+		return this.apiEndpoint ?? (await this.determinePublicAPIEndpoint()).apiEndpoint;
+	}
+	async getDeployedIndexId() {
+		return this.deployedIndexId ?? (await this.determinePublicAPIEndpoint()).deployedIndexId;
+	}
+	static async fromTexts(texts, metadatas, embeddings, dbConfig) {
+		const docs = texts.map((text, index) => ({
+			pageContent: text,
+			metadata: Array.isArray(metadatas) ? metadatas[index] : metadatas
+		}));
+		return this.fromDocuments(docs, embeddings, dbConfig);
+	}
+	static async fromDocuments(docs, embeddings, dbConfig) {
+		const ret = new MatchingEngine(embeddings, dbConfig);
+		await ret.addDocuments(docs);
+		return ret;
+	}
+};
+
+//#endregion
+exports.IdDocument = IdDocument;
+exports.MatchingEngine = MatchingEngine;
+Object.defineProperty(exports, 'googlevertexai_exports', {
+  enumerable: true,
+  get: function () {
+    return googlevertexai_exports;
+  }
+});
+//# sourceMappingURL=googlevertexai.cjs.map
