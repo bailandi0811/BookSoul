@@ -1,28 +1,35 @@
 import { create } from 'zustand';
 
-interface Message {
+export interface Reference {
+  book_name: string;
+  chapter_num: number;
+  content: string;
+}
+
+export interface Message {
   role: 'user' | 'assistant';
   content: string;
-  references?: Array<{
-    book_name: string;
-    chapter_num: number;
-    content: string;
-  }>;
+  references?: Reference[];
 }
+
+export type CharacterType = 'assistant' | 'qiaofeng' | 'duanyu' | 'wangyuyan';
 
 interface ChatState {
   messages: Message[];
   isLoading: boolean;
+  currentCharacter: CharacterType;
   addMessage: (message: Message) => void;
-  updateLastMessage: (content: string, references?: Message['references']) => void;
+  updateLastMessage: (content: string, references?: Reference[]) => void;
   setLoading: (loading: boolean) => void;
   sendMessage: (content: string) => Promise<void>;
   clearMessages: () => void;
+  setCharacter: (character: CharacterType) => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
   isLoading: false,
+  currentCharacter: 'assistant',
 
   addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
 
@@ -42,8 +49,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   clearMessages: () => set({ messages: [] }),
 
+  setCharacter: (character) => set({ currentCharacter: character }),
+
   sendMessage: async (content) => {
-    const { addMessage, updateLastMessage, setLoading } = get();
+    const { addMessage, updateLastMessage, setLoading, currentCharacter } = get();
     
     // Add user message
     addMessage({ role: 'user', content });
@@ -56,7 +65,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const response = await fetch('http://localhost:3000/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: content }),
+        body: JSON.stringify({ message: content, character: currentCharacter }),
       });
 
       if (!response.ok) {

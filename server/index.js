@@ -17,7 +17,7 @@ app.get('/', (req, res) => {
 });
 
 app.post('/api/chat', async (req, res) => {
-    const { message } = req.body;
+    const { message, character } = req.body;
     
     if (!message) {
         return res.status(400).json({ error: 'Message is required' });
@@ -29,7 +29,7 @@ app.post('/api/chat', async (req, res) => {
     res.setHeader('Connection', 'keep-alive');
 
     try {
-        console.log(`Received question: ${message}`);
+        console.log(`Received question: ${message}, Character: ${character || 'assistant'}`);
         
         // 1. Retrieve context
         const retrievedContent = await retrieveRelevantContent(message);
@@ -37,10 +37,12 @@ app.post('/api/chat', async (req, res) => {
         let context = '';
         if (retrievedContent.length === 0) {
             console.log('No relevant content found.');
-            context = '未找到相关原文片段。请尝试根据通用知识回答，但需说明这可能不在本书范围内。';
             // Send empty references
             res.write(`data: ${JSON.stringify({ references: [] })}\n\n`);
         } else {
+            // Filter low relevance results (simple heuristic, Milvus score logic depends on metric type)
+            // Here we just pass all top-k for now, but in a real system we should check scores.
+            
             // Send references first
             res.write(`data: ${JSON.stringify({ references: retrievedContent })}\n\n`);
             
@@ -53,7 +55,7 @@ app.post('/api/chat', async (req, res) => {
         }
 
         // 2. Generate Stream Response
-        await generateResponseStream(message, context, res);
+        await generateResponseStream(message, context, res, character);
 
     } catch (error) {
         console.error('Chat API Error:', error);
