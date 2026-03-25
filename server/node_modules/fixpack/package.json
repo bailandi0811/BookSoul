@@ -1,0 +1,41 @@
+{
+  "name": "fixpack",
+  "description": "cli tool that cleans up package.json files.",
+  "version": "4.0.0",
+  "author": "Henrik Joreteg <henrik@andyet.net>",
+  "bin": "./bin/fixpack",
+  "browser": false,
+  "bugs": {
+    "url": "https://github.com/henrikjoreteg/fixpack/issues"
+  },
+  "dependencies": {
+    "alce": "1.2.0",
+    "chalk": "^3.0.0",
+    "detect-indent": "^6.0.0",
+    "detect-newline": "^3.1.0",
+    "extend-object": "^1.0.0",
+    "rc": "^1.2.8"
+  },
+  "devDependencies": {
+    "standard": "14.3.1"
+  },
+  "homepage": "https://github.com/henrikjoreteg/fixpack",
+  "keywords": [
+    "cleanup",
+    "package"
+  ],
+  "license": "MIT",
+  "main": "fixpack.js",
+  "preferGlobal": true,
+  "prettier": {
+    "semi": false,
+    "singleQuote": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/henrikjoreteg/fixpack"
+  },
+  "scripts": {
+    "test": "standard && standard bin/fixpack"
+  }
+}

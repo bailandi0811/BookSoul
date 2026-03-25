@@ -1,13 +1,13 @@
 !function(e, r) {
   "object" == typeof exports && "undefined" != typeof module ? r(exports, require("deep-eql"), require("lodash-es")) : "function" == typeof define && define.amd ? define([ "exports", "deep-eql", "lodash-es" ], r) : r((e = "undefined" != typeof globalThis ? globalThis : e || self).ArrayHyperUnique = {}, e._equals, e.lodashEs);
-}(this, (function(e, r, u) {
+}(this, function(e, r, u) {
   "use strict";
   function equals(e, u) {
     return r(e, u);
   }
   function defaultFilter(e = {}) {
     const r = e.checker || defaultChecker, t = e.filter || null, i = e.removeFromFirst ? u.findLastIndex : u.findIndex;
-    return (e, u, n) => i(n, (u => r(u, e, n, n))) === u && (!t || t(e));
+    return (e, u, n) => i(n, u => r(u, e, n, n)) === u && (!t || t(e));
   }
   function defaultChecker(e, u, t, i) {
     return r(e, u);
@@ -58,5 +58,5 @@
   Object.defineProperty(e, "__esModule", {
     value: !0
   });
-}));
+});
 //# sourceMappingURL=index.umd.production.min.cjs.map

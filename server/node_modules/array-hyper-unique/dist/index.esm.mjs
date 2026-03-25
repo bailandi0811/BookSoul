@@ -8,7 +8,7 @@ function equals(r, u) {
 
 function defaultFilter(e = {}) {
   const t = e.checker || defaultChecker, n = e.filter || null, i = e.removeFromFirst ? r : u;
-  return (e, r, u) => i(u, (r => t(r, e, u, u))) === r && (!n || n(e));
+  return (e, r, u) => i(u, r => t(r, e, u, u)) === r && (!n || n(e));
 }
 
 function defaultChecker(r, u, t, n) {

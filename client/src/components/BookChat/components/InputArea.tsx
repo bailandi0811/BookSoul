@@ -1,16 +1,31 @@
 import { useRef, useEffect, useState } from 'react';
-import { Send } from 'lucide-react';
+import { Send, Sparkles } from 'lucide-react';
+import { useChatStore } from '@/store/useChatStore';
 
-interface InputAreaProps {
-  isLoading: boolean;
-  onSendMessage: (content: string) => void;
-}
-
-export const InputArea = ({ isLoading, onSendMessage }: InputAreaProps) => {
+export const InputArea = () => {
   const [inputValue, setInputValue] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const { isLoading, sendMessage } = useChatStore();
 
-  // Auto resize input
+  // Custom event listener for external updates
+  useEffect(() => {
+    const handleInputUpdate = () => {
+      const el = document.getElementById('chat-input') as HTMLTextAreaElement;
+      if (el && el.value !== inputValue) {
+        setInputValue(el.value);
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight, 150) + 'px';
+      }
+    };
+    
+    document.addEventListener('input', handleInputUpdate);
+    document.addEventListener('click', handleInputUpdate); // For button clicks
+    return () => {
+      document.removeEventListener('input', handleInputUpdate);
+      document.removeEventListener('click', handleInputUpdate);
+    };
+  }, [inputValue]);
+
   useEffect(() => {
     if (inputRef.current) {
       inputRef.current.style.height = 'auto';
@@ -21,9 +36,10 @@ export const InputArea = ({ isLoading, onSendMessage }: InputAreaProps) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (inputValue.trim() && !isLoading) {
-      onSendMessage(inputValue);
+      sendMessage(inputValue);
       setInputValue('');
       if (inputRef.current) {
+        inputRef.current.value = '';
         inputRef.current.style.height = 'auto';
       }
     }
@@ -36,59 +52,47 @@ export const InputArea = ({ isLoading, onSendMessage }: InputAreaProps) => {
     }
   };
 
-  // Expose setter for external control (like example questions)
-  // Note: In a cleaner architecture, inputValue could be lifted up, 
-  // but for now we'll keep local state and use a ref or just let parent pass initial value?
-  // Actually, let's keep it simple. If parent needs to set value, we can add a prop or use a key to reset.
-  // For the example questions, we might need to lift the state up.
-  // Let's modify the props to accept value and setter if we want parent control,
-  // OR just keep it self-contained and assume example questions will be handled differently.
-  // Let's stick to the current pattern in index.tsx where state was local. 
-  // Wait, in index.tsx state was in BookChat. Let's lift it back up or keep it here?
-  // The original code had state in BookChat. To make this component reusable and controllable, 
-  // we should probably accept value and onChange, or just use a ref.
-  
-  // Let's make it a controlled component to be safe.
-  
   return (
-    <div className="bg-[#F5F2E9] p-4 pb-8 sticky bottom-0 z-20">
-      <div className="max-w-4xl mx-auto">
-        <form onSubmit={handleSubmit} className="relative group">
-          <div className="relative flex items-end bg-[#FAF8F4] rounded-[24px] border border-[#E6DCC8] shadow-[0_8px_30px_-8px_rgba(44,24,16,0.12)] focus-within:border-[#D4C5A9] focus-within:shadow-[0_12px_40px_-10px_rgba(44,24,16,0.18)] transition-all duration-300 overflow-hidden">
+    <div className="p-4 md:p-6 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent sticky bottom-0 z-20">
+      <div className="max-w-3xl mx-auto">
+        <form onSubmit={handleSubmit} className="relative">
+          <div className="relative flex items-end bg-white rounded-2xl border border-slate-200 shadow-sm focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-500/10 transition-all duration-200 overflow-hidden">
             <textarea
+              id="chat-input"
               ref={inputRef}
-              placeholder="在此输入问题，与书中人物对话..."
+              placeholder="输入你的问题，例如：我在哪里？"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
               disabled={isLoading}
               rows={1}
-              className="w-full resize-none bg-transparent pl-6 pr-16 py-5 text-[#2C1810] placeholder:text-[#8B4513]/30 focus:outline-none min-h-[64px] max-h-[200px] text-[15px] font-serif leading-relaxed"
+              aria-label="输入问题"
+              className="w-full resize-none bg-transparent pl-4 pr-14 py-3.5 text-slate-800 placeholder:text-slate-400 focus:outline-none min-h-[52px] max-h-[150px] text-[15px] leading-relaxed"
               style={{ height: 'auto' }}
             />
             <div className="absolute right-2 bottom-2">
               <button 
                 type="submit"
                 disabled={isLoading || !inputValue.trim()}
+                aria-label="发送"
                 className={`
-                  w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300
+                  w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200
                   ${inputValue.trim() 
-                    ? 'bg-[#2C1810] text-[#F5F2E9] hover:bg-[#4A3B32] shadow-md transform hover:scale-105 active:scale-95' 
-                    : 'bg-[#E6DCC8]/50 text-[#F5F2E9] cursor-not-allowed'}
+                    ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm' 
+                    : 'bg-slate-100 text-slate-400 cursor-not-allowed'}
                 `}
               >
                 {isLoading ? (
-                  <div className="w-4 h-4 border-2 border-[#F5F2E9]/30 border-t-[#F5F2E9] rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
                   <Send className="w-4 h-4 ml-0.5" />
                 )}
               </button>
             </div>
           </div>
-          <div className="text-center mt-4 opacity-0 group-hover:opacity-100 transition-opacity duration-700">
-            <span className="text-[10px] text-[#8B4513]/40 font-serif tracking-[0.3em] uppercase">
-              — 阅 读 · 思 考 · 对 话 —
-            </span>
+          <div className="flex items-center justify-center gap-1 mt-3 text-[11px] text-slate-400 font-medium">
+            <Sparkles className="w-3 h-3" />
+            AI 生成内容仅供参考
           </div>
         </form>
       </div>

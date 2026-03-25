@@ -1,0 +1,393 @@
+"use strict";
+
+var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault").default;
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = MJMLParser;
+var _htmlparser = require("htmlparser2");
+var _lodash = require("lodash");
+var _fp = require("lodash/fp");
+var _path = _interopRequireDefault(require("path"));
+var _fs = _interopRequireDefault(require("fs"));
+var _cleanNode = _interopRequireDefault(require("./helpers/cleanNode"));
+var _convertBooleansOnAttrs = _interopRequireDefault(require("./helpers/convertBooleansOnAttrs"));
+var _setEmptyAttributes = _interopRequireDefault(require("./helpers/setEmptyAttributes"));
+const isNode = require('detect-node');
+const indexesForNewLine = xml => {
+  const regex = /\n/gi;
+  const indexes = [0];
+  while (regex.exec(xml)) {
+    indexes.push(regex.lastIndex);
+  }
+  return indexes;
+};
+const isSelfClosing = (indexes, parser) => indexes.startIndex === parser.startIndex && indexes.endIndex === parser.endIndex;
+function MJMLParser(xml, options = {}, includedIn = []) {
+  const {
+    addEmptyAttributes = true,
+    components = {},
+    convertBooleans = true,
+    keepComments = true,
+    filePath = '.',
+    actualPath = '.',
+    ignoreIncludes = true,
+    preprocessors = [],
+    includePath
+  } = options;
+  const endingTags = (0, _fp.flow)((0, _fp.filter)(component => component.endingTag), (0, _fp.map)(component => component.getTagName()))({
+    ...components
+  });
+  let cwd = process.cwd();
+  if (isNode && filePath) {
+    try {
+      const isDir = _fs.default.lstatSync(filePath).isDirectory();
+      cwd = isDir ? filePath : _path.default.dirname(filePath);
+    } catch (e) {
+      throw new Error('Specified filePath does not exist');
+    }
+  }
+  let mjml = null;
+  let cur = null;
+  let inInclude = !!includedIn.length;
+  let inEndingTag = 0;
+  const cssIncludes = [];
+  const currentEndingTagIndexes = {
+    startIndex: 0,
+    endIndex: 0
+  };
+  const findTag = (tagName, tree) => (0, _lodash.find)(tree.children, {
+    tagName
+  });
+  const lineIndexes = indexesForNewLine(xml);
+  const extraAllowedRoots = [];
+  const addAllowedRoot = p => {
+    if (!p) return;
+    try {
+      const resolved = _fs.default.realpathSync(_path.default.resolve(cwd, p));
+      extraAllowedRoots.push(resolved);
+    } catch (_) {
+      // ignore non-existent paths
+    }
+  };
+
+  // Fully decode URL-encoded strings, handling double/triple encodings
+  const fullyDecode = input => {
+    let result = String(input);
+    for (let i = 0; i < 10; i += 1) {
+      try {
+        const decoded = decodeURIComponent(result);
+        if (decoded === result) break;
+        result = decoded;
+      } catch (_) {
+        break;
+      }
+    }
+    return result;
+  };
+  const isUNCPath = p => p.startsWith('\\') || p.startsWith('//');
+  const hasDriveLetter = p => /^[a-zA-Z]:/.test(p);
+  if (Array.isArray(includePath)) {
+    includePath.forEach(addAllowedRoot);
+  } else {
+    addAllowedRoot(includePath);
+  }
+  const isPathAllowed = absolutePath => {
+    try {
+      const target = _fs.default.realpathSync(absolutePath);
+      const root = _fs.default.realpathSync(cwd);
+      const roots = [root, ...extraAllowedRoots];
+      return roots.some(r => {
+        const relative = _path.default.relative(r, target);
+        return relative && !relative.startsWith('..') && !_path.default.isAbsolute(relative);
+      });
+    } catch (e) {
+      return false;
+    }
+  };
+  const denyInclude = line => {
+    const newNode = {
+      line,
+      file: actualPath,
+      absoluteFilePath: _path.default.resolve(cwd, actualPath),
+      parent: cur,
+      tagName: 'mj-raw',
+      content: '<!-- mj-include denied -->',
+      children: [],
+      errors: [{
+        type: 'include-denied',
+        params: {}
+      }]
+    };
+    cur.children.push(newNode);
+  };
+  const handleCssHtmlInclude = (file, attrs, line) => {
+    const decoded = fullyDecode(file);
+    // Early rejects for dangerous patterns
+    if (decoded.includes('\0') || _path.default.isAbsolute(decoded) || hasDriveLetter(decoded) || isUNCPath(decoded)) {
+      denyInclude(line);
+      return;
+    }
+    const partialPath = _path.default.resolve(cwd, decoded);
+    if (!isPathAllowed(partialPath)) {
+      denyInclude(line);
+      return;
+    }
+    let content;
+    try {
+      content = _fs.default.readFileSync(partialPath, 'utf8');
+    } catch (e) {
+      const newNode = {
+        line,
+        file,
+        absoluteFilePath: _path.default.resolve(cwd, actualPath),
+        parent: cur,
+        tagName: 'mj-raw',
+        content: `<!-- mj-include fails to read file : ${file} at ${partialPath} -->`,
+        children: [],
+        errors: [{
+          type: 'include',
+          params: {
+            file,
+            partialPath
+          }
+        }]
+      };
+      cur.children.push(newNode);
+      return;
+    }
+    if (attrs.type === 'html') {
+      const newNode = {
+        line,
+        file,
+        absoluteFilePath: _path.default.resolve(cwd, actualPath),
+        parent: cur,
+        tagName: 'mj-raw',
+        content
+      };
+      cur.children.push(newNode);
+      return;
+    }
+    const attributes = attrs['css-inline'] === 'inline' ? {
+      inline: 'inline'
+    } : {};
+    const newNode = {
+      line,
+      file,
+      absoluteFilePath: _path.default.resolve(cwd, actualPath),
+      tagName: 'mj-style',
+      content,
+      children: [],
+      attributes
+    };
+    cssIncludes.push(newNode);
+  };
+  const handleInclude = (file, line) => {
+    const decoded = fullyDecode(file);
+    // Early rejects for dangerous patterns
+    if (decoded.includes('\0') || _path.default.isAbsolute(decoded) || hasDriveLetter(decoded) || isUNCPath(decoded)) {
+      denyInclude(line);
+      return;
+    }
+    const partialPath = _path.default.resolve(cwd, decoded);
+    const curBeforeInclude = cur;
+    if (!isPathAllowed(partialPath)) {
+      denyInclude(line);
+      return;
+    }
+    if ((0, _lodash.find)(cur.includedIn, {
+      file: partialPath
+    })) throw new Error(`Circular inclusion detected on file : ${partialPath}`);
+    let content;
+    try {
+      content = _fs.default.readFileSync(partialPath, 'utf8');
+    } catch (e) {
+      const newNode = {
+        line,
+        file,
+        absoluteFilePath: _path.default.resolve(cwd, actualPath),
+        parent: cur,
+        tagName: 'mj-raw',
+        content: `<!-- mj-include fails to read file : ${file} at ${partialPath} -->`,
+        children: [],
+        errors: [{
+          type: 'include',
+          params: {
+            file,
+            partialPath
+          }
+        }]
+      };
+      cur.children.push(newNode);
+      return;
+    }
+    content = content.indexOf('<mjml>') === -1 ? `<mjml><mj-body>${content}</mj-body></mjml>` : content;
+    const partialMjml = MJMLParser(content, {
+      ...options,
+      filePath: partialPath,
+      actualPath: partialPath
+    }, [...cur.includedIn, {
+      file: cur.absoluteFilePath,
+      line
+    }]);
+    const bindToTree = (children, tree = cur) => children.map(c => ({
+      ...c,
+      parent: tree
+    }));
+    if (partialMjml.tagName !== 'mjml') {
+      return;
+    }
+    const body = findTag('mj-body', partialMjml);
+    const head = findTag('mj-head', partialMjml);
+    if (body) {
+      const boundChildren = bindToTree(body.children);
+      cur.children = [...cur.children, ...boundChildren];
+    }
+    if (head) {
+      let curHead = findTag('mj-head', mjml);
+      if (!curHead) {
+        mjml.children.push({
+          file: actualPath,
+          absoluteFilePath: _path.default.resolve(cwd, actualPath),
+          parent: mjml,
+          tagName: 'mj-head',
+          children: [],
+          includedIn: []
+        });
+        curHead = findTag('mj-head', mjml);
+      }
+      const boundChildren = bindToTree(head.children, curHead);
+      curHead.children = [...curHead.children, ...boundChildren];
+    }
+
+    // must restore cur to the cur before include started
+    cur = curBeforeInclude;
+  };
+  const parser = new _htmlparser.Parser({
+    onopentag: (name, attrs) => {
+      const isAnEndingTag = endingTags.indexOf(name) !== -1;
+      if (inEndingTag > 0) {
+        if (isAnEndingTag) inEndingTag += 1;
+        return;
+      }
+      if (isAnEndingTag) {
+        inEndingTag += 1;
+        if (inEndingTag === 1) {
+          // we're entering endingTag
+          currentEndingTagIndexes.startIndex = parser.startIndex;
+          currentEndingTagIndexes.endIndex = parser.endIndex;
+        }
+      }
+      const line = (0, _lodash.findLastIndex)(lineIndexes, i => i <= parser.startIndex) + 1;
+      if (name === 'mj-include') {
+        if (ignoreIncludes || !isNode) return;
+        if (attrs.type === 'css' || attrs.type === 'html') {
+          handleCssHtmlInclude(attrs.path, attrs, line);
+          return;
+        }
+        inInclude = true;
+        handleInclude(attrs.path, line);
+        return;
+      }
+      if (convertBooleans) {
+        // "true" and "false" will be converted to bools
+        attrs = (0, _convertBooleansOnAttrs.default)(attrs);
+      }
+      const newNode = {
+        file: actualPath,
+        absoluteFilePath: isNode ? _path.default.resolve(cwd, actualPath) : actualPath,
+        line,
+        includedIn,
+        parent: cur,
+        tagName: name,
+        attributes: attrs,
+        children: []
+      };
+      if (cur) {
+        cur.children.push(newNode);
+      } else {
+        mjml = newNode;
+      }
+      cur = newNode;
+    },
+    onclosetag: name => {
+      if (endingTags.indexOf(name) !== -1) {
+        inEndingTag -= 1;
+        if (!inEndingTag) {
+          // we're getting out of endingTag
+          // if self-closing tag we don't get the content
+          if (!isSelfClosing(currentEndingTagIndexes, parser)) {
+            const partialVal = xml.substring(currentEndingTagIndexes.endIndex + 1, parser.endIndex).trim();
+            const val = partialVal.substring(0, partialVal.lastIndexOf(`</${name}`));
+            if (val) cur.content = val.trim();
+          }
+        }
+      }
+      if (inEndingTag > 0) return;
+      if (inInclude) {
+        inInclude = false;
+      }
+
+      // for includes, setting cur is handled in handleInclude because when there is
+      // only mj-head in include it doesn't create any elements, so setting back to parent is wrong
+      if (name !== 'mj-include') cur = cur && cur.parent || null;
+    },
+    ontext: text => {
+      if (inEndingTag > 0) return;
+      if (text && text.trim() && cur) {
+        cur.content = `${cur && cur.content || ''}${text.trim()}`.trim();
+      }
+    },
+    oncomment: data => {
+      if (inEndingTag > 0) return;
+      if (cur && keepComments) {
+        cur.children.push({
+          line: (0, _lodash.findLastIndex)(lineIndexes, i => i <= parser.startIndex) + 1,
+          tagName: 'mj-raw',
+          content: `<!--${data}-->`,
+          includedIn
+        });
+      }
+    }
+  }, {
+    recognizeCDATA: true,
+    decodeEntities: false,
+    recognizeSelfClosing: true,
+    lowerCaseAttributeNames: false
+  });
+
+  // Apply preprocessors to raw xml
+  xml = (0, _fp.flow)(preprocessors)(xml);
+  parser.write(xml);
+  parser.end();
+  if (!(0, _lodash.isObject)(mjml)) {
+    throw new Error('Parsing failed. Check your mjml.');
+  }
+  (0, _cleanNode.default)(mjml);
+
+  // Assign "attributes" property if not set
+  if (addEmptyAttributes) {
+    (0, _setEmptyAttributes.default)(mjml);
+  }
+  if (cssIncludes.length) {
+    const head = (0, _lodash.find)(mjml.children, {
+      tagName: 'mj-head'
+    });
+    if (head) {
+      if (head.children) {
+        head.children = [...head.children, ...cssIncludes];
+      } else {
+        head.children = cssIncludes;
+      }
+    } else {
+      mjml.children.push({
+        file: filePath,
+        line: 0,
+        tagName: 'mj-head',
+        children: cssIncludes
+      });
+    }
+  }
+  return mjml;
+}
+module.exports = exports.default;

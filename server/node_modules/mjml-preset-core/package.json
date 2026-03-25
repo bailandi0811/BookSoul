@@ -1,0 +1,56 @@
+{
+  "name": "mjml-preset-core",
+  "description": "mjml-preset-core",
+  "version": "5.0.0-beta.2",
+  "main": "lib/index.js",
+  "files": [
+    "lib"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mjmlio/mjml.git",
+    "directory": "packages/mjml-preset-core"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mjmlio/mjml/issues"
+  },
+  "homepage": "https://mjml.io",
+  "scripts": {
+    "clean": "rimraf lib",
+    "build": "babel src --out-dir lib --root-mode upward"
+  },
+  "dependencies": {
+    "@babel/runtime": "^7.28.4",
+    "mjml-accordion": "5.0.0-beta.2",
+    "mjml-body": "5.0.0-beta.2",
+    "mjml-button": "5.0.0-beta.2",
+    "mjml-carousel": "5.0.0-beta.2",
+    "mjml-column": "5.0.0-beta.2",
+    "mjml-divider": "5.0.0-beta.2",
+    "mjml-group": "5.0.0-beta.2",
+    "mjml-head": "5.0.0-beta.2",
+    "mjml-head-attributes": "5.0.0-beta.2",
+    "mjml-head-breakpoint": "5.0.0-beta.2",
+    "mjml-head-font": "5.0.0-beta.2",
+    "mjml-head-html-attributes": "5.0.0-beta.2",
+    "mjml-head-preview": "5.0.0-beta.2",
+    "mjml-head-style": "5.0.0-beta.2",
+    "mjml-head-title": "5.0.0-beta.2",
+    "mjml-hero": "5.0.0-beta.2",
+    "mjml-image": "5.0.0-beta.2",
+    "mjml-navbar": "5.0.0-beta.2",
+    "mjml-raw": "5.0.0-beta.2",
+    "mjml-section": "5.0.0-beta.2",
+    "mjml-social": "5.0.0-beta.2",
+    "mjml-spacer": "5.0.0-beta.2",
+    "mjml-table": "5.0.0-beta.2",
+    "mjml-text": "5.0.0-beta.2",
+    "mjml-wrapper": "5.0.0-beta.2"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.8.4",
+    "rimraf": "^3.0.2"
+  },
+  "gitHead": "9aac8c66d964abad5fa70fb46734a6360a4163b4"
+}
