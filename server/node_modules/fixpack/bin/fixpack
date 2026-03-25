@@ -1,0 +1,20 @@
+#!/usr/bin/env node
+'use strict'
+
+const fixpack = require('../fixpack')
+const path = require('path')
+const defaultConfig = require('../config')
+const config = require('rc')('fixpack', defaultConfig)
+const files = config._
+
+if (files.length) {
+  config.files = files
+}
+
+let exitCode = 0
+
+config.files.forEach(function (file) {
+  exitCode = Math.max(exitCode, fixpack(path.resolve(file), config))
+})
+
+process.exit(exitCode)

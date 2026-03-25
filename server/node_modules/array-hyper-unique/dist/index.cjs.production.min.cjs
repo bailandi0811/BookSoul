@@ -4,7 +4,7 @@ var e = require("deep-eql"), r = require("lodash");
 
 function defaultFilter(e = {}) {
   const u = e.checker || defaultChecker, t = e.filter || null, n = e.removeFromFirst ? r.findLastIndex : r.findIndex;
-  return (e, r, i) => n(i, (r => u(r, e, i, i))) === r && (!t || t(e));
+  return (e, r, i) => n(i, r => u(r, e, i, i)) === r && (!t || t(e));
 }
 
 function defaultChecker(r, u, t, n) {

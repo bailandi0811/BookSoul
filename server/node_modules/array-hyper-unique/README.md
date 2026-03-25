@@ -1,13 +1,36 @@
 # array-hyper-unique
 
-    Get unique values of an array. Really, like deeply unique.
+取得陣列唯一值，支援深度比較巢狀物件和陣列。/ Get unique values from array with deep comparison for nested objects and arrays.
 
 [API](index.d.ts)
 
-1. this module base on [arr-unique](https://www.npmjs.com/package/arr-unique)
-2. but rewrite to typescript and bug fix
-3. also add option control
-4. see [_data.ts](test/_data.ts) and [test.test.ts](test/test.test.ts) or [lib.chk.ts](test/lib.chk.ts)
+## 簡介 / Introduction
+
+此模組基於 [arr-unique](https://www.npmjs.com/package/arr-unique) 進行開發。/
+This module is based on [arr-unique](https://www.npmjs.com/package/arr-unique).
+
+1. 重新使用 TypeScript 編寫並修復問題 / Rewrite to TypeScript and fix bugs
+2. 增加選項控制 / Add option control
+3. 詳細用法請參考 [_data.ts](test/_data.ts)、[test.test.ts](test/test.test.ts) 或 [lib.chk.ts](test/lib.chk.ts)
+
+---
+
+## 安裝 / Install
+
+```bash
+yarn add array-hyper-unique
+yarn-tool add array-hyper-unique
+yt add array-hyper-unique
+```
+
+## 應用情境 / Application Scenarios
+
+1. **去除複雜物件重複項**: 處理巢狀物件和陣列的深度去重
+2. **API 資料處理**: 清理 API 回傳的重複資料
+3. **表單驗證**: 檢查使用者提交的重複選項
+4. **資料合併**: 合併多個資料源並去除重複
+
+## 效能比較 / Performance Comparison
 
 ```json5
 { 'array-hyper-unique': { success: 15, fail: 0, error: 0 },
@@ -21,7 +44,7 @@
   'tfk-unique-array': { success: 5, fail: 6, error: 4 } }
 ```
 
-## demo
+## 示範 / Demo
 
 [demo.ts](test/demo.ts)
 
@@ -151,7 +174,7 @@ function _testIt(data)
 [ [ 'a', 'b', 'c' ] ]
 ```
 
-## options
+## 選項 / Options
 
 ```ts
 array_unique(arr_input, {
@@ -169,7 +192,7 @@ array_unique(arr_input, {
 })
 ```
 
-## diff with other module
+## 與其他模組的差異 / Differences from Other Modules
 
 [lib.chk.ts](test/lib.chk.ts)
 
@@ -369,8 +392,6 @@ array_unique(arr_input, {
 [FAIL] lodash.uniq
 
 
-```
-
 ---
 
 ```js
@@ -386,3 +407,4 @@ array_unique(arr_input, {
   'tfk-unique-array': { success: 5, fail: 6, error: 4 }
 }
 ```
+

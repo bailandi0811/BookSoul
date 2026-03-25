@@ -3,6 +3,32 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.1.8](https://github.com/bluelovers/ws-array/compare/array-hyper-unique@2.1.6...array-hyper-unique@2.1.8) (2026-03-15)
+
+
+
+### 📚　Documentation
+
+* enhance README documentation with bilingual examples and add JSDoc comments ([0c4f3e8](https://github.com/bluelovers/ws-array/commit/0c4f3e8d0371d4a85a973eaee66f2a07d42e3204))
+
+
+### 🚨　Tests
+
+* **fix:** 統一將`.toThrowError`替換為`.toThrow` ([d302908](https://github.com/bluelovers/ws-array/commit/d3029084b642bb16b22df4c35923da3df88f0d5d))
+
+
+### 🛠　Build System
+
+* update build ([ec742b4](https://github.com/bluelovers/ws-array/commit/ec742b467b43e2454f468554d4858761579b0a67))
+* update Jest 配置以支持多层级解析并优化 NPM 忽略规则，同时升级依赖 ([8c4b2d5](https://github.com/bluelovers/ws-array/commit/8c4b2d585e8f8f7633ce7701660965455a291d74))
+
+
+### 🔖　Miscellaneous
+
+* . ([d3e2d88](https://github.com/bluelovers/ws-array/commit/d3e2d886b389dc762c2d122c28af1a88b79df6a4))
+
+
+
 ## [2.1.6](https://github.com/bluelovers/ws-array/compare/array-hyper-unique@2.1.5...array-hyper-unique@2.1.6) (2024-03-09)
 
 
