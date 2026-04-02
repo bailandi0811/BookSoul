@@ -10,12 +10,13 @@ exports.ChatModule = void 0;
 const common_1 = require("@nestjs/common");
 const chat_controller_1 = require("./chat.controller");
 const rag_module_1 = require("../rag/rag.module");
+const agent_module_1 = require("../agent/agent.module");
 let ChatModule = class ChatModule {
 };
 exports.ChatModule = ChatModule;
 exports.ChatModule = ChatModule = __decorate([
     (0, common_1.Module)({
-        imports: [rag_module_1.RagModule],
+        imports: [rag_module_1.RagModule, agent_module_1.AgentModule],
         controllers: [chat_controller_1.ChatController],
     })
 ], ChatModule);

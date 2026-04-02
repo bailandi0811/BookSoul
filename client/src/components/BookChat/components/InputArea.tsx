@@ -1,37 +1,25 @@
 import { useRef, useEffect, useState } from 'react';
-import { Send, Sparkles } from 'lucide-react';
+import { Send, Sparkles, StopCircle } from 'lucide-react';
 import { useChatStore } from '@/store/useChatStore';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export const InputArea = () => {
   const [inputValue, setInputValue] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const { isLoading, sendMessage } = useChatStore();
+  const { isLoading, sendMessage, stopGenerating } = useChatStore();
 
-  // Custom event listener for external updates
-  useEffect(() => {
-    const handleInputUpdate = () => {
-      const el = document.getElementById('chat-input') as HTMLTextAreaElement;
-      if (el && el.value !== inputValue) {
-        setInputValue(el.value);
-        el.style.height = 'auto';
-        el.style.height = Math.min(el.scrollHeight, 150) + 'px';
-      }
-    };
-    
-    document.addEventListener('input', handleInputUpdate);
-    document.addEventListener('click', handleInputUpdate); // For button clicks
-    return () => {
-      document.removeEventListener('input', handleInputUpdate);
-      document.removeEventListener('click', handleInputUpdate);
-    };
-  }, [inputValue]);
-
+  // Auto-resize textarea
   useEffect(() => {
     if (inputRef.current) {
       inputRef.current.style.height = 'auto';
-      inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 150) + 'px';
+      inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 200) + 'px';
     }
   }, [inputValue]);
+
+  // Focus input on mount
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,50 +40,99 @@ export const InputArea = () => {
     }
   };
 
+  const canSend = inputValue.trim().length > 0 && !isLoading;
+
   return (
-    <div className="p-4 md:p-6 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent sticky bottom-0 z-20">
-      <div className="max-w-3xl mx-auto">
-        <form onSubmit={handleSubmit} className="relative">
-          <div className="relative flex items-end bg-white rounded-2xl border border-slate-200 shadow-sm focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-500/10 transition-all duration-200 overflow-hidden">
+    <div className="relative z-20">
+      {/* Main input container */}
+      <div className="mx-auto max-w-3xl px-4 pb-4 md:pb-6">
+        <motion.form
+          onSubmit={handleSubmit}
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+          className="relative group"
+        >
+          {/* Input wrapper with glow effect */}
+          <div className={`
+            relative flex items-end rounded-2xl border transition-all duration-300
+            ${canSend
+              ? 'bg-card border-primary/20 shadow-lg shadow-primary/5'
+              : 'bg-card border-border/50'
+            }
+            focus-within:border-primary/40 focus-within:shadow-xl focus-within:shadow-primary/10
+          `}>
+            {/* Textarea */}
             <textarea
               id="chat-input"
               ref={inputRef}
-              placeholder="输入你的问题，例如：我在哪里？"
+              placeholder="输入你的问题，让AI为你解答..."
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
               disabled={isLoading}
               rows={1}
               aria-label="输入问题"
-              className="w-full resize-none bg-transparent pl-4 pr-14 py-3.5 text-slate-800 placeholder:text-slate-400 focus:outline-none min-h-[52px] max-h-[150px] text-[15px] leading-relaxed"
+              className={`
+                w-full resize-none bg-transparent px-4 pt-4 pb-3 pr-12
+                text-[15px] leading-relaxed text-foreground placeholder:text-muted-foreground/60
+                focus:outline-none min-h-[52px] max-h-[200px]
+                disabled:opacity-50
+              `}
               style={{ height: 'auto' }}
             />
-            <div className="absolute right-2 bottom-2">
-              <button 
-                type="submit"
-                disabled={isLoading || !inputValue.trim()}
-                aria-label="发送"
-                className={`
-                  w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200
-                  ${inputValue.trim() 
-                    ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm' 
-                    : 'bg-slate-100 text-slate-400 cursor-not-allowed'}
-                `}
-              >
+
+            {/* Action buttons container */}
+            <div className="absolute right-2 bottom-2 flex items-center gap-1">
+              {/* Send / Stop button */}
+              <AnimatePresence mode="wait">
                 {isLoading ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <motion.button
+                    key="stop"
+                    type="button"
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                    onClick={() => stopGenerating()}
+                    className="p-2.5 bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl shadow-lg shadow-red-500/20 transition-all duration-200 press-effect"
+                    aria-label="停止生成"
+                  >
+                    <StopCircle className="w-4 h-4" />
+                  </motion.button>
                 ) : (
-                  <Send className="w-4 h-4 ml-0.5" />
+                  <motion.button
+                    key="send"
+                    type="submit"
+                    disabled={!canSend}
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                    className={`
+                      p-2.5 rounded-xl transition-all duration-200 press-effect
+                      ${canSend
+                        ? 'bg-gradient-to-br from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-white shadow-lg shadow-primary/20'
+                        : 'bg-muted text-muted-foreground/40 cursor-not-allowed'
+                      }
+                    `}
+                    aria-label="发送消息"
+                  >
+                    <Send className="w-4 h-4" />
+                  </motion.button>
                 )}
-              </button>
+              </AnimatePresence>
             </div>
           </div>
-          <div className="flex items-center justify-center gap-1 mt-3 text-[11px] text-slate-400 font-medium">
+
+          {/* Footer hint */}
+          <div className="flex items-center justify-center gap-2 mt-3 text-[12px] text-muted-foreground/40">
             <Sparkles className="w-3 h-3" />
-            AI 生成内容仅供参考
+            <span>AI助手基于《天龙八部》提供智能问答服务</span>
           </div>
-        </form>
+        </motion.form>
       </div>
+
+      {/* Gradient fade at top when scrolling */}
+      <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-background/95 to-transparent pointer-events-none" />
     </div>
   );
 };

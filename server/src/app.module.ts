@@ -9,6 +9,7 @@ import { McpModule } from './mcp/mcp.module';
 import { RagModule } from './rag/rag.module';
 import { ChatModule } from './chat/chat.module';
 import { ToolsModule } from './tools/tools.module';
+import { PersonaModule } from './persona/persona.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { ToolsModule } from './tools/tools.module';
     RagModule,
     ChatModule,
     ToolsModule,
+    PersonaModule,
   ],
   controllers: [AppController],
   providers: [AppService],

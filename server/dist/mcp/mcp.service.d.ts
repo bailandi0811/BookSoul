@@ -5,7 +5,6 @@ export declare class McpService implements OnModuleDestroy {
     private configService;
     private mcpClient;
     private readonly logger;
-    private readonly ipInfoTool;
     constructor(configService: ConfigService);
     getMcpClient(): Promise<MultiServerMCPClient>;
     getMcpTools(): Promise<any[]>;
