@@ -1,15 +1,19 @@
-import { Controller, Post, Body, Res, BadRequestException, Logger } from '@nestjs/common';
-import type { Response } from 'express';
+import { Controller, Post, Body, Res, Req, BadRequestException, Logger } from '@nestjs/common';
+import type { Response, Request } from 'express';
+import { AgentService } from '../agent/agent.service';
 import { RagService } from '../rag/rag.service';
 
 @Controller('api/chat')
 export class ChatController {
   private readonly logger = new Logger(ChatController.name);
 
-  constructor(private readonly ragService: RagService) {}
+  constructor(
+    private readonly agentService: AgentService,
+    private readonly ragService: RagService,
+  ) {}
 
   @Post()
-  async chat(@Body() body: { message: string; character?: string }, @Res() res: Response) {
+  async chat(@Body() body: { message: string; character?: string }, @Res() res: Response, @Req() req: Request) {
     const { message, character } = body;
 
     if (!message) {
@@ -21,33 +25,51 @@ export class ChatController {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
+    // Create an AbortController to pass the cancellation signal to the Agent
+    const abortController = new AbortController();
+
+    req.on('close', () => {
+      this.logger.log('Client disconnected, aborting agent stream...');
+      abortController.abort();
+    });
+
     try {
       this.logger.log(`Received question: ${message}, Character: ${character || 'assistant'}`);
 
-      // 1. Retrieve context
-      const retrievedContent = await this.ragService.retrieveRelevantContent(message);
+      // 使用Agentic RAG进行流式响应
+      let hasSentReferences = false;
 
-      let context = '';
-      if (retrievedContent.length === 0) {
-        this.logger.log('No relevant content found.');
-        res.write(`data: ${JSON.stringify({ references: [] })}\n\n`);
-      } else {
-        res.write(`data: ${JSON.stringify({ references: retrievedContent })}\n\n`);
+      for await (const event of this.agentService.streamChat(message, character || 'assistant', abortController.signal)) {
+        switch (event.type) {
+          case 'references':
+            // 发送引用卡片（只发送一次）
+            if (!hasSentReferences && event.data.length > 0) {
+              res.write(`data: ${JSON.stringify({ references: event.data })}\n\n`);
+              hasSentReferences = true;
+            }
+            break;
 
-        context = retrievedContent
-          .map(
-            (item, i) => `
-[片段${i + 1}]
-书名：${item.book_name}
-章节：第 ${item.chapter_num} 章
-内容：${item.content}
-            `,
-          )
-          .join('\n\n----\n\n');
+          case 'content':
+            // 发送内容块
+            if (event.data) {
+              res.write(`data: ${JSON.stringify({ content: event.data })}\n\n`);
+            }
+            break;
+
+          case 'final':
+            // 最终响应（备用，可能为空因为content已经发送了完整内容）
+            break;
+
+          case 'error':
+            // 错误处理
+            this.logger.error(`Agent error: ${event.data}`);
+            res.write(`data: ${JSON.stringify({ error: event.data })}\n\n`);
+            break;
+        }
       }
 
-      // 2. Generate Stream Response
-      await this.ragService.generateResponseStream(message, context, res, character);
+      res.write('data: [DONE]\n\n');
+      res.end();
     } catch (error) {
       this.logger.error('Chat API Error:', error);
       res.write(`data: ${JSON.stringify({ error: 'Internal Server Error' })}\n\n`);

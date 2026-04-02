@@ -1,6 +1,6 @@
-import React, { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { useChatStore } from '@/store/useChatStore';
-import { Send, MapPin, Database, Map as MapIcon, RotateCcw, PanelLeftOpen, Search, User, Mail } from 'lucide-react';
+import { MapPin, Database, Map as MapIcon, PanelLeftOpen, Mail, Sparkles, Bot, Plus, MessageSquare } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageBubble } from './components/MessageBubble';
@@ -8,7 +8,7 @@ import { InputArea } from './components/InputArea';
 import { Sidebar } from './components/Sidebar';
 
 export default function BookChat() {
-  const { messages, isLoading, clearMessages } = useChatStore();
+  const { messages, isLoading, clearMessages, sendMessage } = useChatStore();
   const scrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -21,17 +21,49 @@ export default function BookChat() {
     scrollToBottom();
   }, [messages, isLoading]);
 
+
+  const SUGGESTED_QUESTIONS = [
+    {
+      icon: MapPin,
+      gradient: 'from-emerald-500/10 to-emerald-500/5',
+      border: 'border-emerald-500/20',
+      iconColor: 'text-emerald-500',
+      text: '我现在在哪里？离大理有多远？',
+    },
+    {
+      icon: Database,
+      gradient: 'from-violet-500/10 to-violet-500/5',
+      border: 'border-violet-500/20',
+      iconColor: 'text-violet-500',
+      text: '乔峰在聚贤庄喝了几碗酒？',
+    },
+    {
+      icon: MapIcon,
+      gradient: 'from-amber-500/10 to-amber-500/5',
+      border: 'border-amber-500/20',
+      iconColor: 'text-amber-500',
+      text: '无量山在现实中的什么地方？',
+    },
+    {
+      icon: Mail,
+      gradient: 'from-blue-500/10 to-blue-500/5',
+      border: 'border-blue-500/20',
+      iconColor: 'text-blue-500',
+      text: '给我讲讲降龙十八掌，发到 user@example.com',
+    },
+  ];
+
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden">
+    <div className="flex h-screen bg-background text-foreground overflow-hidden">
       {/* Sidebar Navigation */}
       <AnimatePresence initial={false}>
         {isSidebarOpen && (
           <motion.div
             initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 280, opacity: 1 }}
+            animate={{ width: 300, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
-            transition={{ duration: 0.3, ease: "easeInOut" }}
-            className="h-full border-r border-slate-200 bg-white shadow-sm flex-shrink-0 z-20 overflow-hidden"
+            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+            className="h-full border-r border-border/50 bg-card z-30 flex-shrink-0 overflow-hidden"
           >
             <Sidebar onClose={() => setIsSidebarOpen(false)} />
           </motion.div>
@@ -39,107 +71,189 @@ export default function BookChat() {
       </AnimatePresence>
 
       {/* Main Chat Area */}
-      <div className="flex flex-col flex-1 relative h-full min-w-0 transition-all duration-300">
+      <div className="flex flex-col flex-1 relative h-full min-w-0">
         {/* Header */}
-        <header className="h-16 flex items-center justify-between px-4 lg:px-8 border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-10">
+        <header className="h-16 flex items-center justify-between px-4 lg:px-6 border-b border-border/50 bg-background/80 backdrop-blur-xl sticky top-0 z-20">
           <div className="flex items-center gap-3">
             {!isSidebarOpen && (
-              <button 
+              <motion.button
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
                 onClick={() => setIsSidebarOpen(true)}
-                className="p-2 -ml-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 -ml-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-xl transition-all duration-200"
                 aria-label="打开侧边栏"
               >
                 <PanelLeftOpen className="w-5 h-5" />
-              </button>
+              </motion.button>
             )}
-            <div className="flex flex-col">
-              <h1 className="font-semibold text-lg text-slate-800 tracking-tight">BookSoul</h1>
-              <span className="text-[11px] text-slate-500 uppercase tracking-widest font-medium">Intelligence Agent</span>
+
+            {/* Logo */}
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl avatar-gradient flex items-center justify-center shadow-lg shadow-primary/20">
+                <Bot className="w-5 h-5 text-white" />
+              </div>
+              <div className="hidden sm:block">
+                <h1 className="font-semibold text-foreground tracking-tight">BookSoul</h1>
+                <p className="text-[11px] text-muted-foreground/60">智能体助手</p>
+              </div>
             </div>
           </div>
-          
+
+          {/* Actions */}
           <div className="flex items-center gap-2">
-            <button 
-              onClick={clearMessages}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => {
+                clearMessages();
+              }}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-xl transition-all duration-200"
               title="新建对话"
             >
-              <RotateCcw className="w-4 h-4" />
+              <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">新对话</span>
-            </button>
+            </motion.button>
           </div>
         </header>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-hidden relative bg-slate-50/50">
-          <ScrollArea className="h-full px-4 lg:px-8" ref={scrollRef}>
+        {/* Messages Area */}
+        <div className="flex-1 overflow-hidden relative bg-gradient-to-b from-background via-background to-background">
+          {/* Subtle background pattern */}
+          <div className="absolute inset-0 opacity-[0.015] dark:opacity-[0.02]" style={{
+            backgroundImage: `radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)`,
+            backgroundSize: '24px 24px'
+          }} />
+
+          <ScrollArea className="h-full chat-scrollbar" ref={scrollRef}>
             <div className="max-w-3xl mx-auto w-full py-8 min-h-[calc(100vh-150px)]">
-              {messages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center min-h-[60vh] opacity-0 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                  <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border border-slate-200 flex items-center justify-center mb-6">
-                    <Search className="w-8 h-8 text-indigo-500" />
+              {/* Empty State */}
+              {messages.length === 0 && !isLoading ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+                  className="flex flex-col items-center justify-center min-h-[60vh]"
+                >
+                  {/* Hero section */}
+                  <div className="text-center mb-10">
+                    <motion.div
+                      initial={{ scale: 0.9, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ delay: 0.1, duration: 0.5 }}
+                      className="w-20 h-20 mx-auto mb-6 rounded-2xl avatar-gradient flex items-center justify-center shadow-xl shadow-primary/20"
+                    >
+                      <MessageSquare className="w-10 h-10 text-white" />
+                    </motion.div>
+                    <motion.h2
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.15 }}
+                      className="text-2xl font-semibold text-foreground mb-3"
+                    >
+                      开启智能探索之旅
+                    </motion.h2>
+                    <motion.p
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2 }}
+                      className="text-muted-foreground max-w-md mx-auto leading-relaxed"
+                    >
+                      基于《天龙八部》构建的智能体，不仅能回答原著问题，
+                      还能感知你的位置进行古今对照
+                    </motion.p>
                   </div>
-                  <h2 className="text-2xl font-semibold text-slate-800 mb-3">开启智能探索</h2>
-                  <p className="text-slate-500 text-center max-w-md mb-10 leading-relaxed">
-                    基于《天龙八部》构建的智能体。不仅能回答原著问题，还能感知你的地理位置进行古今对照。
-                  </p>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-2xl">
-                    {[
-                      { icon: <MapPin className="w-4 h-4" />, text: "我现在在哪里？离大理有多远？" },
-                      { icon: <Database className="w-4 h-4" />, text: "乔峰在聚贤庄喝了几碗酒？" },
-                      { icon: <MapIcon className="w-4 h-4" />, text: "无量山在现实中的什么地方？" },
-                      { icon: <Mail className="w-4 h-4" />, text: "给我讲讲降龙十八掌，并把内容发到我邮箱 user@example.com" }
-                    ].map((item, i) => (
-                      <button 
-                        key={i}
-                        className="flex items-center gap-3 p-4 bg-white border border-slate-200 rounded-xl hover:border-indigo-300 hover:shadow-sm transition-all text-left text-sm text-slate-700 group"
-                        onClick={() => {
-                          // We need to pass this to InputArea somehow, or handle it via store.
-                          // For now, let's let InputArea handle its own state or we lift it.
-                          // We will use an event bus or just let the user type.
-                          const inputEl = document.getElementById('chat-input') as HTMLTextAreaElement;
-                          if (inputEl) {
-                            inputEl.value = item.text;
-                            inputEl.focus();
-                            // Dispatch event to trigger React state update if needed, but lifting state is better.
-                          }
-                        }}
-                      >
-                        <span className="p-2 bg-slate-50 rounded-lg text-slate-400 group-hover:text-indigo-500 group-hover:bg-indigo-50 transition-colors">
-                          {item.icon}
-                        </span>
-                        {item.text}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+
+                  {/* Suggested questions */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.25 }}
+                    className="w-full max-w-2xl px-4"
+                  >
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {SUGGESTED_QUESTIONS.map((item, i) => {
+                        const Icon = item.icon;
+                        return (
+                          <motion.button
+                            key={i}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.3 + i * 0.05 }}
+                            whileHover={{ scale: 1.02, y: -2 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => {
+                              // 直接发送消息而不是填充输入框
+                              if (!isLoading) {
+                                sendMessage(item.text);
+                              }
+                            }}
+                            className={`
+                              flex items-center gap-3 p-4 rounded-xl border bg-gradient-to-br ${item.gradient} ${item.border}
+                              hover:shadow-lg transition-all duration-200 text-left group press-effect
+                            `}
+                          >
+                            <div className={`p-2 rounded-lg bg-background/80 backdrop-blur-sm ${item.iconColor}`}>
+                              <Icon className="w-4 h-4" />
+                            </div>
+                            <span className="text-sm text-foreground flex-1 leading-relaxed">
+                              {item.text}
+                            </span>
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+
+                  {/* Features highlight */}
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.5 }}
+                    className="mt-12 flex items-center gap-6 text-[12px] text-muted-foreground/60"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>AI 智能生成</span>
+                    </div>
+                    <div className="w-px h-3 bg-border" />
+                    <div className="flex items-center gap-2">
+                      <Database className="w-3.5 h-3.5" />
+                      <span>向量检索</span>
+                    </div>
+                    <div className="w-px h-3 bg-border" />
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-3.5 h-3.5" />
+                      <span>古今对照</span>
+                    </div>
+                  </motion.div>
+                </motion.div>
               ) : (
+                /* Messages */
                 <div className="space-y-6 pb-4">
                   <AnimatePresence initial={false}>
                     {messages.map((msg, index) => (
-                      <MessageBubble 
+                      <MessageBubble
                         key={index}
-                        message={msg} 
-                        isTyping={isLoading && index === messages.length - 1 && msg.role === 'assistant'}
+                        message={msg}
                       />
                     ))}
                   </AnimatePresence>
-                  
+
+                  {/* Loading indicator */}
                   {isLoading && messages[messages.length - 1]?.role === 'user' && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="flex gap-4 items-end"
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      className="flex gap-3 items-end"
                     >
-                      <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center shadow-sm flex-shrink-0">
-                        <Search className="w-4 h-4 text-white animate-pulse" />
+                      <div className="w-9 h-9 rounded-xl avatar-gradient flex items-center justify-center shadow-md flex-shrink-0">
+                        <Bot className="w-4 h-4 text-white" />
                       </div>
-                      <div className="bg-white border border-slate-200 px-5 py-3.5 rounded-2xl rounded-bl-sm shadow-sm">
+                      <div className="bg-card border border-border/50 px-5 py-4 rounded-2xl rounded-bl-md shadow-sm">
                         <div className="flex gap-1.5 items-center h-5">
-                          <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1, delay: 0 }} className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
-                          <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
-                          <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
+                          <div className="w-2 h-2 rounded-full bg-primary/60 typing-dot" />
+                          <div className="w-2 h-2 rounded-full bg-primary/60 typing-dot" />
+                          <div className="w-2 h-2 rounded-full bg-primary/60 typing-dot" />
                         </div>
                       </div>
                     </motion.div>
@@ -152,7 +266,9 @@ export default function BookChat() {
         </div>
 
         {/* Input Area */}
-        <InputArea />
+        <div className="relative bg-gradient-to-t from-background via-background to-transparent">
+          <InputArea />
+        </div>
       </div>
     </div>
   );

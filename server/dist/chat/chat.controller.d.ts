@@ -1,11 +1,13 @@
-import type { Response } from 'express';
+import type { Response, Request } from 'express';
+import { AgentService } from '../agent/agent.service';
 import { RagService } from '../rag/rag.service';
 export declare class ChatController {
+    private readonly agentService;
     private readonly ragService;
     private readonly logger;
-    constructor(ragService: RagService);
+    constructor(agentService: AgentService, ragService: RagService);
     chat(body: {
         message: string;
         character?: string;
-    }, res: Response): Promise<void>;
+    }, res: Response, req: Request): Promise<void>;
 }

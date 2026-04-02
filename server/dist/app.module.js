@@ -21,6 +21,7 @@ const mcp_module_1 = require("./mcp/mcp.module");
 const rag_module_1 = require("./rag/rag.module");
 const chat_module_1 = require("./chat/chat.module");
 const tools_module_1 = require("./tools/tools.module");
+const persona_module_1 = require("./persona/persona.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -53,6 +54,7 @@ exports.AppModule = AppModule = __decorate([
             rag_module_1.RagModule,
             chat_module_1.ChatModule,
             tools_module_1.ToolsModule,
+            persona_module_1.PersonaModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService],
