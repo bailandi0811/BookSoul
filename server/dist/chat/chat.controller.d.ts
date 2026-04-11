@@ -9,5 +9,6 @@ export declare class ChatController {
     chat(body: {
         message: string;
         character?: string;
+        sessionId?: string;
     }, res: Response, req: Request): Promise<void>;
 }

@@ -26,7 +26,7 @@ let ChatController = ChatController_1 = class ChatController {
         this.ragService = ragService;
     }
     async chat(body, res, req) {
-        const { message, character } = body;
+        const { message, character, sessionId = 'default_session' } = body;
         if (!message) {
             throw new common_1.BadRequestException('Message is required');
         }
@@ -39,9 +39,9 @@ let ChatController = ChatController_1 = class ChatController {
             abortController.abort();
         });
         try {
-            this.logger.log(`Received question: ${message}, Character: ${character || 'assistant'}`);
+            this.logger.log(`Received question: ${message}, Character: ${character || 'assistant'}, SessionId: ${sessionId}`);
             let hasSentReferences = false;
-            for await (const event of this.agentService.streamChat(message, character || 'assistant', abortController.signal)) {
+            for await (const event of this.agentService.streamChat(message, character || 'assistant', sessionId, abortController.signal)) {
                 switch (event.type) {
                     case 'references':
                         if (!hasSentReferences && event.data.length > 0) {
