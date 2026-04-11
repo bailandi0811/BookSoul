@@ -18,6 +18,7 @@ BookSoul 是一个基于 **Agentic RAG** (基于智能体的检索增强生成) 
 - **邮件发送服务 (Tools)**: 支持将小说片段、武功秘籍或对话内容一键通过邮件（SMTP）发送至用户指定邮箱。
 - **动态思考 UI (Thinking State)**: 媲美 ChatGPT 的精美前端体验，在 Agent 检索或调用工具时，展示优雅的“思考中”动画与发光效果。
 - **流式中断机制**: 支持随时通过前端中止正在生成或思考中的 Agent 任务，及时释放前后端资源。
+- **持久化短期记忆 (Memory)**: 引入基于 FileSystem 的会话记忆机制，自动按 Session 隔离对话，并采用滑动窗口截断策略精准控制 Token 消耗，实现丝滑的“断点续聊”。
 
 ## 技术架构
 
@@ -30,7 +31,8 @@ BookSoul 抛弃了简单的线性链，采用了基于 `@langchain/langgraph` �
   - *系统级路由* : 通过 `createReactAgent` 构建的 ReAct 循环，让 LLM 可以在“思考”、“调用工具”、“总结”之间自主循环。
   - *专家级工具* : 将高耗时的 CRAG 检索流程封装为 `search_novel_expert` 工具，只有在明确需要小说知识时才被 Agent 触发。
 - **记忆 (Memory)** :
-  - *长期记忆* : 通过 Milvus 向量数据库存储《天龙八部》全文的向量化数据。
+  - *长期记忆 (RAG)* : 通过 Milvus 向量数据库存储《天龙八部》全文的向量化数据。
+  - *短期记忆 (Session)* : 使用 LangChain 的 `FileSystemChatMessageHistory`，结合滑动窗口截断策略，实现基于 SessionId 的持久化会话记录。
 - **工具集 (Tools)** :
   - *MCP (模型上下文协议)* : 深度集成 MCP，将外部能力“赋能”给 AI。
   - *自定义 Tools* : 包含 IP 定位、SMTP 邮件发送等。

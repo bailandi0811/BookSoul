@@ -20,6 +20,7 @@ interface ChatState {
   messages: Message[];
   isLoading: boolean;
   currentCharacter: CharacterType;
+  sessionId: string; // 新增：会话ID
   abortController: AbortController | null;
   addMessage: (message: Message) => void;
   updateLastMessage: (content: string, references?: Reference[]) => void;
@@ -37,6 +38,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
   isLoading: false,
   currentCharacter: 'assistant',
+  sessionId: `session_${Date.now()}`, // 默认随机生成一个 session id
   abortController: null,
 
   addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
@@ -100,12 +102,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  clearMessages: () => set({ messages: [] }),
+  clearMessages: () => set({ messages: [], sessionId: `session_${Date.now()}` }),
 
   setCharacter: (character) => set({ currentCharacter: character }),
 
   sendMessage: async (content) => {
-    const { addMessage, updateStreamingContent, finishStreaming, setThinking, setLoading, currentCharacter } = get();
+    const { addMessage, updateStreamingContent, finishStreaming, setThinking, setLoading, currentCharacter, sessionId } = get();
 
     // 终止之前可能正在进行的请求
     get().stopGenerating();
@@ -125,7 +127,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const response = await fetch('http://localhost:3000/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: content, character: currentCharacter }),
+        body: JSON.stringify({ message: content, character: currentCharacter, sessionId: sessionId }),
         signal: newAbortController.signal,
       });
 

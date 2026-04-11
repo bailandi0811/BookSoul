@@ -7,10 +7,12 @@ import { ToolsService } from '../tools/tools.service';
 import { PersonaService } from '../persona/persona.service';
 import { createQueryRewriterNode, createCritiqueNode } from './nodes';
 import { MetricType } from '@zilliz/milvus2-sdk-node';
-import { ToolMessage } from '@langchain/core/messages';
+import { FileSystemChatMessageHistory } from '@langchain/community/stores/message/file_system';
+import { HumanMessage, AIMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
+import * as path from 'path';
 
 interface QueryAnalysis {
   type: 'simple' | 'compare' | 'multi_hop' | 'broad';
@@ -149,6 +151,7 @@ export class AgentService implements OnModuleInit {
   async *streamChat(
     query: string,
     persona: string = 'assistant',
+    sessionId: string = 'default_session',
     abortSignal?: AbortSignal,
   ): AsyncGenerator<{ type: string; data: any }> {
     const personaPrompt = this.personaService.getPersonaPrompt(persona);
@@ -227,17 +230,39 @@ export class AgentService implements OnModuleInit {
 如果你需要查询用户的 IP、地理位置或当前所在城市，请使用 \`fetch\` 工具调用 \`http://ip-api.com/json\` 或者其他你知晓的 API。
 **只有当用户明确询问《天龙八部》小说内容时，才必须调用 search_novel_expert 工具进行检索。**`;
 
+      // 引入基于 FileSystem 的记忆持久化机制
+      const historyFilePath = path.join(process.cwd(), 'chat_history.json');
+      const history = new FileSystemChatMessageHistory({
+        sessionId: sessionId,
+        filePath: historyFilePath,
+      });
+
+      const oldMessages = await history.getMessages();
+
+      // 记忆截断策略：过滤掉复杂的工具调用历史，仅保留纯对话，然后取最近 N 条（滑动窗口）
+      const filteredMessages = oldMessages.filter((msg) => {
+        if (msg instanceof ToolMessage) return false;
+        if (msg instanceof AIMessage && msg.tool_calls && msg.tool_calls.length > 0) return false;
+        return true;
+      });
+      const recentMessages = filteredMessages.slice(-10); // 保留最近10条（5轮对话）
+
+      const sysMsg = new SystemMessage(systemMessage);
+      const userMsg = new HumanMessage(query);
+
       const eventStream = await agent.streamEvents(
         {
           messages: [
-            { role: 'system', content: systemMessage },
-            { role: 'user', content: query },
+            sysMsg,
+            ...recentMessages,
+            userMsg,
           ],
         },
         { version: 'v2', signal: abortSignal }
       );
 
       let hasEmittedReferences = false;
+      let fullResponse = '';
 
       for await (const event of eventStream) {
         if (abortSignal?.aborted) {
@@ -253,9 +278,16 @@ export class AgentService implements OnModuleInit {
 
         if (event.event === 'on_chat_model_stream') {
           if (event.data.chunk.content && typeof event.data.chunk.content === 'string') {
+            fullResponse += event.data.chunk.content;
             yield { type: 'content', data: event.data.chunk.content };
           }
         }
+      }
+
+      // 对话结束后，持久化当前对话
+      if (!abortSignal?.aborted) {
+        await history.addMessage(userMsg);
+        await history.addMessage(new AIMessage(fullResponse));
       }
 
     } catch (error: any) {
@@ -264,14 +296,14 @@ export class AgentService implements OnModuleInit {
     }
   }
 
-  async chat(query: string, persona: string = 'assistant'): Promise<{
+  async chat(query: string, persona: string = 'assistant', sessionId: string = 'default_session'): Promise<{
     response: string;
     references: any[];
   }> {
     let response = '';
     let references: any[] = [];
 
-    for await (const event of this.streamChat(query, persona)) {
+    for await (const event of this.streamChat(query, persona, sessionId)) {
       if (event.type === 'content' || event.type === 'final') {
         response += event.data;
       }

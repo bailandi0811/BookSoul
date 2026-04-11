@@ -20,11 +20,11 @@ export declare class AgentService implements OnModuleInit {
     private analyzeQuery;
     private critiqueResults;
     private formatContext;
-    streamChat(query: string, persona?: string, abortSignal?: AbortSignal): AsyncGenerator<{
+    streamChat(query: string, persona?: string, sessionId?: string, abortSignal?: AbortSignal): AsyncGenerator<{
         type: string;
         data: any;
     }>;
-    chat(query: string, persona?: string): Promise<{
+    chat(query: string, persona?: string, sessionId?: string): Promise<{
         response: string;
         references: any[];
     }>;

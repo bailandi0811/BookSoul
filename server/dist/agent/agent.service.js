@@ -1,10 +1,43 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
@@ -20,9 +53,12 @@ const tools_service_1 = require("../tools/tools.service");
 const persona_service_1 = require("../persona/persona.service");
 const nodes_1 = require("./nodes");
 const milvus2_sdk_node_1 = require("@zilliz/milvus2-sdk-node");
+const file_system_1 = require("@langchain/community/stores/message/file_system");
+const messages_1 = require("@langchain/core/messages");
 const tools_1 = require("@langchain/core/tools");
 const zod_1 = require("zod");
 const prebuilt_1 = require("@langchain/langgraph/prebuilt");
+const path = __importStar(require("path"));
 let AgentService = AgentService_1 = class AgentService {
     configService;
     milvusService;
@@ -134,7 +170,7 @@ let AgentService = AgentService_1 = class AgentService {
             .map((doc, i) => `[片段${i + 1}]\n书名：${doc.book_name}\n章节：第 ${doc.chapter_num} 章\n内容：${doc.content}`)
             .join('\n\n');
     }
-    async *streamChat(query, persona = 'assistant', abortSignal) {
+    async *streamChat(query, persona = 'assistant', sessionId = 'default_session', abortSignal) {
         const personaPrompt = this.personaService.getPersonaPrompt(persona);
         let allFoundReferences = [];
         const searchNovelExpertTool = (0, tools_1.tool)(async ({ search_query }) => {
@@ -188,13 +224,31 @@ let AgentService = AgentService_1 = class AgentService {
             const systemMessage = `${personaPrompt}\n\n你是一个具备智能决策能力的AI。如果用户只是进行普通问候（如"你好"）、闲聊，或是询问与小说无关的真实世界信息（如真实位置、当前天气等），请直接回答或使用相应的现实工具（如MCP工具）。
 如果你需要查询用户的 IP、地理位置或当前所在城市，请使用 \`fetch\` 工具调用 \`http://ip-api.com/json\` 或者其他你知晓的 API。
 **只有当用户明确询问《天龙八部》小说内容时，才必须调用 search_novel_expert 工具进行检索。**`;
+            const historyFilePath = path.join(process.cwd(), 'chat_history.json');
+            const history = new file_system_1.FileSystemChatMessageHistory({
+                sessionId: sessionId,
+                filePath: historyFilePath,
+            });
+            const oldMessages = await history.getMessages();
+            const filteredMessages = oldMessages.filter((msg) => {
+                if (msg instanceof messages_1.ToolMessage)
+                    return false;
+                if (msg instanceof messages_1.AIMessage && msg.tool_calls && msg.tool_calls.length > 0)
+                    return false;
+                return true;
+            });
+            const recentMessages = filteredMessages.slice(-10);
+            const sysMsg = new messages_1.SystemMessage(systemMessage);
+            const userMsg = new messages_1.HumanMessage(query);
             const eventStream = await agent.streamEvents({
                 messages: [
-                    { role: 'system', content: systemMessage },
-                    { role: 'user', content: query },
+                    sysMsg,
+                    ...recentMessages,
+                    userMsg,
                 ],
             }, { version: 'v2', signal: abortSignal });
             let hasEmittedReferences = false;
+            let fullResponse = '';
             for await (const event of eventStream) {
                 if (abortSignal?.aborted) {
                     this.logger.log('Agent stream aborted by client');
@@ -206,9 +260,14 @@ let AgentService = AgentService_1 = class AgentService {
                 }
                 if (event.event === 'on_chat_model_stream') {
                     if (event.data.chunk.content && typeof event.data.chunk.content === 'string') {
+                        fullResponse += event.data.chunk.content;
                         yield { type: 'content', data: event.data.chunk.content };
                     }
                 }
+            }
+            if (!abortSignal?.aborted) {
+                await history.addMessage(userMsg);
+                await history.addMessage(new messages_1.AIMessage(fullResponse));
             }
         }
         catch (error) {
@@ -216,10 +275,10 @@ let AgentService = AgentService_1 = class AgentService {
             yield { type: 'error', data: error.message };
         }
     }
-    async chat(query, persona = 'assistant') {
+    async chat(query, persona = 'assistant', sessionId = 'default_session') {
         let response = '';
         let references = [];
-        for await (const event of this.streamChat(query, persona)) {
+        for await (const event of this.streamChat(query, persona, sessionId)) {
             if (event.type === 'content' || event.type === 'final') {
                 response += event.data;
             }

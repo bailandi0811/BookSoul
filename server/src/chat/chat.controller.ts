@@ -13,8 +13,8 @@ export class ChatController {
   ) {}
 
   @Post()
-  async chat(@Body() body: { message: string; character?: string }, @Res() res: Response, @Req() req: Request) {
-    const { message, character } = body;
+  async chat(@Body() body: { message: string; character?: string; sessionId?: string }, @Res() res: Response, @Req() req: Request) {
+    const { message, character, sessionId = 'default_session' } = body;
 
     if (!message) {
       throw new BadRequestException('Message is required');
@@ -34,12 +34,12 @@ export class ChatController {
     });
 
     try {
-      this.logger.log(`Received question: ${message}, Character: ${character || 'assistant'}`);
+      this.logger.log(`Received question: ${message}, Character: ${character || 'assistant'}, SessionId: ${sessionId}`);
 
       // 使用Agentic RAG进行流式响应
       let hasSentReferences = false;
 
-      for await (const event of this.agentService.streamChat(message, character || 'assistant', abortController.signal)) {
+      for await (const event of this.agentService.streamChat(message, character || 'assistant', sessionId, abortController.signal)) {
         switch (event.type) {
           case 'references':
             // 发送引用卡片（只发送一次）
