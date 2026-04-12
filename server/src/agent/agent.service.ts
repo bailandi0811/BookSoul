@@ -13,6 +13,7 @@ import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import * as path from 'path';
+import * as fs from 'fs';
 
 interface QueryAnalysis {
   type: 'simple' | 'compare' | 'multi_hop' | 'broad';
@@ -231,32 +232,96 @@ export class AgentService implements OnModuleInit {
 **只有当用户明确询问《天龙八部》小说内容时，才必须调用 search_novel_expert 工具进行检索。**`;
 
       // 引入基于 FileSystem 的记忆持久化机制
-      const historyFilePath = path.join(process.cwd(), 'chat_history.json');
+      const historyDir = path.join(process.cwd(), 'chat_histories');
+      if (!fs.existsSync(historyDir)) {
+        fs.mkdirSync(historyDir, { recursive: true });
+      }
+      const historyFilePath = path.join(historyDir, `${sessionId}.json`);
       const history = new FileSystemChatMessageHistory({
         sessionId: sessionId,
         filePath: historyFilePath,
       });
 
-      const oldMessages = await history.getMessages();
+      let oldMessages = await history.getMessages();
 
-      // 记忆截断策略：过滤掉复杂的工具调用历史，仅保留纯对话，然后取最近 N 条（滑动窗口）
-      const filteredMessages = oldMessages.filter((msg) => {
+      // 查找现有的摘要消息 (我们约定摘要消息是一个 SystemMessage，并且内容以特定前缀开始)
+      const SUMMARY_PREFIX = '【历史对话摘要】\n';
+      let existingSummary = '';
+      let summaryMsgIndex = -1;
+
+      for (let i = 0; i < oldMessages.length; i++) {
+        const msg = oldMessages[i];
+        if (msg instanceof SystemMessage && typeof msg.content === 'string' && msg.content.startsWith(SUMMARY_PREFIX)) {
+          existingSummary = msg.content.substring(SUMMARY_PREFIX.length);
+          summaryMsgIndex = i;
+          break;
+        }
+      }
+
+      // 提取纯对话消息（排除摘要消息）
+      let conversationMessages = oldMessages;
+      if (summaryMsgIndex !== -1) {
+        conversationMessages = oldMessages.filter((_, index) => index !== summaryMsgIndex);
+      }
+
+      // 记忆截断策略：过滤掉复杂的工具调用历史，仅保留纯对话
+      conversationMessages = conversationMessages.filter((msg) => {
         if (msg instanceof ToolMessage) return false;
         if (msg instanceof AIMessage && msg.tool_calls && msg.tool_calls.length > 0) return false;
         return true;
       });
-      const recentMessages = filteredMessages.slice(-10); // 保留最近10条（5轮对话）
+
+      const MAX_WINDOW_SIZE = 10; // 保留最近10条（5轮对话）
+      const SUMMARY_TRIGGER_THRESHOLD = 14; // 当消息达到14条时触发摘要，合并最老的几条
+
+      if (conversationMessages.length >= SUMMARY_TRIGGER_THRESHOLD) {
+        const numMessagesToSummarize = conversationMessages.length - MAX_WINDOW_SIZE;
+        const messagesToSummarize = conversationMessages.slice(0, numMessagesToSummarize);
+        conversationMessages = conversationMessages.slice(numMessagesToSummarize); // 剩下的保留在窗口内
+
+        const formattedMessagesForSummary = messagesToSummarize
+          .map((m) => `${m instanceof HumanMessage ? 'User' : 'Assistant'}: ${m.content}`)
+          .join('\n');
+
+        const summaryPrompt = `你是一个有用的AI助手。请根据以下先前的对话摘要（如果有）和新的对话记录，生成一个简短且连贯的更新版对话摘要。请保留重要的事实、偏好和上下文信息。只返回摘要文本，不要有任何其他多余的解释。
+
+之前的摘要：
+${existingSummary || '无'}
+
+新的对话记录：
+${formattedMessagesForSummary}`;
+
+        try {
+          this.logger.log(`Generating history summary for session ${sessionId}...`);
+          const summaryResponse = await this.model.invoke([new HumanMessage(summaryPrompt)]);
+          existingSummary = summaryResponse.content as string;
+
+          // 更新历史记录
+          await history.clear();
+          await history.addMessage(new SystemMessage(`${SUMMARY_PREFIX}${existingSummary}`));
+          for (const msg of conversationMessages) {
+            await history.addMessage(msg);
+          }
+        } catch (error) {
+          this.logger.error('Failed to generate history summary:', error);
+          // 如果摘要失败，为了安全，我们退回到简单的截断
+          conversationMessages = conversationMessages.slice(-MAX_WINDOW_SIZE);
+        }
+      }
 
       const sysMsg = new SystemMessage(systemMessage);
       const userMsg = new HumanMessage(query);
+      
+      const finalMessagesForAgent: any[] = [sysMsg];
+      if (existingSummary) {
+        finalMessagesForAgent.push(new SystemMessage(`这是之前对话的摘要，供你参考：\n${existingSummary}`));
+      }
+      finalMessagesForAgent.push(...conversationMessages);
+      finalMessagesForAgent.push(userMsg);
 
       const eventStream = await agent.streamEvents(
         {
-          messages: [
-            sysMsg,
-            ...recentMessages,
-            userMsg,
-          ],
+          messages: finalMessagesForAgent,
         },
         { version: 'v2', signal: abortSignal }
       );
