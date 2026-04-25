@@ -1,8 +1,9 @@
 import { useChatStore, CharacterType } from '@/store/useChatStore';
-import { Bot, User, Settings, Book, PanelLeftClose, Mail, MapPin, Sparkles, Zap, Moon, Sun, HelpCircle } from 'lucide-react';
+import { Bot, User, Settings, Book, PanelLeftClose, Mail, MapPin, Sparkles, Zap, Moon, Sun, HelpCircle, History, MessageSquare, Trash2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { motion } from 'framer-motion';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { MemoryPanel } from './MemoryPanel';
 
 const CHARACTERS: { id: CharacterType; name: string; desc: string; icon: React.ElementType; emoji: string }[] = [
   { id: 'assistant', name: '全知助手', desc: '专业的《天龙八部》导读与知识库', icon: Book, emoji: '📚' },
@@ -18,8 +19,12 @@ const CAPABILITIES = [
 ];
 
 export const Sidebar = ({ onClose }: { onClose: () => void }) => {
-  const { currentCharacter, setCharacter, clearMessages } = useChatStore();
+  const { currentCharacter, setCharacter, clearMessages, sessions, fetchSessions, loadSession, deleteSession, sessionId } = useChatStore();
   const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    fetchSessions();
+  }, [fetchSessions]);
 
   const toggleTheme = () => {
     setIsDark(!isDark);
@@ -50,6 +55,61 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
       </div>
 
       <ScrollArea className="flex-1 py-4 scrollbar-thin">
+        {/* History Section */}
+        <div className="px-4 mb-6">
+          <h3 className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-wider mb-3 px-1 flex items-center gap-2">
+            <History className="w-3 h-3" />
+            历史对话
+          </h3>
+          <div className="space-y-1.5 max-h-[200px] overflow-y-auto pr-1 scrollbar-thin">
+            {!sessions || sessions.length === 0 ? (
+              <div className="text-xs text-muted-foreground/50 text-center py-4">暂无历史对话</div>
+            ) : (
+              sessions.map((session, index) => {
+                const isActive = session.sessionId === sessionId;
+                return (
+                  <motion.div
+                    key={session.sessionId}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.02 }}
+                    onClick={() => {
+                      if (!isActive) {
+                        loadSession(session.sessionId);
+                      }
+                    }}
+                    className={`
+                      w-full flex items-center gap-3 p-2.5 rounded-xl transition-all duration-200 text-left group cursor-pointer
+                      ${isActive
+                        ? 'bg-primary/10 text-primary font-medium'
+                        : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'
+                      }
+                    `}
+                  >
+                    <MessageSquare className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-primary' : 'text-muted-foreground/50'}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs truncate">{session.title}</div>
+                      <div className="text-[10px] opacity-60 mt-0.5">
+                        {new Date(session.updatedAt).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteSession(session.sessionId);
+                      }}
+                      className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded-md transition-all"
+                      title="删除对话"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </motion.div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
         {/* Characters Section */}
         <div className="px-4 mb-6">
           <h3 className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-wider mb-3 px-1 flex items-center gap-2">
@@ -192,6 +252,9 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
           </div>
         </div>
       </ScrollArea>
+
+      {/* Memory Panel */}
+      <MemoryPanel />
 
       {/* Footer */}
       <div className="p-4 border-t border-border/50 space-y-2">

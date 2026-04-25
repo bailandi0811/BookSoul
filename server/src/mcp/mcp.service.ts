@@ -6,6 +6,10 @@ import { MultiServerMCPClient } from '@langchain/mcp-adapters';
 export class McpService implements OnModuleDestroy {
   private mcpClient: MultiServerMCPClient | null = null;
   private readonly logger = new Logger(McpService.name);
+  private cachedTools: any[] | null = null;
+  private toolsCachedAt = 0;
+  private toolsLoadPromise: Promise<any[]> | null = null;
+  private readonly TOOLS_CACHE_TTL_MS = 5 * 60 * 1000;
 
   constructor(private configService: ConfigService) {}
 
@@ -43,15 +47,32 @@ export class McpService implements OnModuleDestroy {
   }
 
   async getMcpTools(): Promise<any[]> {
-    try {
-      const client = await this.getMcpClient();
-      const tools = await client.getTools();
-      this.logger.log(`Loaded ${tools.length} tools: ${tools.map((t) => t.name).join(', ')}`);
-      return tools;
-    } catch (error) {
-      this.logger.error('Failed to load MCP tools:', error);
-      return [];
+    const now = Date.now();
+    if (this.cachedTools && now - this.toolsCachedAt < this.TOOLS_CACHE_TTL_MS) {
+      return this.cachedTools;
     }
+
+    if (this.toolsLoadPromise) {
+      return this.toolsLoadPromise;
+    }
+
+    this.toolsLoadPromise = (async () => {
+      try {
+        const client = await this.getMcpClient();
+        const tools = await client.getTools();
+        this.cachedTools = tools;
+        this.toolsCachedAt = Date.now();
+        this.logger.log(`Loaded ${tools.length} tools: ${tools.map((t) => t.name).join(', ')}`);
+        return tools;
+      } catch (error) {
+        this.logger.error('Failed to load MCP tools:', error);
+        return [];
+      } finally {
+        this.toolsLoadPromise = null;
+      }
+    })();
+
+    return this.toolsLoadPromise;
   }
 
   async onModuleDestroy() {
@@ -63,5 +84,8 @@ export class McpService implements OnModuleDestroy {
       }
       this.mcpClient = null;
     }
+    this.cachedTools = null;
+    this.toolsCachedAt = 0;
+    this.toolsLoadPromise = null;
   }
 }

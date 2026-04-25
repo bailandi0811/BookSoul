@@ -22,6 +22,7 @@ const rag_module_1 = require("./rag/rag.module");
 const chat_module_1 = require("./chat/chat.module");
 const tools_module_1 = require("./tools/tools.module");
 const persona_module_1 = require("./persona/persona.module");
+const memory_module_1 = require("./memory/memory.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -36,8 +37,8 @@ exports.AppModule = AppModule = __decorate([
                 useFactory: (configService) => ({
                     transport: {
                         host: configService.get('SMTP_HOST') || 'smtp.qq.com',
-                        port: configService.get('SMTP_PORT') || 465,
-                        secure: configService.get('SMTP_SECURE') === 'true' || true,
+                        port: Number(configService.get('SMTP_PORT') || 465),
+                        secure: (configService.get('SMTP_SECURE') || 'true') === 'true',
                         auth: {
                             user: configService.get('SMTP_USER'),
                             pass: configService.get('SMTP_PASS'),
@@ -55,6 +56,7 @@ exports.AppModule = AppModule = __decorate([
             chat_module_1.ChatModule,
             tools_module_1.ToolsModule,
             persona_module_1.PersonaModule,
+            memory_module_1.MemoryModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService],

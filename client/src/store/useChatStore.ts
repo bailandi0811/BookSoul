@@ -6,12 +6,20 @@ export interface Reference {
   content: string;
 }
 
+export interface HistorySession {
+  sessionId: string;
+  title: string;
+  updatedAt: number;
+}
+
 export interface Message {
   role: 'user' | 'assistant';
   content: string;
   references?: Reference[];
   isStreaming?: boolean; // 标记是否正在流式输出
   isThinking?: boolean; // 标记是否正在思考
+  thinkingText?: string; // 思考中显示的提示文本
+  thinkingSteps?: string[]; // 思考过程步骤记录
 }
 
 export type CharacterType = 'assistant' | 'qiaofeng' | 'duanyu' | 'wangyuyan';
@@ -20,25 +28,34 @@ interface ChatState {
   messages: Message[];
   isLoading: boolean;
   currentCharacter: CharacterType;
-  sessionId: string; // 新增：会话ID
+  sessionId: string;
+  userId: string; // 新增：用户ID，用于记忆系统
+  sessions: HistorySession[]; // 新增：历史会话列表
+  isSessionsLoading: boolean; // 新增：加载会话列表状态
   abortController: AbortController | null;
   addMessage: (message: Message) => void;
   updateLastMessage: (content: string, references?: Reference[]) => void;
   updateStreamingContent: (content: string) => void; // 新增：流式更新内容
   finishStreaming: () => void; // 新增：结束流式输出
-  setThinking: (isThinking: boolean) => void; // 新增：设置思考状态
+  setThinking: (isThinking: boolean, text?: string) => void; // 新增：设置思考状态及提示文字
   setLoading: (loading: boolean) => void;
   sendMessage: (content: string) => Promise<void>;
   stopGenerating: () => void; // 新增：停止生成
   clearMessages: () => void;
   setCharacter: (character: CharacterType) => void;
+  fetchSessions: () => Promise<void>; // 新增：获取会话列表
+  loadSession: (sessionId: string) => Promise<void>; // 新增：加载指定会话
+  deleteSession: (sessionId: string) => Promise<void>; // 新增：删除指定会话
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
   isLoading: false,
   currentCharacter: 'assistant',
-  sessionId: `session_${Date.now()}`, // 默认随机生成一个 session id
+  sessionId: `session_${Date.now()}`,
+  userId: 'anonymous', // 默认用户ID
+  sessions: [],
+  isSessionsLoading: false,
   abortController: null,
 
   addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
@@ -82,12 +99,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
   }),
 
   // 设置思考状态
-  setThinking: (isThinking) => set((state) => {
+  setThinking: (isThinking, text) => set((state) => {
     const newMessages = [...state.messages];
     if (newMessages.length > 0) {
       const lastMsg = newMessages[newMessages.length - 1];
       if (lastMsg.role === 'assistant') {
         lastMsg.isThinking = isThinking;
+        if (text) {
+          lastMsg.thinkingText = text;
+          if (!lastMsg.thinkingSteps) {
+            lastMsg.thinkingSteps = [];
+          }
+          if (lastMsg.thinkingSteps[lastMsg.thinkingSteps.length - 1] !== text) {
+            lastMsg.thinkingSteps.push(text);
+          }
+        }
       }
     }
     return { messages: newMessages };
@@ -106,8 +132,68 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   setCharacter: (character) => set({ currentCharacter: character }),
 
+  fetchSessions: async () => {
+    set({ isSessionsLoading: true });
+    try {
+      const response = await fetch('/api/chat/history');
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          set({ sessions: result.data });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch sessions:', error);
+    } finally {
+      set({ isSessionsLoading: false });
+    }
+  },
+
+  deleteSession: async (sessionId: string) => {
+    try {
+      const response = await fetch(`/api/chat/history/${sessionId}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          // 刷新会话列表
+          await get().fetchSessions();
+          // 如果删除的是当前会话，清空当前消息并开启新会话
+          if (get().sessionId === sessionId) {
+            get().clearMessages();
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Failed to delete session ${sessionId}:`, error);
+    }
+  },
+
+  loadSession: async (sessionId: string) => {
+    // 如果已经在这个会话中，不重复加载
+    if (get().sessionId === sessionId && get().messages.length > 0) return;
+    
+    get().stopGenerating();
+    set({ isLoading: true, sessionId });
+    
+    try {
+      const response = await fetch(`/api/chat/history/${sessionId}`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          set({ messages: result.data });
+        }
+      }
+    } catch (error) {
+      console.error(`Failed to load session ${sessionId}:`, error);
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
   sendMessage: async (content) => {
-    const { addMessage, updateStreamingContent, finishStreaming, setThinking, setLoading, currentCharacter, sessionId } = get();
+    const { addMessage, updateStreamingContent, finishStreaming, setThinking, setLoading, currentCharacter, sessionId, userId, fetchSessions } = get();
 
     // 终止之前可能正在进行的请求
     get().stopGenerating();
@@ -118,16 +204,45 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // Add user message
     addMessage({ role: 'user', content });
     // Add placeholder assistant message
-    addMessage({ role: 'assistant', content: '', isStreaming: true, isThinking: true });
+    addMessage({ 
+      role: 'assistant', 
+      content: '', 
+      isStreaming: true, 
+      isThinking: false, 
+      thinkingText: '',
+      thinkingSteps: [] 
+    });
     setLoading(true);
 
     let assistantMessage = '';
+    let bufferedContent = '';
+    let flushTimer: ReturnType<typeof setTimeout> | null = null;
+    let hasRenderedFirstToken = false;
+    let lastThinkingAt = 0;
+    let lastThinkingText = '';
+    const THINKING_THROTTLE_MS = 350;
+    const CONTENT_FLUSH_MS = 45;
+
+    const flushBufferedContent = () => {
+      if (!bufferedContent) return;
+      assistantMessage += bufferedContent;
+      bufferedContent = '';
+      updateStreamingContent(assistantMessage);
+    };
+
+    const scheduleContentFlush = () => {
+      if (flushTimer) return;
+      flushTimer = setTimeout(() => {
+        flushTimer = null;
+        flushBufferedContent();
+      }, CONTENT_FLUSH_MS);
+    };
 
     try {
-      const response = await fetch('http://localhost:3000/api/chat', {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: content, character: currentCharacter, sessionId: sessionId }),
+        body: JSON.stringify({ message: content, character: currentCharacter, sessionId: sessionId, userId: userId }),
         signal: newAbortController.signal,
       });
 
@@ -137,52 +252,88 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
+      let buffer = '';
 
       if (reader) {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n');
+          buffer += decoder.decode(value, { stream: true });
+          let eventEndIndex;
+          
+          while ((eventEndIndex = buffer.indexOf('\n\n')) >= 0) {
+            const eventStr = buffer.slice(0, eventEndIndex);
+            buffer = buffer.slice(eventEndIndex + 2);
 
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const dataStr = line.slice(6);
-              if (dataStr === '[DONE]') continue;
+            const lines = eventStr.split('\n');
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const dataStr = line.slice(6).trim();
+                if (dataStr === '[DONE]') continue;
 
-              try {
-                const data = JSON.parse(dataStr);
+                try {
+                  const data = JSON.parse(dataStr);
 
-                // Handle references data
-                if (data.references) {
-                  updateStreamingContent(assistantMessage); // 先保存当前内容再更新references
-                  // 直接更新最后一条消息的references
-                  set((state) => {
-                    const newMessages = [...state.messages];
-                    if (newMessages.length > 0) {
-                      newMessages[newMessages.length - 1].references = data.references;
+                  // Check for error field from backend
+                  if (data.error) {
+                    updateStreamingContent(`抱歉，发生错误：${data.error}`);
+                    setLoading(false);
+                    return; // Stop processing further
+                  }
+
+                  if (data.thinking) {
+                    const now = Date.now();
+                    if (
+                      data.thinking !== lastThinkingText &&
+                      now - lastThinkingAt >= THINKING_THROTTLE_MS &&
+                      !hasRenderedFirstToken
+                    ) {
+                      lastThinkingAt = now;
+                      lastThinkingText = data.thinking;
+                      setThinking(true, data.thinking);
                     }
-                    return { messages: newMessages };
-                  });
-                }
+                  }
 
-                // Handle content stream - 增量更新
-                if (data.content) {
-                  // 一旦有内容返回，就停止思考状态
-                  setThinking(false);
-                  assistantMessage += data.content;
-                  updateStreamingContent(assistantMessage);
+                  // Handle references data
+                  if (data.references) {
+                    updateStreamingContent(assistantMessage);
+                    set((state) => {
+                      const newMessages = [...state.messages];
+                      if (newMessages.length > 0) {
+                        newMessages[newMessages.length - 1].references = data.references;
+                      }
+                      return { messages: newMessages };
+                    });
+                  }
+
+                  // Handle content stream - 增量更新
+                  if (data.content) {
+                    if (!hasRenderedFirstToken) {
+                      hasRenderedFirstToken = true;
+                      setThinking(false);
+                      assistantMessage += data.content;
+                      updateStreamingContent(assistantMessage);
+                    } else {
+                      bufferedContent += data.content;
+                      scheduleContentFlush();
+                    }
+                  }
+
+                  if (data.metrics) {
+                    console.debug('SSE metrics:', data.metrics);
+                  }
+                } catch (e) {
+                  console.error('Parse error:', e, dataStr);
                 }
-              } catch (e) {
-                // 忽略解析错误，继续处理下一个chunk
               }
             }
           }
         }
+        flushBufferedContent();
       }
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
         console.log('Request was aborted');
         // 可选：你可以在这里更新一条状态告知用户“已停止生成”
       } else {
@@ -190,8 +341,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
         updateStreamingContent('抱歉，发生了错误，请稍后再试。');
       }
     } finally {
+      if (flushTimer) {
+        clearTimeout(flushTimer);
+        flushTimer = null;
+      }
+      flushBufferedContent();
       finishStreaming();
       setLoading(false);
+      // 发送完消息后刷新会话列表，以防是新会话
+      fetchSessions();
     }
   },
 }));

@@ -36,7 +36,7 @@ const CRITIQUE_PROMPT = `你是一个自我反思专家，负责评估检索结�
 }
 
 判断标准：
-- confidence >= 0.7 且 相关片段 >= 2 → is_adequate = true
+- confidence >= 0.6 且 相关片段 >= 1 → is_adequate = true
 - 否则 → is_adequate = false`;
 
 export const createCritiqueAgent = (model: ChatOpenAI) => {
@@ -77,8 +77,10 @@ export const createCritiqueNode = (model: ChatOpenAI) => {
 
   return async (state: AgentState): Promise<Partial<AgentState>> => {
     const allDocs = state.retrieved_documents.flatMap(d => d.docs);
+    const intentType = state.intent_classification?.intent_type;
 
     if (allDocs.length === 0) {
+      const nextRetryCount = state.retry_count + 1;
       return {
         critique: {
           is_adequate: false,
@@ -87,13 +89,28 @@ export const createCritiqueNode = (model: ChatOpenAI) => {
           suggested_rewrite: state.query,
           reasoning: 'No documents retrieved',
         },
-        next_action: state.retry_count < 2 ? 'rewrite' as const : 'generate' as const,
+        retry_count: nextRetryCount,
+        next_action: nextRetryCount < state.max_retries ? 'rewrite' as const : 'generate' as const,
+      };
+    }
+
+    // 快速路径：命中文档后优先走启发式评估，减少一次 LLM 调用延迟
+    if (intentType !== 'complex_rag' && allDocs.length >= 1) {
+      return {
+        critique: {
+          is_adequate: true,
+          confidence: allDocs.length >= 2 ? 0.85 : 0.7,
+          missing_aspects: [],
+          suggested_rewrite: '',
+          reasoning: `Heuristic pass with ${allDocs.length} retrieved doc(s)`,
+        },
+        next_action: 'generate' as const,
       };
     }
 
     const critique = await critiqueAgent(state.query, allDocs);
 
-    if (!critique.is_adequate && state.retry_count < 2) {
+    if (!critique.is_adequate && state.retry_count < state.max_retries) {
       // 需要重新检索
       return {
         critique,

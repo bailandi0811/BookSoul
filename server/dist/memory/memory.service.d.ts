@@ -1,0 +1,31 @@
+import { ConfigService } from '@nestjs/config';
+import { MilvusService } from '../milvus/milvus.service';
+import { UserProfileRepository } from './repositories/user-profile.repository';
+import { MemoryEntryRepository } from './repositories/memory-entry.repository';
+import { ImportanceScorerStrategy } from './strategies/importance-scorer.strategy';
+import { UserProfile, MemoryEntry, MemoryLevel, ImportanceScore, MemoryUpdateEvent } from './interfaces/memory.types';
+export declare class MemoryService {
+    private configService;
+    private milvusService;
+    private userProfileRepo;
+    private memoryEntryRepo;
+    private importanceScorer;
+    private readonly logger;
+    private readonly embeddings;
+    private readonly model;
+    private readonly COLLECTION_NAME;
+    constructor(configService: ConfigService, milvusService: MilvusService, userProfileRepo: UserProfileRepository, memoryEntryRepo: MemoryEntryRepository, importanceScorer: ImportanceScorerStrategy);
+    onModuleInit(): Promise<void>;
+    getOrCreateUserProfile(userId: string, sessionId: string): Promise<UserProfile>;
+    updateUserProfile(userId: string, sessionId: string, updates: Partial<UserProfile>): Promise<UserProfile>;
+    extractAndUpdateProfile(userId: string, sessionId: string, messages: string[]): Promise<UserProfile>;
+    scoreImportance(message: string, context?: string[]): Promise<ImportanceScore>;
+    processAndStoreMemory(userId: string, sessionId: string, message: string): Promise<MemoryUpdateEvent>;
+    private determineCategory;
+    getMemories(userId: string, sessionId: string, level?: MemoryLevel): Promise<MemoryEntry[]>;
+    updateMemory(memoryId: string, userId: string, updates: Partial<MemoryEntry>): Promise<MemoryEntry | null>;
+    deleteMemory(memoryId: string, userId: string): Promise<void>;
+    searchMemories(query: string, userId: string, topK?: number): Promise<MemoryEntry[]>;
+    private ensureCollection;
+    private storeToMilvus;
+}

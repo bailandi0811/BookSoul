@@ -9,17 +9,17 @@ export declare class ToolsService {
     getSendMailTool(): import("@langchain/core/tools").DynamicStructuredTool<z.ZodObject<{
         to: z.ZodString;
         subject: z.ZodString;
-        text: z.ZodString;
-        html: z.ZodString;
+        text: z.ZodOptional<z.ZodString>;
+        html: z.ZodOptional<z.ZodString>;
     }, z.core.$strip>, {
         to: string;
         subject: string;
-        text: string;
-        html: string;
+        text?: string | undefined;
+        html?: string | undefined;
     }, {
         to: string;
         subject: string;
-        text: string;
-        html: string;
+        text?: string | undefined;
+        html?: string | undefined;
     }, string, unknown, "send_mail">;
 }
