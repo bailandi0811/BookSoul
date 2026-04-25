@@ -25,8 +25,49 @@ let ChatController = ChatController_1 = class ChatController {
         this.agentService = agentService;
         this.ragService = ragService;
     }
+    async getHistoryList() {
+        try {
+            const list = await this.agentService.getHistoryList();
+            return { success: true, data: list };
+        }
+        catch (error) {
+            this.logger.error('Failed to fetch history list', error);
+            return { success: false, error: 'Failed to fetch history list' };
+        }
+    }
+    async getSessionHistory(sessionId) {
+        if (!sessionId) {
+            throw new common_1.BadRequestException('Session ID is required');
+        }
+        try {
+            const messages = await this.agentService.getSessionHistory(sessionId);
+            return { success: true, data: messages };
+        }
+        catch (error) {
+            this.logger.error(`Failed to fetch history for session ${sessionId}`, error);
+            return { success: false, error: 'Failed to fetch session history' };
+        }
+    }
+    async deleteSession(sessionId) {
+        if (!sessionId) {
+            throw new common_1.BadRequestException('Session ID is required');
+        }
+        try {
+            const success = await this.agentService.deleteSession(sessionId);
+            if (success) {
+                return { success: true };
+            }
+            else {
+                return { success: false, error: 'Failed to delete session' };
+            }
+        }
+        catch (error) {
+            this.logger.error(`Failed to delete session ${sessionId}`, error);
+            return { success: false, error: 'Internal Server Error' };
+        }
+    }
     async chat(body, res, req) {
-        const { message, character, sessionId = 'default_session' } = body;
+        const { message, character, sessionId = 'default_session', userId = 'anonymous' } = body;
         if (!message) {
             throw new common_1.BadRequestException('Message is required');
         }
@@ -39,9 +80,9 @@ let ChatController = ChatController_1 = class ChatController {
             abortController.abort();
         });
         try {
-            this.logger.log(`Received question: ${message}, Character: ${character || 'assistant'}, SessionId: ${sessionId}`);
+            this.logger.log(`Received question: ${message}, Character: ${character || 'assistant'}, SessionId: ${sessionId}, UserId: ${userId}`);
             let hasSentReferences = false;
-            for await (const event of this.agentService.streamChat(message, character || 'assistant', sessionId, abortController.signal)) {
+            for await (const event of this.agentService.streamChat(message, character || 'assistant', sessionId, userId, abortController.signal)) {
                 switch (event.type) {
                     case 'references':
                         if (!hasSentReferences && event.data.length > 0) {
@@ -53,6 +94,15 @@ let ChatController = ChatController_1 = class ChatController {
                         if (event.data) {
                             res.write(`data: ${JSON.stringify({ content: event.data })}\n\n`);
                         }
+                        break;
+                    case 'thinking':
+                        res.write(`data: ${JSON.stringify({ thinking: event.data })}\n\n`);
+                        break;
+                    case 'memory_update':
+                        res.write(`data: ${JSON.stringify({ memoryUpdate: event.data })}\n\n`);
+                        break;
+                    case 'metrics':
+                        res.write(`data: ${JSON.stringify({ metrics: event.data })}\n\n`);
                         break;
                     case 'final':
                         break;
@@ -73,6 +123,26 @@ let ChatController = ChatController_1 = class ChatController {
     }
 };
 exports.ChatController = ChatController;
+__decorate([
+    (0, common_1.Get)('history'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], ChatController.prototype, "getHistoryList", null);
+__decorate([
+    (0, common_1.Get)('history/:sessionId'),
+    __param(0, (0, common_1.Param)('sessionId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], ChatController.prototype, "getSessionHistory", null);
+__decorate([
+    (0, common_1.Delete)('history/:sessionId'),
+    __param(0, (0, common_1.Param)('sessionId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], ChatController.prototype, "deleteSession", null);
 __decorate([
     (0, common_1.Post)(),
     __param(0, (0, common_1.Body)()),

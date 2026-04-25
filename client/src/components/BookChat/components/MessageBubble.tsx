@@ -1,5 +1,5 @@
-import { User, Copy, Check, Bot, Quote, Sparkles } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { User, Copy, Check, Bot, Quote, ChevronDown, Loader2 } from 'lucide-react';
+import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ReferenceCard } from './ReferenceCard';
 import { Message } from '@/store/useChatStore';
@@ -12,21 +12,22 @@ interface MessageBubbleProps {
 export const MessageBubble = ({ message }: MessageBubbleProps) => {
   const isUser = message.role === 'user';
   const [isCopied, setIsCopied] = useState(false);
-  const [displayContent, setDisplayContent] = useState(message.content);
-  const contentRef = useRef(message.content);
-
-  // 当message.content变化时，更新displayContent
-  useEffect(() => {
-    if (message.isStreaming) {
-      // 流式输出时立即更新显示内容
-      setDisplayContent(message.content);
-      contentRef.current = message.content;
-    } else if (message.content !== contentRef.current) {
-      // 非流式输出时直接更新
-      setDisplayContent(message.content);
-      contentRef.current = message.content;
+  
+  // Directly use message.content for display to avoid setState in effect
+  const displayContent = message.content;
+  
+  const [isThinkingExpanded, setIsThinkingExpanded] = useState(message.isThinking);
+  
+  // Automatically expand/collapse when isThinking prop changes
+  const [prevIsThinking, setPrevIsThinking] = useState(message.isThinking);
+  if (message.isThinking !== prevIsThinking) {
+    setPrevIsThinking(message.isThinking);
+    if (message.isThinking) {
+      setIsThinkingExpanded(true);
+    } else if (message.thinkingSteps && message.thinkingSteps.length > 0) {
+      setIsThinkingExpanded(false);
     }
-  }, [message.content, message.isStreaming]);
+  }
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content);
@@ -34,7 +35,7 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  const showStreamingCursor = message.isStreaming && displayContent.length > 0;
+  const showStreamingCursor = message.isStreaming && displayContent.trim().length > 0;
 
   return (
     <motion.div
@@ -94,27 +95,69 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
 
               {/* Markdown content with streaming cursor */}
               <div className="prose-ai">
-                <AnimatePresence mode="wait">
-                  {message.isThinking ? (
-                    <motion.div
-                      key="thinking"
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="flex items-center gap-3 text-muted-foreground/80 bg-muted/30 px-4 py-3 rounded-xl border border-border/40"
+                {/* Thought Process Accordion */}
+                {message.thinkingSteps && message.thinkingSteps.length > 0 && (
+                  <div className="mb-3">
+                    <button
+                      onClick={() => setIsThinkingExpanded(!isThinkingExpanded)}
+                      className="flex items-center gap-2 py-1 hover:opacity-80 transition-opacity"
                     >
-                      <Sparkles className="w-4 h-4 animate-pulse text-primary/70" />
-                      <span className="text-sm font-medium tracking-wide">
-                        思考中，正在检索与决策...
-                      </span>
-                      <div className="flex gap-1 items-center h-5 pt-0.5 ml-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: '300ms' }} />
+                      {message.isThinking ? (
+                        <div className="flex items-center gap-2">
+                           <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                           <span className="text-[13px] font-medium text-primary">深度思考中...</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Check className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-[13px] font-medium text-muted-foreground">已深度思考 ({message.thinkingSteps.length} 步)</span>
+                        </div>
+                      )}
+                      <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${isThinkingExpanded ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    <AnimatePresence>
+                      {isThinkingExpanded && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="mt-2 pl-4 border-l-2 border-border/50 space-y-2.5 py-1">
+                            {message.thinkingSteps.map((step, idx) => (
+                              <motion.div
+                                key={idx}
+                                initial={{ opacity: 0, y: 5 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="text-[13px] text-muted-foreground leading-relaxed"
+                              >
+                                {step}
+                              </motion.div>
+                            ))}
+                            {message.isThinking && (
+                              <div className="flex items-center gap-1.5 mt-2 h-4">
+                                <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                                <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                                <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
+
+                {/* Main Content */}
+                {(!message.isThinking || displayContent.trim().length > 0) && (
+                  <motion.div key="content" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative mt-2 first:mt-0">
+                    {displayContent.trim().length === 0 && message.isStreaming && !message.isThinking && (!message.thinkingSteps || message.thinkingSteps.length === 0) ? (
+                      <div className="flex gap-2 items-center h-6 px-1 text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                        <span className="text-[13px]">AI正在思考中...</span>
                       </div>
-                    </motion.div>
-                  ) : (
-                    <motion.div key="content" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative">
+                    ) : (
                       <ReactMarkdown
                         components={{
                           p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
@@ -145,7 +188,7 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                               );
                             }
                             return (
-                              <code className={`${className} block font-mono text-[13px] bg-muted/80 rounded-xl p-4 my-4 overflow-x-auto border border-border/50`}>
+                              <code className={`${className} font-mono text-[13px]`}>
                                 {children}
                               </code>
                             );
@@ -181,14 +224,14 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                       >
                         {displayContent}
                       </ReactMarkdown>
+                    )}
 
                       {/* Streaming cursor */}
                       {showStreamingCursor && (
                         <span className="absolute w-0.5 h-5 bg-primary ml-0.5 animate-pulse rounded-sm" />
                       )}
                     </motion.div>
-                  )}
-                </AnimatePresence>
+                )}
               </div>
             </div>
           )}

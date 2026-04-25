@@ -37,7 +37,7 @@ export const createGeneratorNode = (
   tools: Tool[],
   getPersonaPrompt: (name: string) => string,
 ) => {
-  return async (state: AgentState): Promise<Partial<AgentState>> => {
+  return async (state: AgentState): Promise<Partial<AgentState> & { stream?: any }> => {
     const persona = PERSONAS[state.persona] || PERSONAS.assistant;
     const personaPrompt = getPersonaPrompt(state.persona);
 
@@ -68,6 +68,17 @@ ${state.query}
 请基于以上信息和你的角色设定回答用户问题。`;
 
     try {
+      // 无工具场景直接流式生成，避免额外的一次 invoke 往返
+      if (!tools || tools.length === 0) {
+        const stream = await model.stream(prompt);
+        return {
+          stream,
+          final_response: '',
+          references: allDocs,
+          next_action: 'done' as const,
+        };
+      }
+
       // 检查是否需要调用工具（如邮件发送等）
       const modelWithTools = model.bindTools(tools);
       const messages = [{ role: 'user' as const, content: prompt }];
@@ -102,30 +113,34 @@ ${state.query}
         // 继续生成（传入工具结果）
         const finalResponse = await model.stream([...messages, response, ...toolMessages]);
 
-        let fullResponse = '';
-        for await (const chunk of finalResponse) {
-          if (chunk.content) {
-            fullResponse += chunk.content;
-          }
-        }
-
         return {
-          final_response: fullResponse,
+          stream: finalResponse,
+          final_response: '',
           references: allDocs,
           next_action: 'done' as const,
         };
       } else {
-        // 无工具调用，直接生成
-        const stream = await model.stream(prompt);
-        let fullResponse = '';
-        for await (const chunk of stream) {
-          if (chunk.content) {
-            fullResponse += chunk.content;
-          }
+        // 如果没有工具调用，检查是否是普通字符串回复，或者是返回的带内容的AIMessage
+        if (response.content) {
+            const contentStr = typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
+            if (contentStr.trim().length > 0) {
+              return {
+                final_response: contentStr,
+                references: allDocs,
+                next_action: 'done' as const,
+              };
+            }
         }
+        
+        // 当模型同时返回 content (可能为空字符串) 和 tool_calls，上面判断可能会放过空字符串。
+        // 若确保无 tool_calls 才执行此，实际上前文 `if (response.tool_calls...` 已经处理了有工具调用的情况。
+
+        // 无工具调用，为了保证支持流式，重新发起流式请求
+        const stream = await model.stream(prompt);
 
         return {
-          final_response: fullResponse,
+          stream,
+          final_response: '',
           references: allDocs,
           next_action: 'done' as const,
         };

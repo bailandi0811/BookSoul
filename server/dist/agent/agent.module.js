@@ -13,12 +13,13 @@ const milvus_module_1 = require("../milvus/milvus.module");
 const mcp_module_1 = require("../mcp/mcp.module");
 const tools_module_1 = require("../tools/tools.module");
 const persona_module_1 = require("../persona/persona.module");
+const memory_module_1 = require("../memory/memory.module");
 let AgentModule = class AgentModule {
 };
 exports.AgentModule = AgentModule;
 exports.AgentModule = AgentModule = __decorate([
     (0, common_1.Module)({
-        imports: [milvus_module_1.MilvusModule, mcp_module_1.McpModule, tools_module_1.ToolsModule, persona_module_1.PersonaModule],
+        imports: [milvus_module_1.MilvusModule, mcp_module_1.McpModule, tools_module_1.ToolsModule, persona_module_1.PersonaModule, memory_module_1.MemoryModule],
         providers: [agent_service_1.AgentService],
         exports: [agent_service_1.AgentService],
     })

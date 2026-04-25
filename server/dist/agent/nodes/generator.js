@@ -48,6 +48,15 @@ ${state.query}
 
 请基于以上信息和你的角色设定回答用户问题。`;
         try {
+            if (!tools || tools.length === 0) {
+                const stream = await model.stream(prompt);
+                return {
+                    stream,
+                    final_response: '',
+                    references: allDocs,
+                    next_action: 'done',
+                };
+            }
             const modelWithTools = model.bindTools(tools);
             const messages = [{ role: 'user', content: prompt }];
             const response = await modelWithTools.invoke(messages);
@@ -72,28 +81,28 @@ ${state.query}
                     }
                 }
                 const finalResponse = await model.stream([...messages, response, ...toolMessages]);
-                let fullResponse = '';
-                for await (const chunk of finalResponse) {
-                    if (chunk.content) {
-                        fullResponse += chunk.content;
-                    }
-                }
                 return {
-                    final_response: fullResponse,
+                    stream: finalResponse,
+                    final_response: '',
                     references: allDocs,
                     next_action: 'done',
                 };
             }
             else {
-                const stream = await model.stream(prompt);
-                let fullResponse = '';
-                for await (const chunk of stream) {
-                    if (chunk.content) {
-                        fullResponse += chunk.content;
+                if (response.content) {
+                    const contentStr = typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
+                    if (contentStr.trim().length > 0) {
+                        return {
+                            final_response: contentStr,
+                            references: allDocs,
+                            next_action: 'done',
+                        };
                     }
                 }
+                const stream = await model.stream(prompt);
                 return {
-                    final_response: fullResponse,
+                    stream,
+                    final_response: '',
                     references: allDocs,
                     next_action: 'done',
                 };

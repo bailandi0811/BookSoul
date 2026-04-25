@@ -10,6 +10,7 @@ import { RagModule } from './rag/rag.module';
 import { ChatModule } from './chat/chat.module';
 import { ToolsModule } from './tools/tools.module';
 import { PersonaModule } from './persona/persona.module';
+import { MemoryModule } from './memory/memory.module';
 
 @Module({
   imports: [
@@ -21,8 +22,8 @@ import { PersonaModule } from './persona/persona.module';
       useFactory: (configService: ConfigService) => ({
         transport: {
           host: configService.get('SMTP_HOST') || 'smtp.qq.com',
-          port: configService.get('SMTP_PORT') || 465,
-          secure: configService.get('SMTP_SECURE') === 'true' || true,
+          port: Number(configService.get('SMTP_PORT') || 465),
+          secure: (configService.get('SMTP_SECURE') || 'true') === 'true',
           auth: {
             user: configService.get('SMTP_USER'),
             pass: configService.get('SMTP_PASS'),
@@ -40,6 +41,7 @@ import { PersonaModule } from './persona/persona.module';
     ChatModule,
     ToolsModule,
     PersonaModule,
+    MemoryModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -18,6 +18,10 @@ let McpService = McpService_1 = class McpService {
     configService;
     mcpClient = null;
     logger = new common_1.Logger(McpService_1.name);
+    cachedTools = null;
+    toolsCachedAt = 0;
+    toolsLoadPromise = null;
+    TOOLS_CACHE_TTL_MS = 5 * 60 * 1000;
     constructor(configService) {
         this.configService = configService;
     }
@@ -48,16 +52,31 @@ let McpService = McpService_1 = class McpService {
         return this.mcpClient;
     }
     async getMcpTools() {
-        try {
-            const client = await this.getMcpClient();
-            const tools = await client.getTools();
-            this.logger.log(`Loaded ${tools.length} tools: ${tools.map((t) => t.name).join(', ')}`);
-            return tools;
+        const now = Date.now();
+        if (this.cachedTools && now - this.toolsCachedAt < this.TOOLS_CACHE_TTL_MS) {
+            return this.cachedTools;
         }
-        catch (error) {
-            this.logger.error('Failed to load MCP tools:', error);
-            return [];
+        if (this.toolsLoadPromise) {
+            return this.toolsLoadPromise;
         }
+        this.toolsLoadPromise = (async () => {
+            try {
+                const client = await this.getMcpClient();
+                const tools = await client.getTools();
+                this.cachedTools = tools;
+                this.toolsCachedAt = Date.now();
+                this.logger.log(`Loaded ${tools.length} tools: ${tools.map((t) => t.name).join(', ')}`);
+                return tools;
+            }
+            catch (error) {
+                this.logger.error('Failed to load MCP tools:', error);
+                return [];
+            }
+            finally {
+                this.toolsLoadPromise = null;
+            }
+        })();
+        return this.toolsLoadPromise;
     }
     async onModuleDestroy() {
         if (this.mcpClient) {
@@ -66,6 +85,9 @@ let McpService = McpService_1 = class McpService {
             }
             this.mcpClient = null;
         }
+        this.cachedTools = null;
+        this.toolsCachedAt = 0;
+        this.toolsLoadPromise = null;
     }
 };
 exports.McpService = McpService;

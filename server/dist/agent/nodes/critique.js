@@ -28,7 +28,7 @@ const CRITIQUE_PROMPT = `你是一个自我反思专家，负责评估检索结�
 }
 
 判断标准：
-- confidence >= 0.7 且 相关片段 >= 2 → is_adequate = true
+- confidence >= 0.6 且 相关片段 >= 1 → is_adequate = true
 - 否则 → is_adequate = false`;
 const createCritiqueAgent = (model) => {
     return async (query, documents) => {
@@ -65,7 +65,9 @@ const createCritiqueNode = (model) => {
     const critiqueAgent = (0, exports.createCritiqueAgent)(model);
     return async (state) => {
         const allDocs = state.retrieved_documents.flatMap(d => d.docs);
+        const intentType = state.intent_classification?.intent_type;
         if (allDocs.length === 0) {
+            const nextRetryCount = state.retry_count + 1;
             return {
                 critique: {
                     is_adequate: false,
@@ -74,11 +76,24 @@ const createCritiqueNode = (model) => {
                     suggested_rewrite: state.query,
                     reasoning: 'No documents retrieved',
                 },
-                next_action: state.retry_count < 2 ? 'rewrite' : 'generate',
+                retry_count: nextRetryCount,
+                next_action: nextRetryCount < state.max_retries ? 'rewrite' : 'generate',
+            };
+        }
+        if (intentType !== 'complex_rag' && allDocs.length >= 1) {
+            return {
+                critique: {
+                    is_adequate: true,
+                    confidence: allDocs.length >= 2 ? 0.85 : 0.7,
+                    missing_aspects: [],
+                    suggested_rewrite: '',
+                    reasoning: `Heuristic pass with ${allDocs.length} retrieved doc(s)`,
+                },
+                next_action: 'generate',
             };
         }
         const critique = await critiqueAgent(state.query, allDocs);
-        if (!critique.is_adequate && state.retry_count < 2) {
+        if (!critique.is_adequate && state.retry_count < state.max_retries) {
             return {
                 critique,
                 retry_count: state.retry_count + 1,

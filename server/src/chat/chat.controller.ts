@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Res, Req, BadRequestException, Logger } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Param, Body, Res, Req, BadRequestException, Logger } from '@nestjs/common';
 import type { Response, Request } from 'express';
 import { AgentService } from '../agent/agent.service';
 import { RagService } from '../rag/rag.service';
@@ -12,9 +12,54 @@ export class ChatController {
     private readonly ragService: RagService,
   ) {}
 
+  @Get('history')
+  async getHistoryList() {
+    try {
+      const list = await this.agentService.getHistoryList();
+      return { success: true, data: list };
+    } catch (error) {
+      this.logger.error('Failed to fetch history list', error);
+      return { success: false, error: 'Failed to fetch history list' };
+    }
+  }
+
+  @Get('history/:sessionId')
+  async getSessionHistory(@Param('sessionId') sessionId: string) {
+    if (!sessionId) {
+      throw new BadRequestException('Session ID is required');
+    }
+    
+    try {
+      const messages = await this.agentService.getSessionHistory(sessionId);
+      return { success: true, data: messages };
+    } catch (error) {
+      this.logger.error(`Failed to fetch history for session ${sessionId}`, error);
+      return { success: false, error: 'Failed to fetch session history' };
+    }
+  }
+
+  @Delete('history/:sessionId')
+  async deleteSession(@Param('sessionId') sessionId: string) {
+    if (!sessionId) {
+      throw new BadRequestException('Session ID is required');
+    }
+
+    try {
+      const success = await this.agentService.deleteSession(sessionId);
+      if (success) {
+        return { success: true };
+      } else {
+        return { success: false, error: 'Failed to delete session' };
+      }
+    } catch (error) {
+      this.logger.error(`Failed to delete session ${sessionId}`, error);
+      return { success: false, error: 'Internal Server Error' };
+    }
+  }
+
   @Post()
-  async chat(@Body() body: { message: string; character?: string; sessionId?: string }, @Res() res: Response, @Req() req: Request) {
-    const { message, character, sessionId = 'default_session' } = body;
+  async chat(@Body() body: { message: string; character?: string; sessionId?: string; userId?: string }, @Res() res: Response, @Req() req: Request) {
+    const { message, character, sessionId = 'default_session', userId = 'anonymous' } = body;
 
     if (!message) {
       throw new BadRequestException('Message is required');
@@ -34,12 +79,12 @@ export class ChatController {
     });
 
     try {
-      this.logger.log(`Received question: ${message}, Character: ${character || 'assistant'}, SessionId: ${sessionId}`);
+      this.logger.log(`Received question: ${message}, Character: ${character || 'assistant'}, SessionId: ${sessionId}, UserId: ${userId}`);
 
       // 使用Agentic RAG进行流式响应
       let hasSentReferences = false;
 
-      for await (const event of this.agentService.streamChat(message, character || 'assistant', sessionId, abortController.signal)) {
+      for await (const event of this.agentService.streamChat(message, character || 'assistant', sessionId, userId, abortController.signal)) {
         switch (event.type) {
           case 'references':
             // 发送引用卡片（只发送一次）
@@ -54,6 +99,21 @@ export class ChatController {
             if (event.data) {
               res.write(`data: ${JSON.stringify({ content: event.data })}\n\n`);
             }
+            break;
+
+          case 'thinking':
+            // 发送思考进度
+            res.write(`data: ${JSON.stringify({ thinking: event.data })}\n\n`);
+            break;
+
+          case 'memory_update':
+            // 发送记忆更新事件
+            res.write(`data: ${JSON.stringify({ memoryUpdate: event.data })}\n\n`);
+            break;
+
+          case 'metrics':
+            // 发送性能指标事件（前端可选消费）
+            res.write(`data: ${JSON.stringify({ metrics: event.data })}\n\n`);
             break;
 
           case 'final':

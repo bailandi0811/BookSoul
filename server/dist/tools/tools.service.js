@@ -28,8 +28,8 @@ let ToolsService = ToolsService_1 = class ToolsService {
         const sendMailArgsSchema = zod_1.z.object({
             to: zod_1.z.string().email().describe('收件人邮箱地址，例如: test@example.com'),
             subject: zod_1.z.string().describe('邮件主题'),
-            text: zod_1.z.string().describe('纯文本内容，可选'),
-            html: zod_1.z.string().describe('HTML 内容，可选'),
+            text: zod_1.z.string().describe('纯文本内容，可选').optional(),
+            html: zod_1.z.string().describe('HTML 内容，可选').optional(),
         });
         return (0, tools_1.tool)(async ({ to, subject, text, html }) => {
             try {

@@ -17,8 +17,8 @@ export class ToolsService {
     const sendMailArgsSchema = z.object({
       to: z.string().email().describe('收件人邮箱地址，例如: test@example.com'),
       subject: z.string().describe('邮件主题'),
-      text: z.string().describe('纯文本内容，可选'),
-      html: z.string().describe('HTML 内容，可选'),
+      text: z.string().describe('纯文本内容，可选').optional(),
+      html: z.string().describe('HTML 内容，可选').optional(),
     });
 
     return tool(
