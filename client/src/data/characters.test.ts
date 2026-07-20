@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CHARACTERS, getCharacter, CHARACTER_IDS } from './characters';
+import { getCharacter, CHARACTER_IDS } from './characters';
 
 describe('characters', () => {
   it('exposes four character ids matching backend CharacterType', () => {
