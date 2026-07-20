@@ -1,8 +1,9 @@
-import { User, Copy, Check, Bot, Quote, ChevronDown, Loader2 } from 'lucide-react';
+import { User, Copy, Check, Quote, ChevronDown, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ReferenceCard } from './ReferenceCard';
-import { Message } from '@/store/useChatStore';
+import { Message, useChatStore } from '@/store/useChatStore';
+import { getCharacter } from '@/data/characters';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface MessageBubbleProps {
@@ -12,13 +13,13 @@ interface MessageBubbleProps {
 export const MessageBubble = ({ message }: MessageBubbleProps) => {
   const isUser = message.role === 'user';
   const [isCopied, setIsCopied] = useState(false);
-  
-  // Directly use message.content for display to avoid setState in effect
+  const currentCharacter = useChatStore((s) => s.currentCharacter);
+  const character = getCharacter(currentCharacter);
+
   const displayContent = message.content;
-  
+
   const [isThinkingExpanded, setIsThinkingExpanded] = useState(message.isThinking);
-  
-  // Automatically expand/collapse when isThinking prop changes
+
   const [prevIsThinking, setPrevIsThinking] = useState(message.isThinking);
   if (message.isThinking !== prevIsThinking) {
     setPrevIsThinking(message.isThinking);
@@ -36,6 +37,7 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
   };
 
   const showStreamingCursor = message.isStreaming && displayContent.trim().length > 0;
+  const sealColor = `rgb(var(${character.accentCssVar}))`;
 
   return (
     <motion.div
@@ -44,31 +46,32 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
       transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
       className={`flex gap-3 group ${isUser ? 'flex-row-reverse' : ''}`}
     >
-      {/* Avatar */}
       <div className="flex-shrink-0 mt-0.5">
         {isUser ? (
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center ring-2 ring-white dark:ring-slate-900 shadow-sm">
-            <User className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+          <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center border border-border/60">
+            <User className="w-4 h-4 text-muted-foreground" />
           </div>
         ) : (
-          <div className="w-9 h-9 rounded-xl avatar-gradient flex items-center justify-center shadow-md ring-2 ring-white dark:ring-slate-800">
-            <Bot className="w-4 h-4 text-white" />
-          </div>
+          <span
+            className="seal-mark w-9 h-9 flex items-center justify-center text-sm"
+            style={{ color: sealColor }}
+          >
+            {character.sealChar}
+          </span>
         )}
       </div>
 
-      {/* Content */}
       <div className={`flex flex-col w-full max-w-[85%] lg:max-w-[70%] ${isUser ? 'items-end' : 'items-start'}`}>
-        {/* Message bubble */}
-        <div className={`
+        <div
+          className={`
           relative px-5 py-4 rounded-2xl text-[15px] leading-relaxed transition-all duration-200
           ${isUser
-            ? 'bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-tr-md shadow-lg shadow-slate-900/10 dark:from-slate-800 dark:to-slate-900'
-            : 'bg-card text-card-foreground border border-border/50 rounded-tl-md shadow-sm hover:shadow-md'
+            ? 'bg-foreground text-background rounded-tr-md'
+            : 'bg-card text-card-foreground border border-border/50 rounded-tl-md'
           }
-        `}>
+        `}
+        >
           {isUser ? (
-            // User message - simple text
             <div className="space-y-1">
               {message.content.split('\n').map((line, i) => (
                 <p key={i} className={line.trim() === '' ? 'h-2' : ''}>
@@ -77,43 +80,47 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
               ))}
             </div>
           ) : (
-            // Assistant message - markdown with streaming support
             <div className="relative group/content">
-              {/* Action buttons - appear on hover */}
-              <div className={`
+              <div
+                className={`
                 absolute -right-2 -top-2 flex items-center gap-1 opacity-0 group-hover/content:opacity-100
-                transition-all duration-200 ${isUser ? '-left-16 right-auto' : ''}
-              `}>
+                transition-all duration-200
+              `}
+              >
                 <button
+                  type="button"
                   onClick={handleCopy}
                   aria-label="复制回答"
-                  className="p-1.5 bg-background/80 backdrop-blur-sm rounded-lg shadow-sm border border-border/50 text-muted-foreground hover:text-foreground transition-colors"
+                  className="p-1.5 bg-background/80 backdrop-blur-sm rounded-sm shadow-sm border border-border/50 text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  {isCopied ? <Check className="w-3.5 h-3.5 text-accent" /> : <Copy className="w-3.5 h-3.5" />}
                 </button>
               </div>
 
-              {/* Markdown content with streaming cursor */}
               <div className="prose-ai">
-                {/* Thought Process Accordion */}
                 {message.thinkingSteps && message.thinkingSteps.length > 0 && (
                   <div className="mb-3">
                     <button
+                      type="button"
                       onClick={() => setIsThinkingExpanded(!isThinkingExpanded)}
                       className="flex items-center gap-2 py-1 hover:opacity-80 transition-opacity"
                     >
                       {message.isThinking ? (
                         <div className="flex items-center gap-2">
-                           <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                           <span className="text-[13px] font-medium text-primary">深度思考中...</span>
+                          <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                          <span className="text-[13px] font-medium text-primary">{character.thinkingLabel}</span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-2">
                           <Check className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-[13px] font-medium text-muted-foreground">已深度思考 ({message.thinkingSteps.length} 步)</span>
+                          <span className="text-[13px] font-medium text-muted-foreground">
+                            {character.thoughtDoneLabel(message.thinkingSteps.length)}
+                          </span>
                         </div>
                       )}
-                      <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${isThinkingExpanded ? 'rotate-180' : ''}`} />
+                      <ChevronDown
+                        className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${isThinkingExpanded ? 'rotate-180' : ''}`}
+                      />
                     </button>
 
                     <AnimatePresence>
@@ -137,9 +144,18 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                             ))}
                             {message.isThinking && (
                               <div className="flex items-center gap-1.5 mt-2 h-4">
-                                <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                                <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                                <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                                <span
+                                  className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce"
+                                  style={{ animationDelay: '0ms' }}
+                                />
+                                <span
+                                  className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce"
+                                  style={{ animationDelay: '150ms' }}
+                                />
+                                <span
+                                  className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce"
+                                  style={{ animationDelay: '300ms' }}
+                                />
                               </div>
                             )}
                           </div>
@@ -149,20 +165,27 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                   </div>
                 )}
 
-                {/* Main Content */}
                 {(!message.isThinking || displayContent.trim().length > 0) && (
-                  <motion.div key="content" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative mt-2 first:mt-0">
-                    {displayContent.trim().length === 0 && message.isStreaming && !message.isThinking && (!message.thinkingSteps || message.thinkingSteps.length === 0) ? (
+                  <motion.div
+                    key="content"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="relative mt-2 first:mt-0"
+                  >
+                    {displayContent.trim().length === 0 &&
+                    message.isStreaming &&
+                    !message.isThinking &&
+                    (!message.thinkingSteps || message.thinkingSteps.length === 0) ? (
                       <div className="flex gap-2 items-center h-6 px-1 text-muted-foreground">
                         <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                        <span className="text-[13px]">AI正在思考中...</span>
+                        <span className="text-[13px]">{character.waitingText}</span>
                       </div>
                     ) : (
                       <ReactMarkdown
                         components={{
                           p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
                           strong: ({ children }) => (
-                            <strong className="font-semibold text-foreground bg-gradient-to-r from-primary/10 to-primary/5 px-1 py-0.5 rounded">
+                            <strong className="font-semibold text-foreground bg-primary/8 px-1 py-0.5 rounded-sm">
                               {children}
                             </strong>
                           ),
@@ -173,7 +196,7 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                             <ol className="list-decimal list-inside my-3 space-y-1 marker:text-primary/60">{children}</ol>
                           ),
                           blockquote: ({ children }) => (
-                            <blockquote className="flex gap-3 my-4 pl-0 border-l-4 border-primary/30 italic text-muted-foreground bg-gradient-to-r from-muted/30 to-transparent p-4 rounded-r-xl">
+                            <blockquote className="flex gap-3 my-4 pl-0 border-l-4 border-primary/30 italic text-muted-foreground bg-muted/30 p-4 rounded-r-xl">
                               <Quote className="w-5 h-5 text-primary/40 flex-shrink-0 rotate-180 mt-0.5" />
                               <div className="flex-1">{children}</div>
                             </blockquote>
@@ -188,9 +211,7 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                               );
                             }
                             return (
-                              <code className={`${className} font-mono text-[13px]`}>
-                                {children}
-                              </code>
+                              <code className={`${className} font-mono text-[13px]`}>{children}</code>
                             );
                           },
                           pre: ({ children }) => (
@@ -199,13 +220,24 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                             </pre>
                           ),
                           a: ({ children, href }) => (
-                            <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                            <a
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline"
+                            >
                               {children}
                             </a>
                           ),
-                          h1: ({ children }) => <h1 className="text-xl font-semibold text-foreground mt-4 mb-2">{children}</h1>,
-                          h2: ({ children }) => <h2 className="text-lg font-semibold text-foreground mt-4 mb-2">{children}</h2>,
-                          h3: ({ children }) => <h3 className="text-base font-semibold text-foreground mt-3 mb-2">{children}</h3>,
+                          h1: ({ children }) => (
+                            <h1 className="text-xl font-semibold text-foreground mt-4 mb-2">{children}</h1>
+                          ),
+                          h2: ({ children }) => (
+                            <h2 className="text-lg font-semibold text-foreground mt-4 mb-2">{children}</h2>
+                          ),
+                          h3: ({ children }) => (
+                            <h3 className="text-base font-semibold text-foreground mt-3 mb-2">{children}</h3>
+                          ),
                           hr: () => <hr className="my-4 border-border/50" />,
                           table: ({ children }) => (
                             <div className="overflow-x-auto my-4">
@@ -215,7 +247,9 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                             </div>
                           ),
                           th: ({ children }) => (
-                            <th className="border border-border/50 bg-muted/50 px-4 py-2 text-left font-semibold text-sm">{children}</th>
+                            <th className="border border-border/50 bg-muted/50 px-4 py-2 text-left font-semibold text-sm">
+                              {children}
+                            </th>
                           ),
                           td: ({ children }) => (
                             <td className="border border-border/50 px-4 py-2 text-sm">{children}</td>
@@ -226,28 +260,28 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                       </ReactMarkdown>
                     )}
 
-                      {/* Streaming cursor */}
-                      {showStreamingCursor && (
-                        <span className="absolute w-0.5 h-5 bg-primary ml-0.5 animate-pulse rounded-sm" />
-                      )}
-                    </motion.div>
+                    {showStreamingCursor && (
+                      <span className="absolute w-0.5 h-5 bg-primary ml-0.5 animate-pulse rounded-sm" />
+                    )}
+                  </motion.div>
                 )}
               </div>
             </div>
           )}
         </div>
 
-        {/* References */}
         {!isUser && message.references && message.references.length > 0 && (
           <div className="mt-2">
             <ReferenceCard references={message.references} />
           </div>
         )}
 
-        {/* Timestamp - show on hover */}
-        {!isUser && (
+        {!isUser && message.createdAt != null && (
           <div className="mt-1 text-[11px] text-muted-foreground/0 group-hover:text-muted-foreground/60 transition-colors duration-200 px-1">
-            {new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+            {new Date(message.createdAt).toLocaleTimeString('zh-CN', {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
           </div>
         )}
       </div>
