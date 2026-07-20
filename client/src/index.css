@@ -1,49 +1,58 @@
 @import "tailwindcss";
 
-/* CSS Variables for theming */
+/* CSS Variables for theming — ink-paper */
 :root {
-  --background: 250 250 250;
-  --foreground: 15 23 42;
-  --card: 255 255 255;
-  --card-foreground: 15 23 42;
-  --popover: 255 255 255;
-  --popover-foreground: 15 23 42;
-  --primary: 99 102 241;
-  --primary-foreground: 255 255 255;
-  --secondary: 241 245 249;
-  --secondary-foreground: 51 65 85;
-  --muted: 241 245 249;
-  --muted-foreground: 100 116 139;
-  --accent: 99 102 241;
-  --accent-foreground: 255 255 255;
-  --destructive: 239 68 68;
-  --destructive-foreground: 255 255 255;
-  --border: 226 232 240;
-  --input: 226 232 240;
-  --ring: 99 102 241;
-  --radius: 16px;
+  --background: 247 243 236; /* 纸色 */
+  --foreground: 28 25 23; /* 墨 */
+  --card: 252 249 243;
+  --card-foreground: 28 25 23;
+  --popover: 252 249 243;
+  --popover-foreground: 28 25 23;
+  --primary: 166 45 45; /* 朱砂 */
+  --primary-foreground: 255 252 248;
+  --secondary: 235 228 216;
+  --secondary-foreground: 55 48 40;
+  --muted: 238 232 222;
+  --muted-foreground: 110 98 86;
+  --accent: 45 90 85; /* 黛青 */
+  --accent-foreground: 255 252 248;
+  --destructive: 180 50 50;
+  --destructive-foreground: 255 252 248;
+  --border: 214 204 188;
+  --input: 214 204 188;
+  --ring: 166 45 45;
+  --radius: 12px;
+
+  --font-display: 'Noto Serif SC', 'Songti SC', serif;
+  --font-body: 'Noto Sans SC', system-ui, sans-serif;
+
+  --char-assistant: 45 90 85;
+  --char-qiaofeng: 166 45 45;
+  --char-duanyu: 55 95 120;
+  --char-wangyuyan: 140 85 70;
 }
 
+/* 夜读纸 */
 .dark {
-  --background: 15 15 15;
-  --foreground: 252 252 252;
-  --card: 24 24 24;
-  --card-foreground: 252 252 252;
-  --popover: 30 30 30;
-  --popover-foreground: 252 252 252;
-  --primary: 138 138 246;
-  --primary-foreground: 15 15 15;
-  --secondary: 38 38 38;
-  --secondary-foreground: 220 220 220;
-  --muted: 38 38 38;
-  --muted-foreground: 142 142 142;
-  --accent: 138 138 246;
-  --accent-foreground: 15 15 15;
-  --destructive: 248 113 113;
-  --destructive-foreground: 15 15 15;
-  --border: 45 45 45;
-  --input: 38 38 38;
-  --ring: 138 138 246;
+  --background: 22 20 18;
+  --foreground: 236 230 220;
+  --card: 32 28 24;
+  --card-foreground: 236 230 220;
+  --popover: 36 32 28;
+  --popover-foreground: 236 230 220;
+  --primary: 196 72 72;
+  --primary-foreground: 22 20 18;
+  --secondary: 42 38 34;
+  --secondary-foreground: 220 214 204;
+  --muted: 42 38 34;
+  --muted-foreground: 160 148 132;
+  --accent: 70 120 112;
+  --accent-foreground: 22 20 18;
+  --destructive: 220 90 90;
+  --destructive-foreground: 22 20 18;
+  --border: 58 52 46;
+  --input: 58 52 46;
+  --ring: 196 72 72;
 }
 
 /* Base styles */
@@ -59,7 +68,7 @@
   body {
     background-color: rgb(var(--background));
     color: rgb(var(--foreground));
-    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--font-body);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -78,6 +87,24 @@
 
 /* Custom utilities */
 @layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  .paper-bg {
+    background-color: rgb(var(--background));
+    background-image:
+      radial-gradient(rgb(var(--foreground) / 0.03) 0.5px, transparent 0.5px);
+    background-size: 3px 3px;
+  }
+
+  .seal-mark {
+    font-family: var(--font-display);
+    font-weight: 600;
+    border: 1.5px solid currentColor;
+    border-radius: 2px;
+  }
+
   /* Custom Scrollbar */
   .scrollbar-thin {
     scrollbar-width: thin;
@@ -215,9 +242,9 @@
     transform: scale(0.97);
   }
 
-  /* Avatar gradient background */
+  /* Avatar — solid primary, no purple glow */
   .avatar-gradient {
-    background: linear-gradient(135deg, rgb(var(--primary)), rgb(var(--accent)));
+    background: rgb(var(--primary));
   }
 }
 
@@ -304,9 +331,9 @@
 .prose-ai h2 { font-size: 1.125rem; }
 .prose-ai h3 { font-size: 1rem; }
 
-/* Input area focus glow */
+/* Input area focus — soft zhusha ring, no strong glow */
 .input-glow:focus-within {
-  box-shadow: 0 0 0 4px rgb(var(--primary) / 0.1);
+  box-shadow: 0 0 0 2px rgb(var(--primary) / 0.08);
 }
 
 /* Card hover effect */
