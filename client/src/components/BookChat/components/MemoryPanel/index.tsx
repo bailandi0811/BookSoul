@@ -52,9 +52,9 @@ export const MemoryPanel = () => {
             <Brain className="w-4 h-4" />
           </div>
           <div className="text-left">
-            <div className="text-sm font-medium text-foreground">AI 记忆</div>
+            <div className="text-sm font-medium text-foreground">书中见闻</div>
             <div className="text-[11px] text-muted-foreground/60">
-              {hasContent ? `${totalMemories} 条记忆` : '开始对话后自动学习'}
+              {hasContent ? `${totalMemories} 条见闻` : '对话后自动记下'}
             </div>
           </div>
         </div>
