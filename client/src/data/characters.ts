@@ -24,14 +24,14 @@ export const CHARACTER_IDS: CharacterType[] = [
 export const CHARACTERS: Record<CharacterType, CharacterProfile> = {
   assistant: {
     id: 'assistant',
-    name: '书灵',
+    name: '书魂',
     shortTitle: '《天龙八部》引路人',
     sealChar: '书',
     accentCssVar: '--char-assistant',
-    waitingText: '书灵翻检书页…',
+    waitingText: '书魂翻检书页…',
     thinkingLabel: '正在翻检书页…',
     thoughtDoneLabel: (n) => `已翻检书页（${n} 处）`,
-    placeholder: '向书灵请教…',
+    placeholder: '向书魂请教…',
     greeting: '书已展开。你想先问原著、地理，还是某一位英雄？',
     suggestions: [
       '乔峰在聚贤庄喝了几碗酒？',
