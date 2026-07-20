@@ -63,10 +63,10 @@ export const InputArea = () => {
         <AnimatePresence>
           {lastStopNotice && (
             <motion.div
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className="mb-2 text-center text-xs text-muted-foreground"
+              initial={{ opacity: 0, y: 8, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4 }}
+              className="mb-3 mx-auto w-fit px-3.5 py-1.5 rounded-full text-xs text-muted-foreground bg-muted/70 border border-border/50"
             >
               {lastStopNotice}
             </motion.div>
@@ -77,14 +77,17 @@ export const InputArea = () => {
           onSubmit={handleSubmit}
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.4, delay: 0.1 }}
+          transition={{ type: 'spring', stiffness: 280, damping: 28, delay: 0.05 }}
           className="relative group"
         >
           <div
             className={`
-            relative flex items-end rounded-sm border transition-all duration-300 input-glow
-            ${canSend ? 'bg-card border-primary/30' : 'bg-card border-border/50'}
-            focus-within:border-primary/40
+            relative flex items-end rounded-[1.75rem] border transition-all duration-300
+            ${canSend
+              ? 'bg-card border-primary/25 shadow-lg shadow-primary/5'
+              : 'bg-card/90 border-border/50 shadow-md shadow-foreground/[0.03]'
+            }
+            focus-within:border-primary/35 focus-within:shadow-lg focus-within:shadow-primary/8
           `}
           >
             <textarea
@@ -98,15 +101,15 @@ export const InputArea = () => {
               rows={1}
               aria-label="输入问题"
               className={`
-                w-full resize-none bg-transparent px-4 pt-4 pb-3 pr-12
-                text-[15px] leading-relaxed text-foreground placeholder:text-muted-foreground/60
-                focus:outline-none min-h-[52px] max-h-[200px]
+                w-full resize-none bg-transparent px-5 pt-4 pb-3.5 pr-14
+                text-[15px] leading-relaxed text-foreground placeholder:text-muted-foreground/55
+                focus:outline-none min-h-[56px] max-h-[200px]
                 disabled:opacity-50
               `}
               style={{ height: 'auto' }}
             />
 
-            <div className="absolute right-2 bottom-2 flex items-center gap-1">
+            <div className="absolute right-2.5 bottom-2.5 flex items-center gap-1">
               <AnimatePresence mode="wait">
                 {isLoading ? (
                   <motion.button
@@ -115,8 +118,10 @@ export const InputArea = () => {
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.8, opacity: 0 }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.93 }}
                     onClick={() => stopGenerating()}
-                    className="p-2.5 border border-primary text-primary bg-background hover:bg-primary/5 rounded-sm transition-all duration-200 press-effect"
+                    className="p-2.5 border border-primary/50 text-primary bg-background hover:bg-primary/5 rounded-full transition-all duration-200"
                     aria-label="停止生成"
                   >
                     <StopCircle className="w-4 h-4" />
@@ -129,11 +134,13 @@ export const InputArea = () => {
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.8, opacity: 0 }}
+                    whileHover={canSend ? { scale: 1.06 } : undefined}
+                    whileTap={canSend ? { scale: 0.92 } : undefined}
                     className={`
-                      p-2.5 rounded-sm transition-all duration-200 press-effect
+                      p-2.5 rounded-full transition-all duration-200
                       ${canSend
-                        ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                        : 'bg-muted text-muted-foreground/40 cursor-not-allowed'
+                        ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25'
+                        : 'bg-muted text-muted-foreground/35 cursor-not-allowed'
                       }
                     `}
                     aria-label="发送消息"
@@ -145,13 +152,11 @@ export const InputArea = () => {
             </div>
           </div>
 
-          <div className="flex items-center justify-center mt-3 text-[12px] text-muted-foreground/50">
+          <div className="flex items-center justify-center mt-3 text-[12px] text-muted-foreground/45">
             <span>言出有据处，皆引自原著</span>
           </div>
         </motion.form>
       </div>
-
-      <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-background/95 to-transparent pointer-events-none" />
     </div>
   );
 };

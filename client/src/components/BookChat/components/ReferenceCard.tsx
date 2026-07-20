@@ -20,20 +20,23 @@ export const ReferenceCard = ({ references }: ReferenceCardProps) => {
       className="mt-3"
     >
       {/* Toggle button */}
-      <button
+      <motion.button
+        type="button"
+        whileHover={{ y: -1 }}
+        whileTap={{ scale: 0.98 }}
         onClick={() => setIsExpanded(!isExpanded)}
         className={`
-          flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium
-          transition-all duration-200 press-effect
+          flex items-center gap-2.5 px-3.5 py-2 rounded-full text-xs font-medium
+          transition-all duration-200
           ${isExpanded
-            ? 'bg-gradient-to-r from-primary/10 to-primary/5 text-primary border border-primary/20'
-            : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground border border-transparent'
+            ? 'bg-primary/10 text-primary border border-primary/20'
+            : 'bg-muted/55 text-muted-foreground hover:bg-muted hover:text-foreground border border-transparent'
           }
         `}
       >
         <div className={`
-          p-1 rounded-md
-          ${isExpanded ? 'bg-primary/20' : 'bg-muted'}
+          p-1 rounded-lg
+          ${isExpanded ? 'bg-primary/15' : 'bg-muted'}
         `}>
           <BookOpen className="w-3.5 h-3.5" />
         </div>
@@ -48,7 +51,7 @@ export const ReferenceCard = ({ references }: ReferenceCardProps) => {
             <ChevronDown className="w-4 h-4" />
           )}
         </div>
-      </button>
+      </motion.button>
 
       {/* Expanded content */}
       <AnimatePresence>
@@ -67,7 +70,7 @@ export const ReferenceCard = ({ references }: ReferenceCardProps) => {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.05 }}
-                  className="group relative bg-gradient-to-br from-card to-muted/30 rounded-xl p-4 border border-border/50 hover:border-primary/20 transition-all duration-200"
+                  className="group relative bg-card rounded-2xl p-4 border border-border/50 hover:border-primary/20 transition-all duration-200"
                 >
                   {/* Header */}
                   <div className="flex items-center gap-2 mb-2.5">
