@@ -17,9 +17,11 @@ export function CharacterSwitchPanel({ open, onClose }: CharacterSwitchPanelProp
       onClose();
       return;
     }
-    if (!window.confirm('更换角色将开启新的对话，是否继续？')) return;
-    switchCharacter(id);
-    onClose();
+    switchCharacter(id, { confirm: true });
+    // 若用户取消 confirm，currentCharacter 不变，面板仍可关或保持；关闭以减少干扰
+    if (useChatStore.getState().currentCharacter === id) {
+      onClose();
+    }
   };
 
   return (

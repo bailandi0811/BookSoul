@@ -14,7 +14,7 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
   const isUser = message.role === 'user';
   const [isCopied, setIsCopied] = useState(false);
   const currentCharacter = useChatStore((s) => s.currentCharacter);
-  const character = getCharacter(currentCharacter);
+  const character = getCharacter(message.characterId ?? currentCharacter);
 
   const displayContent = message.content;
 

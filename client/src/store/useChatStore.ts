@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { CharacterType } from '@/data/characters';
+import { CHARACTER_IDS, type CharacterType } from '@/data/characters';
 
 export type { CharacterType };
 
@@ -24,17 +24,43 @@ export interface Message {
   thinkingText?: string;
   thinkingSteps?: string[];
   createdAt?: number;
+  /** 发送时的角色；历史消息可能缺失，UI 回退到 currentCharacter */
+  characterId?: CharacterType;
 }
 
 export type ChatView = 'entrance' | 'dialogue';
 
 const HAS_CHOSEN_KEY = 'booksoul_has_chosen';
+const CHARACTER_KEY = 'booksoul_character';
+
+function isCharacterType(value: string | null): value is CharacterType {
+  return !!value && (CHARACTER_IDS as string[]).includes(value);
+}
 
 function readHasChosen(): boolean {
   try {
     return localStorage.getItem(HAS_CHOSEN_KEY) === '1';
   } catch {
     return false;
+  }
+}
+
+function readStoredCharacter(): CharacterType {
+  try {
+    const raw = localStorage.getItem(CHARACTER_KEY);
+    if (isCharacterType(raw)) return raw;
+  } catch {
+    /* ignore */
+  }
+  return 'assistant';
+}
+
+function persistChosenCharacter(character: CharacterType) {
+  try {
+    localStorage.setItem(HAS_CHOSEN_KEY, '1');
+    localStorage.setItem(CHARACTER_KEY, character);
+  } catch {
+    /* ignore */
   }
 }
 
@@ -72,6 +98,8 @@ interface ChatState {
 }
 
 const initialHasChosen = typeof localStorage !== 'undefined' ? readHasChosen() : false;
+const initialCharacter =
+  typeof localStorage !== 'undefined' ? readStoredCharacter() : 'assistant';
 
 export const useChatStore = create<ChatState>((set, get) => ({
   view: initialHasChosen ? 'dialogue' : 'entrance',
@@ -80,7 +108,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   lastStopNotice: null,
   messages: [],
   isLoading: false,
-  currentCharacter: 'assistant',
+  currentCharacter: initialCharacter,
   sessionId: `session_${Date.now()}`,
   userId: 'anonymous',
   sessions: [],
@@ -91,7 +119,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => ({
       messages: [
         ...state.messages,
-        { ...message, createdAt: message.createdAt ?? Date.now() },
+        {
+          ...message,
+          createdAt: message.createdAt ?? Date.now(),
+          characterId: message.characterId ?? state.currentCharacter,
+        },
       ],
     })),
 
@@ -169,16 +201,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
     get().finishStreaming();
   },
 
-  clearMessages: () => set({ messages: [], sessionId: `session_${Date.now()}` }),
+  clearMessages: () => {
+    get().stopGenerating();
+    set({
+      messages: [],
+      sessionId: `session_${Date.now()}`,
+      isLoading: false,
+      abortController: null,
+    });
+  },
 
-  setCharacter: (character) => set({ currentCharacter: character }),
+  setCharacter: (character) => {
+    persistChosenCharacter(character);
+    set({ currentCharacter: character, hasChosenCharacter: true });
+  },
 
   enterDialogue: (character) => {
-    try {
-      localStorage.setItem(HAS_CHOSEN_KEY, '1');
-    } catch {
-      /* ignore */
-    }
+    persistChosenCharacter(character);
     set({
       view: 'dialogue',
       currentCharacter: character,
@@ -193,18 +232,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
         window.confirm('更换角色将开启新的对话，是否继续？');
       if (!ok) return;
     }
+    get().stopGenerating();
+    persistChosenCharacter(character);
     set({
       currentCharacter: character,
       messages: [],
       sessionId: `session_${Date.now()}`,
       view: 'dialogue',
       hasChosenCharacter: true,
+      isLoading: false,
+      abortController: null,
     });
-    try {
-      localStorage.setItem(HAS_CHOSEN_KEY, '1');
-    } catch {
-      /* ignore */
-    }
   },
 
   openEntrance: () => set({ view: 'entrance' }),
