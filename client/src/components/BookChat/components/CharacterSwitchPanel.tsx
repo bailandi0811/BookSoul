@@ -29,7 +29,7 @@ export function CharacterSwitchPanel({ open, onClose }: CharacterSwitchPanelProp
     <>
       <AnimatePresence>
         {open && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-6">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
             <motion.button
               type="button"
               aria-label="关闭面板"
@@ -43,9 +43,9 @@ export function CharacterSwitchPanel({ open, onClose }: CharacterSwitchPanelProp
               role="dialog"
               aria-modal="true"
               aria-labelledby="switch-character-title"
-              initial={{ opacity: 0, y: 40, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 28, scale: 0.97 }}
+              initial={{ opacity: 0, scale: 0.94, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 4 }}
               transition={{ type: 'spring', stiffness: 380, damping: 30 }}
               className="relative z-10 w-full max-w-md soft-surface rounded-[1.75rem] p-5 sm:p-6 max-h-[85vh] overflow-auto"
             >

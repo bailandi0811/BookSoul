@@ -34,7 +34,7 @@ export function ConfirmDialog({
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <motion.button
             type="button"
             aria-label="关闭"
@@ -49,9 +49,9 @@ export function ConfirmDialog({
             role="dialog"
             aria-modal="true"
             aria-labelledby="confirm-dialog-title"
-            initial={{ opacity: 0, y: 24, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 16, scale: 0.97 }}
+            initial={{ opacity: 0, scale: 0.94, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: 4 }}
             transition={{ type: 'spring', stiffness: 420, damping: 32 }}
             className="relative z-10 w-full max-w-sm soft-surface rounded-3xl p-5 sm:p-6"
           >
