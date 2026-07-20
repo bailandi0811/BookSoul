@@ -38,7 +38,8 @@ export const ReferenceCard = ({ references }: ReferenceCardProps) => {
           <BookOpen className="w-3.5 h-3.5" />
         </div>
         <span>
-          来自《{references[0]?.book_name}》{references.length > 1 ? `等 ${references.length} 处` : ''}知识库引用
+          出自《{references[0]?.book_name}》第 {references[0]?.chapter_num} 回
+          {references.length > 1 ? `等 ${references.length} 处` : ''}
         </span>
         <div className="ml-auto">
           {isExpanded ? (
@@ -73,7 +74,7 @@ export const ReferenceCard = ({ references }: ReferenceCardProps) => {
                     <div className="flex items-center gap-1.5 text-primary/80">
                       <FileText className="w-3.5 h-3.5" />
                       <span className="text-xs font-semibold">
-                        第 {ref.chapter_num} 章
+                        第 {ref.chapter_num} 回
                       </span>
                     </div>
                     <div className="flex-1 h-px bg-gradient-to-r from-border/50 to-transparent" />
