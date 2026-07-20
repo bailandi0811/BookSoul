@@ -47,14 +47,16 @@ export default function BookChat() {
       </AnimatePresence>
 
       <div className="flex flex-col flex-1 relative h-full min-w-0">
-        <header className="h-16 flex items-center justify-between px-4 lg:px-6 border-b border-border/50 bg-background/80 backdrop-blur-xl sticky top-0 z-20">
+        <header className="h-[4.25rem] flex items-center justify-between px-4 lg:px-6 border-b border-border/40 bg-background/75 backdrop-blur-xl sticky top-0 z-20">
           <div className="flex items-center gap-3 min-w-0">
             {!isSidebarOpen && (
               <motion.button
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.94 }}
                 onClick={() => setIsSidebarOpen(true)}
-                className="p-2 -ml-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-sm transition-all duration-200"
+                className="p-2.5 -ml-2 text-muted-foreground hover:text-foreground hover:bg-muted/60 rounded-2xl transition-all duration-200"
                 aria-label="打开侧边栏"
               >
                 <PanelLeftOpen className="w-5 h-5" />
@@ -63,7 +65,7 @@ export default function BookChat() {
 
             <div className="flex items-center gap-3 min-w-0">
               <span
-                className="seal-mark w-9 h-9 flex items-center justify-center text-base flex-shrink-0"
+                className="seal-mark w-10 h-10 flex items-center justify-center text-base flex-shrink-0"
                 style={{ color: `rgb(var(${character.accentCssVar}))` }}
               >
                 {character.sealChar}
@@ -77,25 +79,25 @@ export default function BookChat() {
             </div>
           </div>
 
-          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-            <span className="hidden md:inline text-[11px] text-muted-foreground/50 font-display mr-1">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+            <span className="hidden md:inline text-[11px] text-muted-foreground/45 font-display mr-1">
               BookSoul
             </span>
             <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              whileHover={{ scale: 1.03, y: -1 }}
+              whileTap={{ scale: 0.96 }}
               onClick={() => setSwitchOpen(true)}
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-sm transition-all duration-200"
+              className="flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 rounded-full transition-all duration-200"
               title="更换角色"
             >
               <Users className="w-4 h-4" />
               <span className="hidden sm:inline">更换角色</span>
             </motion.button>
             <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              whileHover={{ scale: 1.03, y: -1 }}
+              whileTap={{ scale: 0.96 }}
               onClick={() => clearMessages()}
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-sm transition-all duration-200"
+              className="flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 rounded-full transition-all duration-200"
               title="新建对话"
             >
               <Plus className="w-4 h-4" />
@@ -117,33 +119,37 @@ export default function BookChat() {
                   className="flex flex-col items-center justify-center min-h-[60vh] px-4"
                 >
                   <div className="text-center mb-10 max-w-lg">
-                    <span
-                      className="seal-mark inline-flex w-14 h-14 items-center justify-center text-2xl mb-6"
+                    <motion.span
+                      initial={{ scale: 0.9, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                      className="seal-mark inline-flex w-16 h-16 items-center justify-center text-2xl mb-6"
                       style={{ color: `rgb(var(${character.accentCssVar}))` }}
                     >
                       {character.sealChar}
-                    </span>
+                    </motion.span>
                     <h2 className="font-display text-xl sm:text-2xl text-foreground mb-3 leading-relaxed">
                       {character.greeting}
                     </h2>
                   </div>
 
-                  <div className="w-full max-w-xl space-y-2">
+                  <div className="w-full max-w-xl space-y-2.5">
                     {character.suggestions.map((text, i) => (
                       <motion.button
                         key={text}
-                        initial={{ opacity: 0, y: 8 }}
+                        initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.15 + i * 0.05 }}
-                        whileTap={{ scale: 0.99 }}
+                        transition={{ delay: 0.12 + i * 0.05, type: 'spring', stiffness: 320, damping: 24 }}
+                        whileHover={{ y: -2, scale: 1.01 }}
+                        whileTap={{ scale: 0.985 }}
                         disabled={isLoading}
                         onClick={() => {
                           if (!isLoading) sendMessage(text);
                         }}
                         className="
-                          w-full text-left px-4 py-3 rounded-sm border border-border/70
-                          bg-card/50 hover:bg-secondary/60 hover:border-border
-                          text-sm text-foreground transition-colors press-effect
+                          w-full text-left px-5 py-3.5 rounded-2xl border border-border/50
+                          bg-card/60 hover:bg-card hover:border-border/80
+                          text-sm text-foreground transition-colors shadow-sm hover:shadow-md
                         "
                       >
                         {text}

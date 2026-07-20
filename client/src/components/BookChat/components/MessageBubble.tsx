@@ -64,10 +64,10 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
       <div className={`flex flex-col w-full max-w-[85%] lg:max-w-[70%] ${isUser ? 'items-end' : 'items-start'}`}>
         <div
           className={`
-          relative px-5 py-4 rounded-2xl text-[15px] leading-relaxed transition-all duration-200
+          relative px-5 py-4 rounded-3xl text-[15px] leading-relaxed transition-all duration-200
           ${isUser
-            ? 'bg-foreground text-background rounded-tr-md'
-            : 'bg-card text-card-foreground border border-border/50 rounded-tl-md'
+            ? 'bg-foreground text-background rounded-br-lg shadow-sm'
+            : 'bg-card/90 text-card-foreground border border-border/40 rounded-bl-lg shadow-sm'
           }
         `}
         >
@@ -91,7 +91,7 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                   type="button"
                   onClick={handleCopy}
                   aria-label="复制回答"
-                  className="p-1.5 bg-background/80 backdrop-blur-sm rounded-sm shadow-sm border border-border/50 text-muted-foreground hover:text-foreground transition-colors"
+                  className="p-1.5 bg-background/90 backdrop-blur-sm rounded-xl shadow-sm border border-border/50 text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {isCopied ? <Check className="w-3.5 h-3.5 text-accent" /> : <Copy className="w-3.5 h-3.5" />}
                 </button>
