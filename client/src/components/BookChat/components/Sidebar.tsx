@@ -72,8 +72,7 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
                   transition={{ delay: index * 0.05 }}
                   onClick={() => {
                     if (isActive) return;
-                    if (!window.confirm('更换角色将开启新的对话，是否继续？')) return;
-                    switchCharacter(id);
+                    switchCharacter(id, { confirm: true });
                   }}
                   className={`
                     w-full flex items-center gap-3 p-3 rounded-sm transition-all duration-200 text-left press-effect
