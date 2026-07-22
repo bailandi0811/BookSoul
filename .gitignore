@@ -1,0 +1,10 @@
+# Ignore local tooling / agent artifacts
+.superpowers/
+
+# Runtime data (chat / memory)
+server/chat_histories/
+server/memories/
+
+# Build artifacts
+server/dist/
+client/dist/

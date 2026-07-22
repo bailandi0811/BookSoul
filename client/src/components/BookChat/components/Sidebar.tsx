@@ -1,7 +1,7 @@
 import { useChatStore } from '@/store/useChatStore';
 import { CHARACTER_IDS, getCharacter, SIDE_ABILITIES, QUICK_PROMPTS, type CharacterType } from '@/data/characters';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { PanelLeftClose, History, Bookmark, Moon, Sun, Trash2 } from 'lucide-react';
+import { PanelLeftClose, History, Moon, Sun, Trash2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
@@ -17,6 +17,7 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
     loadSession,
     deleteSession,
     sessionId,
+    clearMessages,
   } = useChatStore();
   const [isDark, setIsDark] = useState(false);
   const [pendingChar, setPendingChar] = useState<CharacterType | null>(null);
@@ -33,16 +34,12 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
   const pending = pendingChar ? getCharacter(pendingChar) : null;
 
   return (
-    <div className="flex flex-col h-full bg-card/80 backdrop-blur-sm border-r border-border/40">
+    <div className="flex flex-col h-full w-full bg-secondary border-r border-border">
       <div className="p-4 border-b border-border/40">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-3">
           <div>
-            <h2 className="font-display text-base text-foreground tracking-wide">《天龙八部》</h2>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              <span className="font-display">BookSoul</span>
-              <span className="mx-1.5 text-border">·</span>
-              书魂对话
-            </p>
+            <h2 className="font-bold text-base text-foreground tracking-tight">BookSoul</h2>
+            <p className="text-[11px] text-muted-foreground mt-0.5">天龙八部</p>
           </div>
           <motion.button
             type="button"
@@ -55,13 +52,19 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
             <PanelLeftClose className="w-4 h-4" />
           </motion.button>
         </div>
+        <button
+          type="button"
+          onClick={() => clearMessages()}
+          className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-left text-sm font-semibold hover:bg-secondary/80 transition-colors"
+        >
+          ＋ 新对话
+        </button>
       </div>
 
       <ScrollArea className="flex-1 py-4 scrollbar-thin">
         <div className="px-4 mb-6">
-          <h3 className="text-[11px] font-semibold text-muted-foreground/70 tracking-wider mb-3 px-1 flex items-center gap-2">
-            <Bookmark className="w-3 h-3" />
-            角色册
+          <h3 className="text-[11px] font-bold text-muted-foreground tracking-wider mb-3 px-1">
+            角色
           </h3>
           <div className="space-y-1.5">
             {CHARACTER_IDS.map((id, index) => {
@@ -82,21 +85,21 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
                     setPendingChar(id);
                   }}
                   className={`
-                    w-full flex items-center gap-3 p-3 rounded-2xl transition-all duration-200 text-left
+                    w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 text-left
                     ${isActive
-                      ? 'bg-primary/[0.08] border border-primary/25 shadow-sm'
+                      ? 'border border-primary bg-card shadow-sm'
                       : 'hover:bg-muted/55 border border-transparent'
                     }
                   `}
                 >
                   <span
-                    className="seal-mark w-10 h-10 flex items-center justify-center text-base flex-shrink-0"
+                    className="seal-mark w-9 h-9 rounded-full flex items-center justify-center text-sm flex-shrink-0"
                     style={{ color: `rgb(var(${char.accentCssVar}))` }}
                   >
                     {char.sealChar}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <div className={`text-sm font-medium truncate ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
+                    <div className={`text-sm font-semibold truncate ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
                       {char.name}
                     </div>
                     <div className="text-[11px] text-muted-foreground/60 truncate mt-0.5">
@@ -116,13 +119,13 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
         </div>
 
         <div className="px-4 mb-6">
-          <h3 className="text-[11px] font-semibold text-muted-foreground/70 tracking-wider mb-3 px-1 flex items-center gap-2">
+          <h3 className="text-[11px] font-bold text-muted-foreground tracking-wider mb-3 px-1 flex items-center gap-2">
             <History className="w-3 h-3" />
-            书签
+            会话
           </h3>
           <div className="space-y-1.5 max-h-[200px] overflow-y-auto pr-1 scrollbar-thin">
             {!sessions || sessions.length === 0 ? (
-              <div className="text-xs text-muted-foreground/50 text-center py-4">暂无书签</div>
+              <div className="text-xs text-muted-foreground/50 text-center py-4">暂无会话</div>
             ) : (
               sessions.map((session, index) => {
                 const isActive = session.sessionId === sessionId;
@@ -137,14 +140,13 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
                       if (!isActive) loadSession(session.sessionId);
                     }}
                     className={`
-                      w-full flex items-center gap-3 p-2.5 rounded-2xl transition-all duration-200 text-left group cursor-pointer
+                      w-full flex items-center gap-3 p-2.5 rounded-xl transition-all duration-200 text-left group cursor-pointer
                       ${isActive
-                        ? 'bg-primary/10 text-primary font-medium'
-                        : 'hover:bg-muted/55 text-muted-foreground hover:text-foreground'
+                        ? 'bg-card border border-border text-foreground font-semibold shadow-sm'
+                        : 'hover:bg-muted/55 text-muted-foreground hover:text-foreground border border-transparent'
                       }
                     `}
                   >
-                    <Bookmark className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? 'text-primary' : 'text-muted-foreground/50'}`} />
                     <div className="flex-1 min-w-0">
                       <div className="text-xs truncate">{session.title}</div>
                       <div className="text-[10px] opacity-60 mt-0.5">
@@ -163,7 +165,7 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
                         deleteSession(session.sessionId);
                       }}
                       className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded-xl transition-all"
-                      title="删除书签"
+                      title="删除会话"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -175,7 +177,7 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
         </div>
 
         <div className="px-4 mb-6">
-          <h3 className="text-[11px] font-semibold text-muted-foreground/70 tracking-wider mb-3 px-1">
+          <h3 className="text-[11px] font-bold text-muted-foreground tracking-wider mb-3 px-1">
             随身本事
           </h3>
           <div className="space-y-2">
@@ -185,7 +187,7 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
                 initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.08 + index * 0.04 }}
-                className="p-3.5 rounded-2xl border border-border/50 bg-secondary/40"
+                className="p-3.5 rounded-xl border border-border/50 bg-card/60"
               >
                 <div className="text-sm font-medium text-foreground">{cap.name}</div>
                 <div className="text-[11px] text-muted-foreground mt-0.5">{cap.desc}</div>
@@ -195,7 +197,7 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
         </div>
 
         <div className="px-4">
-          <h3 className="text-[11px] font-semibold text-muted-foreground/70 tracking-wider mb-3 px-1">
+          <h3 className="text-[11px] font-bold text-muted-foreground tracking-wider mb-3 px-1">
             快捷指令
           </h3>
           <div className="space-y-1.5">
@@ -205,7 +207,7 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
                 type="button"
                 whileHover={{ x: 2 }}
                 whileTap={{ scale: 0.985 }}
-                className="w-full flex items-center gap-2.5 p-2.5 rounded-2xl hover:bg-muted/55 transition-all duration-200 text-left group border border-transparent hover:border-border/40"
+                className="w-full flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-muted/55 transition-all duration-200 text-left group border border-transparent hover:border-border/40"
                 onClick={() => setDraftInput(text)}
               >
                 <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
@@ -224,11 +226,11 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
           type="button"
           whileTap={{ scale: 0.98 }}
           onClick={toggleTheme}
-          className="w-full flex items-center justify-between p-2.5 hover:bg-muted/55 rounded-2xl transition-all duration-200 group"
+          className="w-full flex items-center justify-between p-2.5 hover:bg-muted/55 rounded-xl transition-all duration-200 group"
         >
           <div className="flex items-center gap-2.5 text-sm text-muted-foreground group-hover:text-foreground">
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            <span>{isDark ? '日间纸色' : '夜读纸'}</span>
+            <span>{isDark ? '浅色' : '暗色'}</span>
           </div>
           <div
             className={`
@@ -248,7 +250,7 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
       <ConfirmDialog
         open={!!pendingChar}
         title={`改为与${pending?.name ?? ''}对话？`}
-        description="将开启新的对话。当前内容仍可在侧栏「书签」中找回。"
+        description="将开启新的对话。当前内容仍可在侧栏「会话」中找回。"
         confirmLabel="开始新对话"
         cancelLabel="再想想"
         onCancel={() => setPendingChar(null)}

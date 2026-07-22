@@ -8,8 +8,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
-        serif: ['"Noto Serif SC"', '"SimSun"', '"STSong"', 'serif'],
+        sans: ['"Noto Sans SC"', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
       },
       colors: {
         background: 'rgb(var(--background) / <alpha-value>)',
@@ -76,8 +75,8 @@ export default {
         },
       },
       boxShadow: {
-        'glow': '0 0 20px rgb(var(--primary) / 0.15)',
-        'glow-lg': '0 0 40px rgb(var(--primary) / 0.2)',
+        'glow': '0 1px 3px rgb(var(--primary) / 0.08)',
+        'glow-lg': '0 2px 6px rgb(var(--primary) / 0.1)',
       },
     },
   },
