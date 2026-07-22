@@ -74,7 +74,7 @@ export function CharacterSwitchPanel({ open, onClose }: CharacterSwitchPanelProp
                   <div>
                     <h3
                       id="switch-character-title"
-                      className="font-display text-lg text-foreground tracking-wide"
+                      className="text-lg font-bold text-foreground tracking-tight"
                     >
                       更换角色
                     </h3>
@@ -121,7 +121,7 @@ export function CharacterSwitchPanel({ open, onClose }: CharacterSwitchPanelProp
                           {c.sealChar}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <div className="font-display text-[15px] text-foreground">{c.name}</div>
+                          <div className="text-[15px] font-semibold text-foreground">{c.name}</div>
                           <div className="text-[12px] text-muted-foreground truncate mt-0.5">
                             {c.shortTitle}
                           </div>
@@ -145,7 +145,7 @@ export function CharacterSwitchPanel({ open, onClose }: CharacterSwitchPanelProp
       <ConfirmDialog
         open={!!pendingId}
         title={`改为与${pending?.name ?? ''}对话？`}
-        description="将开启新的对话。当前内容仍可在侧栏「书签」中找回。"
+        description="将开启新的对话。当前内容仍可在侧栏「会话」中找回。"
         confirmLabel="开始新对话"
         cancelLabel="再想想"
         onCancel={() => setPendingId(null)}

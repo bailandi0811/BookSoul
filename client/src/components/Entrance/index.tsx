@@ -5,33 +5,25 @@ import { useChatStore } from '@/store/useChatStore';
 
 export function Entrance() {
   const enterDialogue = useChatStore((s) => s.enterDialogue);
-  const [selected, setSelected] = useState<CharacterType | null>(null);
+  const [selected, setSelected] = useState<CharacterType>('assistant');
 
   return (
-    <div className="paper-bg min-h-screen w-full flex flex-col items-center justify-center px-6 py-16 relative overflow-hidden">
-      <div
-        className="pointer-events-none absolute inset-0 opacity-60"
-        style={{
-          background:
-            'radial-gradient(ellipse 70% 50% at 50% 0%, rgb(var(--primary) / 0.06), transparent 60%)',
-        }}
-      />
-
+    <div className="min-h-screen w-full bg-background flex flex-col items-center justify-center px-6 py-16">
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 260, damping: 28 }}
-        className="relative text-center mb-12 max-w-xl"
+        className="text-center mb-10 max-w-xl"
       >
-        <h1 className="font-display text-5xl sm:text-6xl tracking-wide text-foreground mb-4">
+        <h1 className="text-5xl sm:text-6xl font-bold tracking-tight text-foreground mb-4">
           BookSoul
         </h1>
-        <p className="text-muted-foreground text-base sm:text-lg leading-relaxed">
+        <p className="text-muted-foreground font-medium text-base sm:text-lg">
           赋予书籍灵魂，与书中人对话
         </p>
       </motion.div>
 
-      <div className="relative grid grid-cols-1 sm:grid-cols-2 gap-3.5 w-full max-w-2xl mb-10">
+      <div className="flex flex-wrap justify-center gap-3 mb-10">
         {CHARACTER_IDS.map((id, i) => {
           const c = getCharacter(id);
           const isSelected = selected === id;
@@ -42,33 +34,27 @@ export function Entrance() {
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.06 + i * 0.05, type: 'spring', stiffness: 320, damping: 26 }}
-              whileHover={{ y: -3 }}
+              whileHover={{ y: -2 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => setSelected(id)}
               className={`
-                flex items-center gap-4 p-4 text-left rounded-3xl border transition-colors
+                flex flex-col items-center gap-2 p-3 rounded-2xl transition-colors w-[96px] sm:w-[104px]
                 ${isSelected
-                  ? 'border-primary/40 bg-primary/[0.07] shadow-md shadow-primary/10'
-                  : 'border-border/50 bg-card/70 hover:border-border hover:bg-card'
+                  ? 'border-2 border-primary bg-card'
+                  : 'border border-border bg-secondary'
                 }
               `}
             >
               <span
-                className="seal-mark w-12 h-12 flex items-center justify-center text-lg flex-shrink-0"
+                className="avatar-mark seal-mark w-9 h-9 flex items-center justify-center text-sm flex-shrink-0"
                 style={{ color: `rgb(var(${c.accentCssVar}))` }}
               >
                 {c.sealChar}
               </span>
-              <div className="min-w-0">
-                <div className="font-display text-lg text-foreground">{c.name}</div>
-                <div className="text-sm text-muted-foreground mt-0.5 truncate">{c.shortTitle}</div>
+              <div className="font-bold text-sm text-foreground">{c.name}</div>
+              <div className="text-[11px] text-muted-foreground text-center leading-tight line-clamp-2">
+                {c.shortTitle}
               </div>
-              {isSelected && (
-                <motion.span
-                  layoutId="entrance-selected"
-                  className="ml-auto w-2.5 h-2.5 rounded-full bg-primary flex-shrink-0"
-                />
-              )}
             </motion.button>
           );
         })}
@@ -79,17 +65,10 @@ export function Entrance() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.28, type: 'spring', stiffness: 300, damping: 24 }}
-        whileHover={selected ? { scale: 1.03, y: -1 } : undefined}
-        whileTap={selected ? { scale: 0.97 } : undefined}
-        disabled={!selected}
-        onClick={() => selected && enterDialogue(selected)}
-        className={`
-          relative px-12 py-3.5 font-display text-base tracking-wide rounded-full transition-colors
-          ${selected
-            ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25'
-            : 'bg-muted text-muted-foreground/45 cursor-not-allowed'
-          }
-        `}
+        whileHover={{ scale: 1.03, y: -1 }}
+        whileTap={{ scale: 0.97 }}
+        onClick={() => enterDialogue(selected)}
+        className="rounded-full bg-primary text-primary-foreground font-bold px-9 py-3.5"
       >
         开始对话
       </motion.button>
