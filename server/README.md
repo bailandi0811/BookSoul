@@ -31,6 +31,26 @@
 $ npm install
 ```
 
+Copy `.env.example` to `.env`, then configure PostgreSQL and authentication:
+
+```dotenv
+DATABASE_URL=postgresql://USER:PASSWORD@127.0.0.1:5432/booksoul?schema=public
+JWT_ACCESS_SECRET=replace-with-a-long-random-secret
+JWT_ACCESS_EXPIRES=15m
+REFRESH_TOKEN_EXPIRES_DAYS=7
+```
+
+Apply the committed database migrations and generate Prisma Client:
+
+```bash
+$ npm run prisma:migrate:deploy
+$ npm run prisma:generate
+```
+
+Authentication endpoints are available at `POST /api/auth/register`,
+`POST /api/auth/login`, and `GET /api/auth/me`. The `me` endpoint requires an
+Access Token in `Authorization: Bearer <token>`.
+
 ## Compile and run the project
 
 ```bash

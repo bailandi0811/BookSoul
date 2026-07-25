@@ -12,6 +12,8 @@ import { ToolsModule } from './tools/tools.module';
 import { PersonaModule } from './persona/persona.module';
 import { MemoryModule } from './memory/memory.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { UsersModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -31,12 +33,16 @@ import { PrismaModule } from './prisma/prisma.module';
           },
         },
         defaults: {
-          from: configService.get('SMTP_FROM') || `"BookSoul Agent" <${configService.get('SMTP_USER')}>`,
+          from:
+            configService.get('SMTP_FROM') ||
+            `"BookSoul Agent" <${configService.get('SMTP_USER')}>`,
         },
       }),
       inject: [ConfigService],
     }),
     PrismaModule,
+    UsersModule,
+    AuthModule,
     MilvusModule,
     McpModule,
     RagModule,
