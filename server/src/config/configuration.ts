@@ -1,4 +1,7 @@
 export default () => ({
+  database: {
+    url: process.env.DATABASE_URL,
+  },
   milvus: {
     address: process.env.MILVUS_ADDRESS || 'localhost:19530',
     token: process.env.MILVUS_TOKEN || 'root:Milvus',

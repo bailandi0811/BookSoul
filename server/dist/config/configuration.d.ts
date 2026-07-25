@@ -1,4 +1,7 @@
 declare const _default: () => {
+    database: {
+        url: string | undefined;
+    };
     milvus: {
         address: string;
         token: string;
