@@ -23,6 +23,7 @@ const chat_module_1 = require("./chat/chat.module");
 const tools_module_1 = require("./tools/tools.module");
 const persona_module_1 = require("./persona/persona.module");
 const memory_module_1 = require("./memory/memory.module");
+const prisma_module_1 = require("./prisma/prisma.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -50,6 +51,7 @@ exports.AppModule = AppModule = __decorate([
                 }),
                 inject: [config_1.ConfigService],
             }),
+            prisma_module_1.PrismaModule,
             milvus_module_1.MilvusModule,
             mcp_module_1.McpModule,
             rag_module_1.RagModule,

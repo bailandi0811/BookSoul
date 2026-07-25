@@ -11,6 +11,7 @@ import { ChatModule } from './chat/chat.module';
 import { ToolsModule } from './tools/tools.module';
 import { PersonaModule } from './persona/persona.module';
 import { MemoryModule } from './memory/memory.module';
+import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { MemoryModule } from './memory/memory.module';
       }),
       inject: [ConfigService],
     }),
+    PrismaModule,
     MilvusModule,
     McpModule,
     RagModule,
