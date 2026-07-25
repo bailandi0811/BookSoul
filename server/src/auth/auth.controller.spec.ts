@@ -1,0 +1,203 @@
+import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JwtModule, JwtService } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
+import { Test, TestingModule } from '@nestjs/testing';
+import request from 'supertest';
+import { App } from 'supertest/types';
+import { UsersService } from '../users/users.service';
+import { AuthController } from './auth.controller';
+import { AuthService } from './auth.service';
+import { JwtStrategy } from './jwt.strategy';
+
+describe('AuthController', () => {
+  const secret = 'controller-test-access-secret';
+  const publicUser = {
+    id: 'user-1',
+    email: 'reader@example.com',
+    name: 'Reader',
+  };
+  const authData = {
+    accessToken: 'access-token',
+    refreshToken: 'refresh-token',
+    user: publicUser,
+  };
+
+  let app: INestApplication<App>;
+  let httpServer: App;
+  let jwtService: JwtService;
+  let authService: {
+    register: jest.Mock;
+    login: jest.Mock;
+  };
+  let usersService: {
+    findPublicById: jest.Mock;
+  };
+
+  beforeAll(async () => {
+    authService = {
+      register: jest.fn().mockResolvedValue(authData),
+      login: jest.fn().mockResolvedValue(authData),
+    };
+    usersService = {
+      findPublicById: jest.fn().mockResolvedValue(publicUser),
+    };
+
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [
+        PassportModule.register({ defaultStrategy: 'jwt' }),
+        JwtModule.register({ secret }),
+      ],
+      controllers: [AuthController],
+      providers: [
+        JwtStrategy,
+        {
+          provide: AuthService,
+          useValue: authService,
+        },
+        {
+          provide: UsersService,
+          useValue: usersService,
+        },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: (key: string) =>
+              key === 'auth.accessSecret' ? secret : undefined,
+          },
+        },
+      ],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
+    await app.init();
+    httpServer = app.getHttpServer();
+    jwtService = moduleFixture.get(JwtService);
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    authService.register.mockResolvedValue(authData);
+    authService.login.mockResolvedValue(authData);
+    usersService.findPublicById.mockResolvedValue(publicUser);
+  });
+
+  it('normalizes a valid registration and returns the response envelope', async () => {
+    await request(httpServer)
+      .post('/api/auth/register')
+      .send({
+        email: '  Reader@Example.COM ',
+        password: 'password123',
+        name: ' Reader ',
+      })
+      .expect(201)
+      .expect({
+        success: true,
+        data: authData,
+      });
+
+    expect(authService.register).toHaveBeenCalledWith({
+      email: 'reader@example.com',
+      password: 'password123',
+      name: 'Reader',
+    });
+  });
+
+  it('rejects invalid and unexpected registration fields', async () => {
+    await request(httpServer)
+      .post('/api/auth/register')
+      .send({
+        email: 'not-an-email',
+        password: 'short',
+        name: '',
+        admin: true,
+      })
+      .expect(400);
+
+    expect(authService.register).not.toHaveBeenCalled();
+  });
+
+  it('returns the current user for a valid access token', async () => {
+    const accessToken = await jwtService.signAsync(
+      {
+        sub: publicUser.id,
+        email: publicUser.email,
+        type: 'access',
+      },
+      { algorithm: 'HS256', expiresIn: '15m' },
+    );
+
+    await request(httpServer)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200)
+      .expect({
+        success: true,
+        data: {
+          user: publicUser,
+        },
+      });
+    expect(usersService.findPublicById).toHaveBeenCalledWith(publicUser.id);
+  });
+
+  it.each([
+    ['no token', undefined],
+    [
+      'a forged token',
+      () =>
+        jwtService.signAsync(
+          {
+            sub: publicUser.id,
+            email: publicUser.email,
+            type: 'access',
+          },
+          { secret: 'wrong-secret', algorithm: 'HS256', expiresIn: '15m' },
+        ),
+    ],
+    [
+      'an expired token',
+      () =>
+        jwtService.signAsync(
+          {
+            sub: publicUser.id,
+            email: publicUser.email,
+            type: 'access',
+          },
+          { algorithm: 'HS256', expiresIn: -1 },
+        ),
+    ],
+    [
+      'a token with the wrong type',
+      () =>
+        jwtService.signAsync(
+          {
+            sub: publicUser.id,
+            email: publicUser.email,
+            type: 'refresh',
+          },
+          { algorithm: 'HS256', expiresIn: '15m' },
+        ),
+    ],
+  ])('rejects %s', async (_case, createToken) => {
+    const call = request(httpServer).get('/api/auth/me');
+    const token =
+      typeof createToken === 'function' ? await createToken() : undefined;
+
+    if (token) {
+      call.set('Authorization', `Bearer ${token}`);
+    }
+
+    await call.expect(401);
+  });
+});
