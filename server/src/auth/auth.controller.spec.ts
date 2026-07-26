@@ -29,6 +29,7 @@ describe('AuthController', () => {
   let authService: {
     register: jest.Mock;
     login: jest.Mock;
+    refresh: jest.Mock;
   };
   let usersService: {
     findPublicById: jest.Mock;
@@ -38,6 +39,7 @@ describe('AuthController', () => {
     authService = {
       register: jest.fn().mockResolvedValue(authData),
       login: jest.fn().mockResolvedValue(authData),
+      refresh: jest.fn().mockResolvedValue(authData),
     };
     usersService = {
       findPublicById: jest.fn().mockResolvedValue(publicUser),
@@ -90,6 +92,7 @@ describe('AuthController', () => {
     jest.clearAllMocks();
     authService.register.mockResolvedValue(authData);
     authService.login.mockResolvedValue(authData);
+    authService.refresh.mockResolvedValue(authData);
     usersService.findPublicById.mockResolvedValue(publicUser);
   });
 
@@ -151,6 +154,30 @@ describe('AuthController', () => {
     expect(usersService.findPublicById).toHaveBeenCalledWith(publicUser.id);
   });
 
+  it('refreshes tokens through the response envelope', async () => {
+    const refreshToken = 'r'.repeat(43);
+
+    await request(httpServer)
+      .post('/api/auth/refresh')
+      .send({ refreshToken })
+      .expect(200)
+      .expect({
+        success: true,
+        data: authData,
+      });
+
+    expect(authService.refresh).toHaveBeenCalledWith(refreshToken);
+  });
+
+  it('validates the refresh request body', async () => {
+    await request(httpServer)
+      .post('/api/auth/refresh')
+      .send({ refreshToken: '', unexpected: true })
+      .expect(400);
+
+    expect(authService.refresh).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['no token', undefined],
     [
@@ -189,6 +216,7 @@ describe('AuthController', () => {
           { algorithm: 'HS256', expiresIn: '15m' },
         ),
     ],
+    ['an opaque refresh token', () => Promise.resolve('r'.repeat(43))],
   ])('rejects %s', async (_case, createToken) => {
     const call = request(httpServer).get('/api/auth/me');
     const token =
