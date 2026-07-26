@@ -12,6 +12,7 @@ import type { PublicUser } from '../users/users.service';
 import { AuthService } from './auth.service';
 import type { AuthData, SuccessResponse } from './auth.types';
 import { LoginDto } from './dto/login.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
@@ -37,6 +38,17 @@ export class AuthController {
     return {
       success: true,
       data: await this.authService.login(dto),
+    };
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  async refresh(
+    @Body() dto: RefreshTokenDto,
+  ): Promise<SuccessResponse<AuthData>> {
+    return {
+      success: true,
+      data: await this.authService.refresh(dto.refreshToken),
     };
   }
 
