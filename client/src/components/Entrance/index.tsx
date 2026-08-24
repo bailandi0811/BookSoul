@@ -8,7 +8,7 @@ export function Entrance() {
   const [selected, setSelected] = useState<CharacterType>('assistant');
 
   return (
-    <div className="min-h-screen w-full bg-background flex flex-col items-center justify-center px-6 py-16">
+    <div className="min-h-[100dvh] w-full bg-background flex flex-col items-center justify-center px-6 py-16">
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}

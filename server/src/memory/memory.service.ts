@@ -175,12 +175,14 @@ ${messages.map(m => `- ${m}`).join('\n')}
   }
 
   async deleteMemory(memoryId: string, userId: string): Promise<void> {
+    const ownedMemory = await this.memoryEntryRepo.getById(memoryId, userId);
+    if (!ownedMemory) return;
     await this.memoryEntryRepo.delete(memoryId, userId);
     // 从 Milvus 中也删除
     try {
       await this.milvusService.getClient().delete({
         collection_name: this.COLLECTION_NAME,
-        filter: `id == "${memoryId}"`,
+        filter: `id == "${memoryId}" && user_id == "${userId}"`,
       });
     } catch (e) {
       this.logger.warn(`Failed to delete from Milvus: ${e}`);

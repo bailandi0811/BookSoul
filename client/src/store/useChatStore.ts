@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { CHARACTER_IDS, type CharacterType } from '@/data/characters';
+import { apiFetch } from '@/lib/api';
 
 export type { CharacterType };
 
@@ -250,7 +251,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   fetchSessions: async () => {
     set({ isSessionsLoading: true });
     try {
-      const response = await fetch('/api/chat/history');
+      const response = await apiFetch('/api/chat/history');
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
@@ -266,7 +267,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   deleteSession: async (sessionId: string) => {
     try {
-      const response = await fetch(`/api/chat/history/${sessionId}`, {
+      const response = await apiFetch(`/api/chat/history/${sessionId}`, {
         method: 'DELETE',
       });
       if (response.ok) {
@@ -290,7 +291,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ isLoading: true, sessionId, lastStopNotice: null });
 
     try {
-      const response = await fetch(`/api/chat/history/${sessionId}`);
+      const response = await apiFetch(`/api/chat/history/${sessionId}`);
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
@@ -313,7 +314,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
       setLoading,
       currentCharacter,
       sessionId,
-      userId,
       fetchSessions,
     } = get();
 
@@ -359,14 +359,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
     };
 
     try {
-      const response = await fetch('/api/chat', {
+      const response = await apiFetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: content,
           character: currentCharacter,
           sessionId: sessionId,
-          userId: userId,
         }),
         signal: newAbortController.signal,
       });

@@ -5,9 +5,10 @@ import { UserProfileRepository } from './repositories/user-profile.repository';
 import { MemoryEntryRepository } from './repositories/memory-entry.repository';
 import { ImportanceScorerStrategy } from './strategies/importance-scorer.strategy';
 import { MilvusModule } from '../milvus/milvus.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [MilvusModule],
+  imports: [MilvusModule, AuthModule],
   controllers: [MemoryController],
   providers: [
     MemoryService,

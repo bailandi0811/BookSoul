@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { MemoryEntry, MemoryLevel, MemoryCategory } from '../interfaces/memory.types';
+import { requireSafePathSegment, resolveWithinRoot } from '../../auth/auth-context';
 
 @Injectable()
 export class MemoryEntryRepository {
@@ -17,14 +18,14 @@ export class MemoryEntryRepository {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         return null;
       }
-      this.logger.error(`Failed to load memory entry: ${error}`);
+      this.logger.error('Failed to load memory entry');
       throw error;
     }
   }
 
   async getByUserId(userId: string, sessionId?: string): Promise<MemoryEntry[]> {
     try {
-      const dir = path.join(process.cwd(), this.baseDir, userId);
+      const dir = this.getUserDirectory(userId);
       await fs.mkdir(dir, { recursive: true });
       const files = await fs.readdir(dir);
       const entries: MemoryEntry[] = [];
@@ -46,7 +47,7 @@ export class MemoryEntryRepository {
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
     } catch (error) {
-      this.logger.error(`Failed to load memory entries: ${error}`);
+      this.logger.error('Failed to load memory entries');
       return [];
     }
   }
@@ -58,12 +59,12 @@ export class MemoryEntryRepository {
 
   async save(entry: MemoryEntry): Promise<void> {
     try {
-      const dir = path.join(process.cwd(), this.baseDir, entry.userId);
+      const dir = this.getUserDirectory(entry.userId);
       await fs.mkdir(dir, { recursive: true });
       const filePath = path.join(dir, `${entry.id}.json`);
       await fs.writeFile(filePath, JSON.stringify(entry, null, 2));
     } catch (error) {
-      this.logger.error(`Failed to save memory entry: ${error}`);
+      this.logger.error('Failed to save memory entry');
       throw error;
     }
   }
@@ -100,6 +101,15 @@ export class MemoryEntryRepository {
   }
 
   private getFilePath(userId: string, memoryId: string): string {
-    return path.join(process.cwd(), this.baseDir, userId, `${memoryId}.json`);
+    requireSafePathSegment(memoryId, '记忆标识');
+    return resolveWithinRoot(
+      this.getUserDirectory(userId),
+      `${memoryId}.json`,
+    );
+  }
+
+  private getUserDirectory(userId: string): string {
+    requireSafePathSegment(userId, '用户标识');
+    return resolveWithinRoot(path.join(process.cwd(), this.baseDir), userId);
   }
 }

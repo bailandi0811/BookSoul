@@ -1,9 +1,13 @@
-import { Controller, Post, Get, Delete, Param, Body, Res, Req, BadRequestException, Logger } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Param, Body, Res, Req, BadRequestException, Logger, UseGuards, HttpException } from '@nestjs/common';
 import type { Response, Request } from 'express';
 import { AgentService } from '../agent/agent.service';
 import { RagService } from '../rag/rag.service';
+import { CurrentAuth } from '../auth/decorators/auth-context.decorator';
+import type { AuthContext } from '../auth/auth-context';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 
 @Controller('api/chat')
+@UseGuards(OptionalJwtAuthGuard)
 export class ChatController {
   private readonly logger = new Logger(ChatController.name);
 
@@ -13,9 +17,9 @@ export class ChatController {
   ) {}
 
   @Get('history')
-  async getHistoryList() {
+  async getHistoryList(@CurrentAuth() auth: AuthContext) {
     try {
-      const list = await this.agentService.getHistoryList();
+      const list = await this.agentService.getHistoryList(auth.userId);
       return { success: true, data: list };
     } catch (error) {
       this.logger.error('Failed to fetch history list', error);
@@ -24,46 +28,63 @@ export class ChatController {
   }
 
   @Get('history/:sessionId')
-  async getSessionHistory(@Param('sessionId') sessionId: string) {
+  async getSessionHistory(
+    @Param('sessionId') sessionId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     if (!sessionId) {
       throw new BadRequestException('Session ID is required');
     }
     
     try {
-      const messages = await this.agentService.getSessionHistory(sessionId);
+      const messages = await this.agentService.getSessionHistory(
+        sessionId,
+        auth.userId,
+      );
       return { success: true, data: messages };
     } catch (error) {
-      this.logger.error(`Failed to fetch history for session ${sessionId}`, error);
+      if (error instanceof HttpException) throw error;
+      this.logger.error('Failed to fetch session history');
       return { success: false, error: 'Failed to fetch session history' };
     }
   }
 
   @Delete('history/:sessionId')
-  async deleteSession(@Param('sessionId') sessionId: string) {
+  async deleteSession(
+    @Param('sessionId') sessionId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     if (!sessionId) {
       throw new BadRequestException('Session ID is required');
     }
 
     try {
-      const success = await this.agentService.deleteSession(sessionId);
+      const success = await this.agentService.deleteSession(
+        sessionId,
+        auth.userId,
+      );
       if (success) {
         return { success: true };
       } else {
         return { success: false, error: 'Failed to delete session' };
       }
     } catch (error) {
-      this.logger.error(`Failed to delete session ${sessionId}`, error);
+      if (error instanceof HttpException) throw error;
+      this.logger.error('Failed to delete session');
       return { success: false, error: 'Internal Server Error' };
     }
   }
 
   @Post()
-  async chat(@Body() body: { message: string; character?: string; sessionId?: string; userId?: string }, @Res() res: Response, @Req() req: Request) {
-    const { message, character, sessionId = 'default_session', userId = 'anonymous' } = body;
+  async chat(@Body() body: { message: string; character?: string; sessionId?: string; userId?: string }, @Res() res: Response, @Req() req: Request, @CurrentAuth() auth: AuthContext) {
+    const { message, character, sessionId = 'default_session' } = body;
+    const userId = auth.userId;
 
     if (!message) {
       throw new BadRequestException('Message is required');
     }
+
+    await this.agentService.assertSessionWritable(sessionId, userId);
 
     // Set headers for SSE
     res.setHeader('Content-Type', 'text/event-stream');
@@ -79,7 +100,7 @@ export class ChatController {
     });
 
     try {
-      this.logger.log(`Received question: ${message}, Character: ${character || 'assistant'}, SessionId: ${sessionId}, UserId: ${userId}`);
+      this.logger.log(`Received chat request. Character: ${character || 'assistant'}, SessionId: ${sessionId}`);
 
       // 使用Agentic RAG进行流式响应
       let hasSentReferences = false;

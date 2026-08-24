@@ -3,23 +3,36 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
+import { MilvusService } from '../src/milvus/milvus.service';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
+    process.env.JWT_ACCESS_SECRET = 'booksoul-e2e-only-access-secret';
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(MilvusService)
+      .useValue({
+        getClient: () => ({
+          describeCollection: jest.fn().mockResolvedValue({}),
+        }),
+      })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
   });
 
   it('/ (GET)', () => {
     return request(app.getHttpServer())
       .get('/')
       .expect(200)
-      .expect('Hello World!');
+      .expect('BookSoul API is running (NestJS)');
   });
 });

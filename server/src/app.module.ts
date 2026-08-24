@@ -14,6 +14,7 @@ import { MemoryModule } from './memory/memory.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
+import { ClaimModule } from './claim/claim.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { AuthModule } from './auth/auth.module';
     PrismaModule,
     UsersModule,
     AuthModule,
+    ClaimModule,
     MilvusModule,
     McpModule,
     RagModule,

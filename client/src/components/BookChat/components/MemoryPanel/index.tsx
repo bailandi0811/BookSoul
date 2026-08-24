@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useChatStore } from '@/store/useChatStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useMemoryStore, MemoryEntry } from '@/store/useMemoryStore';
 import { Brain, ChevronDown, Heart, Info, Bookmark, Plus, Sparkles, Archive } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -19,14 +20,16 @@ export const MemoryPanel = () => {
     deleteMemory,
   } = useMemoryStore();
 
-  const userId = 'anonymous';
+  const userId = useAuthStore(
+    (state) => state.user?.id ?? state.guestUserId,
+  );
 
   useEffect(() => {
     if (sessionId) {
       fetchProfile(userId, sessionId);
       fetchMemories(userId, sessionId);
     }
-  }, [sessionId, fetchProfile, fetchMemories]);
+  }, [sessionId, userId, fetchProfile, fetchMemories]);
 
   const groupedMemories = {
     preference: memories.filter(m => m.category === 'preference'),

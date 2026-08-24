@@ -86,7 +86,7 @@ export default function BookChat() {
   }, []);
 
   return (
-    <div className="flex h-screen bg-background paper-bg text-foreground overflow-hidden">
+    <div className="flex h-[100dvh] min-h-[100dvh] bg-background paper-bg text-foreground overflow-hidden">
       <AnimatePresence initial={false}>
         {isSidebarOpen && (
           <motion.div
