@@ -19,20 +19,20 @@
 
 | 顺序 | 编号 | 闭环需求 | 状态 | 依赖 |
 |---|---|---|---|---|
-| 1 | AUTH-01 | [Prisma 与 PostgreSQL 基础设施](01-auth-prisma-foundation.md) | 待开发 | 无 |
-| 2 | AUTH-02 | [注册、登录与当前用户](02-auth-register-login-me.md) | 待开发 | AUTH-01 |
-| 3 | AUTH-03 | [Refresh Token 轮换](03-refresh-token-rotation.md) | 待开发 | AUTH-02 |
-| 4 | AUTH-04 | [当前设备与全部设备登出](04-auth-logout.md) | 待开发 | AUTH-03 |
-| 5 | IDENTITY-01 | [统一用户与 Guest 身份上下文](05-identity-context.md) | 待开发 | AUTH-02 |
-| 6 | CHAT-01 | [聊天与历史记录归属隔离](06-chat-history-isolation.md) | 待开发 | IDENTITY-01 |
-| 7 | MEMORY-01 | [记忆 CRUD 与搜索归属隔离](07-memory-isolation.md) | 待开发 | IDENTITY-01 |
-| 8 | CLAIM-01 | [访客聊天历史认领](08-claim-chat-history.md) | 待开发 | CHAT-01 |
-| 9 | CLAIM-02 | [访客记忆与 Milvus 认领](09-claim-memory-milvus.md) | 待开发 | MEMORY-01、CLAIM-01 |
-| 10 | CLIENT-01 | [Guest 身份与认证状态仓库](10-client-auth-store.md) | 待开发 | 可并行 |
-| 11 | CLIENT-02 | [注册登录界面与账号展示](11-client-auth-ui.md) | 待开发 | AUTH-02、CLIENT-01 |
-| 12 | CLIENT-03 | [统一请求与 401 单飞刷新](12-client-http-refresh.md) | 待开发 | AUTH-03、IDENTITY-01、CLIENT-01 |
-| 13 | CLIENT-04 | [自动认领与安全登出](13-client-claim-logout.md) | 待开发 | AUTH-04、CLAIM-01、CLAIM-02、CLIENT-02、CLIENT-03 |
-| 14 | RELEASE-01 | [一期端到端验收与文档](14-release-acceptance.md) | 待开发 | 其余需求 |
+| 1 | AUTH-01 | [Prisma 与 PostgreSQL 基础设施](01-auth-prisma-foundation.md) | 已完成 | 无 |
+| 2 | AUTH-02 | [注册、登录与当前用户](02-auth-register-login-me.md) | 已完成 | AUTH-01 |
+| 3 | AUTH-03 | [Refresh Token 轮换](03-refresh-token-rotation.md) | 已完成 | AUTH-02 |
+| 4 | AUTH-04 | [当前设备与全部设备登出](04-auth-logout.md) | 已完成 | AUTH-03 |
+| 5 | IDENTITY-01 | [统一用户与 Guest 身份上下文](05-identity-context.md) | 已完成 | AUTH-02 |
+| 6 | CHAT-01 | [聊天与历史记录归属隔离](06-chat-history-isolation.md) | 已完成 | IDENTITY-01 |
+| 7 | MEMORY-01 | [记忆 CRUD 与搜索归属隔离](07-memory-isolation.md) | 已完成 | IDENTITY-01 |
+| 8 | CLAIM-01 | [访客聊天历史认领](08-claim-chat-history.md) | 已完成 | CHAT-01 |
+| 9 | CLAIM-02 | [访客记忆与 Milvus 认领](09-claim-memory-milvus.md) | 已完成 | MEMORY-01、CLAIM-01 |
+| 10 | CLIENT-01 | [Guest 身份与认证状态仓库](10-client-auth-store.md) | 已完成 | 可并行 |
+| 11 | CLIENT-02 | [注册登录界面与账号展示](11-client-auth-ui.md) | 已完成 | AUTH-02、CLIENT-01 |
+| 12 | CLIENT-03 | [统一请求与 401 单飞刷新](12-client-http-refresh.md) | 已完成 | AUTH-03、IDENTITY-01、CLIENT-01 |
+| 13 | CLIENT-04 | [自动认领与安全登出](13-client-claim-logout.md) | 已完成 | AUTH-04、CLAIM-01、CLAIM-02、CLIENT-02、CLIENT-03 |
+| 14 | RELEASE-01 | [一期端到端验收与文档](14-release-acceptance.md) | 已完成 | 其余需求 |
 
 ## 推荐实施顺序
 

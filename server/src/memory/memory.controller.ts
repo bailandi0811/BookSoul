@@ -1,8 +1,12 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, ForbiddenException } from '@nestjs/common';
 import { MemoryService } from './memory.service';
 import { MemoryLevel, MemoryCategory } from './interfaces/memory.types';
+import { CurrentAuth } from '../auth/decorators/auth-context.decorator';
+import type { AuthContext } from '../auth/auth-context';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 
 @Controller('api/memory')
+@UseGuards(OptionalJwtAuthGuard)
 export class MemoryController {
   constructor(private readonly memoryService: MemoryService) {}
 
@@ -12,8 +16,10 @@ export class MemoryController {
   async getProfile(
     @Param('userId') userId: string,
     @Param('sessionId') sessionId: string,
+    @CurrentAuth() auth: AuthContext,
   ) {
-    return this.memoryService.getOrCreateUserProfile(userId, sessionId);
+    this.assertCompatibleUserId(userId, auth);
+    return this.memoryService.getOrCreateUserProfile(auth.userId, sessionId);
   }
 
   @Patch('profile/:userId/:sessionId')
@@ -21,57 +27,74 @@ export class MemoryController {
     @Param('userId') userId: string,
     @Param('sessionId') sessionId: string,
     @Body() body: { preferences?: any; facts?: Record<string, string>; summary?: string },
+    @CurrentAuth() auth: AuthContext,
   ) {
-    return this.memoryService.updateUserProfile(userId, sessionId, body);
+    this.assertCompatibleUserId(userId, auth);
+    return this.memoryService.updateUserProfile(auth.userId, sessionId, body);
   }
 
   // ========== Memory CRUD ==========
+
+  @Get('search/:userId')
+  async searchMemories(
+    @Param('userId') userId: string,
+    @CurrentAuth() auth: AuthContext,
+    @Query('q') query: string,
+    @Query('topK') topK: number = 5,
+  ) {
+    this.assertCompatibleUserId(userId, auth);
+    return this.memoryService.searchMemories(query, auth.userId, topK);
+  }
 
   @Get(':userId/:sessionId')
   async getMemories(
     @Param('userId') userId: string,
     @Param('sessionId') sessionId: string,
+    @CurrentAuth() auth: AuthContext,
     @Query('level') level?: MemoryLevel,
   ) {
-    return this.memoryService.getMemories(userId, sessionId, level);
+    this.assertCompatibleUserId(userId, auth);
+    return this.memoryService.getMemories(auth.userId, sessionId, level);
   }
 
   @Post()
   async createMemory(@Body() body: {
-    userId: string;
+    userId?: string;
     sessionId: string;
     content: string;
     level?: MemoryLevel;
     category?: MemoryCategory;
-  }) {
-    return this.memoryService.processAndStoreMemory(body.userId, body.sessionId, body.content);
+  }, @CurrentAuth() auth: AuthContext) {
+    if (body.userId) this.assertCompatibleUserId(body.userId, auth);
+    return this.memoryService.processAndStoreMemory(auth.userId, body.sessionId, body.content);
   }
 
   @Patch(':memoryId')
   async updateMemory(
     @Param('memoryId') memoryId: string,
-    @Body() body: { userId: string; content?: string; importance?: number; verified?: boolean },
+    @Body() body: { userId?: string; content?: string; importance?: number; verified?: boolean },
+    @CurrentAuth() auth: AuthContext,
   ) {
-    return this.memoryService.updateMemory(memoryId, body.userId, body);
+    if (body.userId) this.assertCompatibleUserId(body.userId, auth);
+    const updates = { ...body };
+    delete updates.userId;
+    return this.memoryService.updateMemory(memoryId, auth.userId, updates);
   }
 
   @Delete(':memoryId')
   async deleteMemory(
     @Param('memoryId') memoryId: string,
-    @Query('userId') userId: string,
+    @Query('userId') userId: string | undefined,
+    @CurrentAuth() auth: AuthContext,
   ) {
-    await this.memoryService.deleteMemory(memoryId, userId);
+    if (userId) this.assertCompatibleUserId(userId, auth);
+    await this.memoryService.deleteMemory(memoryId, auth.userId);
     return { success: true };
   }
 
-  // ========== Semantic Search ==========
-
-  @Get('search/:userId')
-  async searchMemories(
-    @Param('userId') userId: string,
-    @Query('q') query: string,
-    @Query('topK') topK: number = 5,
-  ) {
-    return this.memoryService.searchMemories(query, userId, topK);
+  private assertCompatibleUserId(userId: string, auth: AuthContext): void {
+    if (userId !== auth.userId) {
+      throw new ForbiddenException('不能访问其他用户的数据');
+    }
   }
 }

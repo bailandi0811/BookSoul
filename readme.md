@@ -19,6 +19,9 @@ BookSoul 是一个基于 **Agentic RAG** (基于智能体的检索增强生成) 
 - **动态思考 UI (Thinking State)**: 媲美 ChatGPT 的精美前端体验，在 Agent 检索或调用工具时，展示优雅的“思考中”动画与发光效果。
 - **流式中断机制**: 支持随时通过前端中止正在生成或思考中的 Agent 任务，及时释放前后端资源。
 - **持久化短期记忆 (Memory)**: 引入基于 FileSystem 的会话记忆机制，自动按 Session 隔离对话，并采用滑动窗口截断策略精准控制 Token 消耗，实现丝滑的“断点续聊”。
+- **双 Token 账号体系**: 支持注册、登录、Access Token 自动刷新、Refresh Token 安全轮换，以及当前设备和全部设备登出。
+- **Guest 数据认领**: 访客登录后可将当前会话、画像、长期记忆和 Milvus 向量归属安全迁移到账号。
+- **身份归属隔离**: 聊天历史与记忆接口只信任服务端解析的 User/Guest 身份，客户端无法通过伪造 `userId` 越权访问。
 
 ## 技术架构
 
@@ -56,6 +59,7 @@ BookSoul 抛弃了简单的线性链，采用了基于 `@langchain/langgraph` �
 
 - Node.js (v18+)
 - Milvus 向量数据库 (推荐 Docker 安装)
+- PostgreSQL 关系数据库
 - OpenAI 兼容的 API Key (如阿里通义千问、OpenAI 等)
 - 高德地图 API Key (用于地理信息查询)
 - 一个可用的 SMTP 邮箱服务 (如 QQ 邮箱、网易邮箱，用于邮件发送)
@@ -77,6 +81,12 @@ npm install
 在 `server` 目录下创建 `.env` 文件，并参考以下配置：
 
 ```env
+# PostgreSQL 与认证
+DATABASE_URL=postgresql://USER:PASSWORD@127.0.0.1:5432/booksoul?schema=public
+JWT_ACCESS_SECRET=replace-with-a-long-random-secret
+JWT_ACCESS_EXPIRES=15m
+REFRESH_TOKEN_EXPIRES_DAYS=7
+
 # LLM 配置
 OPENAI_API_KEY=sk-xxxxxx
 OPENAI_BASE_URL=https://api.openai.com/v1  # 可选，如使用第三方兼容接口
@@ -97,6 +107,14 @@ SMTP_SECURE=true
 SMTP_USER=your_email@qq.com
 SMTP_PASS=your_email_auth_code
 SMTP_FROM="BookSoul"<your_email@qq.com>
+```
+
+首次启动前执行数据库迁移和 Prisma Client 生成：
+
+```bash
+cd server
+npm run prisma:migrate:deploy
+npm run prisma:generate
 ```
 
 ### 4. 数据入库 (Data Ingestion)
@@ -130,3 +148,15 @@ npm run dev
 ## 愿景
 
 BookSoul 致力于打造一个“活”的书籍平台。通过 MCP 协议和智能 Agent 架构，我们打破了书本与现实的界限，让读者在阅读《天龙八部》时，不仅能与乔峰对饮，能一键导航至当年的松鹤楼，还能让段誉将武功秘籍“飞鸽传书”至你的信箱，让每一次阅读都成为一场跨越时空的灵魂交流。
+
+## 一期验收路径
+
+1. 以 Guest 身份进入并创建对话，刷新页面后 Guest ID 保持稳定。
+2. 注册或登录，确认当前会话和记忆自动认领。
+3. 让 Access Token 过期，确认前端只刷新一次并重放等待请求。
+4. 登出当前设备，确认旧 Refresh Token 无法再次刷新，并回到新的 Guest。
+5. 使用两个账号分别创建 history/memory，确认 URL、body、query 中伪造 `userId` 均不能越权。
+
+Milvus 暂时不可用时，文件数据认领仍会完成，接口返回 `partial`。恢复 Milvus 后在侧栏点击“重试认领”即可安全补齐向量归属。
+
+生产部署必须将当前开发环境的宽松 CORS 改为明确的前端域名白名单。

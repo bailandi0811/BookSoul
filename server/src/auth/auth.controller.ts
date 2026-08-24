@@ -52,6 +52,25 @@ export class AuthController {
     };
   }
 
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  async logout(
+    @Body() dto: RefreshTokenDto,
+  ): Promise<SuccessResponse<Record<string, never>>> {
+    await this.authService.logout(dto.refreshToken);
+    return { success: true, data: {} };
+  }
+
+  @Post('logout-all')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async logoutAll(
+    @Request() request: AuthenticatedRequest,
+  ): Promise<SuccessResponse<Record<string, never>>> {
+    await this.authService.logoutAll(request.user.id);
+    return { success: true, data: {} };
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)

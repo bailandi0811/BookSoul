@@ -6,6 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { MemoryPanel } from './MemoryPanel';
+import { AccountSection } from '@/components/auth/AccountSection';
 
 export const Sidebar = ({ onClose }: { onClose: () => void }) => {
   const {
@@ -222,6 +223,9 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
       <MemoryPanel />
 
       <div className="p-4 border-t border-border/40">
+        <div className="mb-3">
+          <AccountSection />
+        </div>
         <motion.button
           type="button"
           whileTap={{ scale: 0.98 }}

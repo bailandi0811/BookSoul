@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { apiFetch } from '@/lib/api';
 
 export interface MemoryEntry {
   id: string;
@@ -65,7 +66,7 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
   fetchProfile: async (userId, sessionId) => {
     set({ isLoading: true });
     try {
-      const response = await fetch(`/api/memory/profile/${userId}/${sessionId}`);
+      const response = await apiFetch(`/api/memory/profile/${userId}/${sessionId}`);
       if (response.ok) {
         const profile = await response.json();
         set({ profile });
@@ -80,7 +81,7 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
   fetchMemories: async (userId, sessionId) => {
     set({ isLoading: true });
     try {
-      const response = await fetch(`/api/memory/${userId}/${sessionId}`);
+      const response = await apiFetch(`/api/memory/${userId}/${sessionId}`);
       if (response.ok) {
         const memories = await response.json();
         set({ memories });
@@ -94,7 +95,7 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
 
   searchMemories: async (userId, query, topK = 5) => {
     try {
-      const response = await fetch(`/api/memory/search/${userId}?q=${encodeURIComponent(query)}&topK=${topK}`);
+      const response = await apiFetch(`/api/memory/search/${userId}?q=${encodeURIComponent(query)}&topK=${topK}`);
       if (response.ok) {
         return await response.json();
       }
@@ -107,7 +108,7 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
 
   updateMemory: async (memoryId, userId, updates) => {
     try {
-      const response = await fetch(`/api/memory/${memoryId}`, {
+      const response = await apiFetch(`/api/memory/${memoryId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, ...updates }),
@@ -127,7 +128,7 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
 
   deleteMemory: async (memoryId, userId) => {
     try {
-      const response = await fetch(`/api/memory/${memoryId}?userId=${userId}`, {
+      const response = await apiFetch(`/api/memory/${memoryId}?userId=${userId}`, {
         method: 'DELETE',
       });
       if (response.ok) {

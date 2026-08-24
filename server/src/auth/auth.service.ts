@@ -160,6 +160,26 @@ export class AuthService {
     };
   }
 
+  async logout(refreshToken: string): Promise<void> {
+    await this.prisma.refreshToken.updateMany({
+      where: {
+        tokenHash: this.hashRefreshToken(refreshToken),
+        revokedAt: null,
+      },
+      data: { revokedAt: new Date() },
+    });
+  }
+
+  async logoutAll(userId: string): Promise<void> {
+    await this.prisma.refreshToken.updateMany({
+      where: {
+        userId,
+        revokedAt: null,
+      },
+      data: { revokedAt: new Date() },
+    });
+  }
+
   private async issueTokens(user: User): Promise<AuthData> {
     const accessToken = await this.signAccessToken(user);
     const refreshToken = this.generateRefreshToken();

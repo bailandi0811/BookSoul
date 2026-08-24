@@ -47,9 +47,24 @@ $ npm run prisma:migrate:deploy
 $ npm run prisma:generate
 ```
 
-Authentication endpoints are available at `POST /api/auth/register`,
-`POST /api/auth/login`, and `GET /api/auth/me`. The `me` endpoint requires an
-Access Token in `Authorization: Bearer <token>`.
+Authentication endpoints:
+
+- `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`
+- `POST /api/auth/refresh`, `POST /api/auth/logout`, `POST /api/auth/logout-all`
+- `POST /api/auth/claim-guest`
+
+Protected requests use `Authorization: Bearer <access-token>`. Guest business
+requests use `X-Guest-User-Id: guest_<uuid>`; the legacy value `anonymous` is
+accepted only for old local data. A supplied invalid Bearer token is rejected
+and never falls back to Guest mode.
+
+Chat history and memory APIs derive ownership from this trusted identity
+context. Client-supplied `userId` values cannot override it. Refresh tokens are
+opaque 32-byte values; only SHA-256 hashes are stored in PostgreSQL.
+
+Guest claim migrates the selected session history, profile, long-term memory,
+and Milvus ownership. If Milvus is unavailable the endpoint returns `partial`;
+the same request can safely be retried after Milvus recovers.
 
 ## Compile and run the project
 
@@ -76,6 +91,10 @@ $ npm run test:e2e
 # test coverage
 $ npm run test:cov
 ```
+
+For production, configure an explicit CORS allowlist instead of the current
+development-wide CORS setting. Never log authorization headers, passwords,
+refresh tokens, token hashes, full Guest IDs, or resolved private data paths.
 
 ## Deployment
 

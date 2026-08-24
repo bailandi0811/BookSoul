@@ -30,6 +30,8 @@ describe('AuthController', () => {
     register: jest.Mock;
     login: jest.Mock;
     refresh: jest.Mock;
+    logout: jest.Mock;
+    logoutAll: jest.Mock;
   };
   let usersService: {
     findPublicById: jest.Mock;
@@ -40,6 +42,8 @@ describe('AuthController', () => {
       register: jest.fn().mockResolvedValue(authData),
       login: jest.fn().mockResolvedValue(authData),
       refresh: jest.fn().mockResolvedValue(authData),
+      logout: jest.fn().mockResolvedValue(undefined),
+      logoutAll: jest.fn().mockResolvedValue(undefined),
     };
     usersService = {
       findPublicById: jest.fn().mockResolvedValue(publicUser),
@@ -93,6 +97,8 @@ describe('AuthController', () => {
     authService.register.mockResolvedValue(authData);
     authService.login.mockResolvedValue(authData);
     authService.refresh.mockResolvedValue(authData);
+    authService.logout.mockResolvedValue(undefined);
+    authService.logoutAll.mockResolvedValue(undefined);
     usersService.findPublicById.mockResolvedValue(publicUser);
   });
 
@@ -176,6 +182,42 @@ describe('AuthController', () => {
       .expect(400);
 
     expect(authService.refresh).not.toHaveBeenCalled();
+  });
+
+  it('logs out the current refresh-token session idempotently', async () => {
+    const refreshToken = 'r'.repeat(43);
+
+    await request(httpServer)
+      .post('/api/auth/logout')
+      .send({ refreshToken })
+      .expect(200)
+      .expect({ success: true, data: {} });
+
+    expect(authService.logout).toHaveBeenCalledWith(refreshToken);
+  });
+
+  it('logs out all sessions for the access-token user', async () => {
+    const accessToken = await jwtService.signAsync(
+      {
+        sub: publicUser.id,
+        email: publicUser.email,
+        type: 'access',
+      },
+      { algorithm: 'HS256', expiresIn: '15m' },
+    );
+
+    await request(httpServer)
+      .post('/api/auth/logout-all')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200)
+      .expect({ success: true, data: {} });
+
+    expect(authService.logoutAll).toHaveBeenCalledWith(publicUser.id);
+  });
+
+  it('requires an access token for logout-all', async () => {
+    await request(httpServer).post('/api/auth/logout-all').expect(401);
+    expect(authService.logoutAll).not.toHaveBeenCalled();
   });
 
   it.each([

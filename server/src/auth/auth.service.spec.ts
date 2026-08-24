@@ -33,6 +33,7 @@ describe('AuthService', () => {
   let prisma: {
     refreshToken: {
       create: jest.Mock;
+      updateMany: jest.Mock;
     };
     $transaction: jest.Mock;
   };
@@ -64,6 +65,7 @@ describe('AuthService', () => {
           refreshTokenWrite = input;
           return Promise.resolve({});
         }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       $transaction: jest.fn((callback: (tx: typeof transaction) => unknown) =>
         callback(transaction),
@@ -396,5 +398,37 @@ describe('AuthService', () => {
     expect(transaction.refreshToken.create).toHaveBeenCalledTimes(1);
     expect(jwtService.signAsync).toHaveBeenCalledTimes(1);
     expect(replacementRevoked).toBe(true);
+  });
+
+  it('logs out only the session identified by the refresh token', async () => {
+    const refreshToken = 'session-refresh-token';
+
+    await service.logout(refreshToken);
+
+    expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: {
+        tokenHash: createHash('sha256').update(refreshToken).digest('hex'),
+        revokedAt: null,
+      },
+      data: { revokedAt: expect.any(Date) as Date },
+    });
+  });
+
+  it('keeps repeated and unknown session logout idempotent', async () => {
+    prisma.refreshToken.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(service.logout('unknown-or-revoked')).resolves.toBeUndefined();
+  });
+
+  it('logs out every session belonging to the authenticated user', async () => {
+    await service.logoutAll(user.id);
+
+    expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: {
+        userId: user.id,
+        revokedAt: null,
+      },
+      data: { revokedAt: expect.any(Date) as Date },
+    });
   });
 });

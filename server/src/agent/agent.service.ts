@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ForbiddenException, HttpException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
 import { MilvusService } from '../milvus/milvus.service';
@@ -23,6 +23,7 @@ import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import * as path from 'path';
 import * as fs from 'fs';
+import { requireSafePathSegment, resolveWithinRoot } from '../auth/auth-context';
 
 interface QueryAnalysis {
   type: 'simple' | 'compare' | 'multi_hop' | 'broad';
@@ -591,7 +592,7 @@ export class AgentService implements OnModuleInit {
       if (!fs.existsSync(historyDir)) {
         fs.mkdirSync(historyDir, { recursive: true });
       }
-      const historyFilePath = path.join(historyDir, `session_${sessionId}.json`);
+      const historyFilePath = this.getHistoryFilePath(sessionId);
 
       const history = new FileSystemChatMessageHistory({
         sessionId: sessionId,
@@ -662,15 +663,18 @@ ${formattedMessagesForSummary}`;
               }
               await history.addMessage(userMsg);
               await history.addMessage(aiMsg);
+              this.writeHistoryOwner(historyFilePath, sessionId, userId);
             })
             .catch(async (error) => {
               this.logger.error('Failed to generate history summary:', error);
               await history.addMessage(userMsg);
               await history.addMessage(aiMsg);
+              this.writeHistoryOwner(historyFilePath, sessionId, userId);
             });
         } else {
           await history.addMessage(userMsg);
           await history.addMessage(aiMsg);
+          this.writeHistoryOwner(historyFilePath, sessionId, userId);
         }
 
         // 后台异步处理并存储重要记忆，避免阻塞 HTTP 响应结束（前端并未依赖该 stream event，而是独立刷新）
@@ -703,7 +707,7 @@ ${formattedMessagesForSummary}`;
     return { response, references };
   }
 
-  async getHistoryList(): Promise<{ sessionId: string; title: string; updatedAt: number }[]> {
+  async getHistoryList(userId: string): Promise<{ sessionId: string; title: string; updatedAt: number }[]> {
     const historyDir = path.join(process.cwd(), 'chat_histories');
     if (!fs.existsSync(historyDir)) return [];
 
@@ -720,6 +724,7 @@ ${formattedMessagesForSummary}`;
           const content = fs.readFileSync(historyFilePath, 'utf-8');
           const data = JSON.parse(content);
           const sessionData = data['']?.[sessionId] || {};
+          if (sessionData.userId !== userId) continue;
           const messages = sessionData.messages || [];
 
           let title = '新对话';
@@ -753,17 +758,21 @@ ${formattedMessagesForSummary}`;
     return list.sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
-  async getSessionHistory(sessionId: string): Promise<any[]> {
-    const historyFilePath = path.join(process.cwd(), 'chat_histories', `session_${sessionId}.json`);
-    const oldHistoryFilePath = path.join(process.cwd(), 'chat_histories', 'messages.json');
-    const targetFilePath = fs.existsSync(historyFilePath) ? historyFilePath : (fs.existsSync(oldHistoryFilePath) ? oldHistoryFilePath : null);
+  async getSessionHistory(sessionId: string, userId: string): Promise<any[]> {
+    const historyFilePath = this.getHistoryFilePath(sessionId);
+    const targetFilePath = fs.existsSync(historyFilePath) ? historyFilePath : null;
 
     if (!targetFilePath) return [];
 
     try {
       const content = fs.readFileSync(targetFilePath, 'utf-8');
       const data = JSON.parse(content);
-      const rawMessages = data['']?.[sessionId]?.messages || [];
+      const sessionData = data['']?.[sessionId];
+      if (!sessionData) return [];
+      if (sessionData.userId !== userId) {
+        throw new ForbiddenException('无权访问该会话');
+      }
+      const rawMessages = sessionData.messages || [];
 
       const messages: any[] = [];
       for (const msg of rawMessages) {
@@ -781,21 +790,58 @@ ${formattedMessagesForSummary}`;
       }
       return messages;
     } catch (error) {
+      if (error instanceof HttpException) throw error;
       this.logger.error(`Error parsing session history ${sessionId}:`, error);
       return [];
     }
   }
 
-  async deleteSession(sessionId: string): Promise<boolean> {
+  async deleteSession(sessionId: string, userId: string): Promise<boolean> {
     try {
-      const historyFilePath = path.join(process.cwd(), 'chat_histories', `session_${sessionId}.json`);
+      const historyFilePath = this.getHistoryFilePath(sessionId);
       if (fs.existsSync(historyFilePath)) {
+        const data = JSON.parse(fs.readFileSync(historyFilePath, 'utf-8'));
+        if (data['']?.[sessionId]?.userId !== userId) {
+          throw new ForbiddenException('无权访问该会话');
+        }
         fs.unlinkSync(historyFilePath);
       }
       return true;
     } catch (error) {
+      if (error instanceof HttpException) throw error;
       this.logger.error(`Failed to delete session ${sessionId}:`, error);
       return false;
+    }
+  }
+
+  async assertSessionWritable(sessionId: string, userId: string): Promise<void> {
+    const historyFilePath = this.getHistoryFilePath(sessionId);
+    if (!fs.existsSync(historyFilePath)) return;
+
+    const data = JSON.parse(fs.readFileSync(historyFilePath, 'utf-8'));
+    const owner = data['']?.[sessionId]?.userId;
+    if (owner !== userId) {
+      throw new ForbiddenException('无权访问该会话');
+    }
+  }
+
+  private getHistoryFilePath(sessionId: string): string {
+    const safeSessionId = requireSafePathSegment(sessionId, '会话标识');
+    return resolveWithinRoot(
+      path.join(process.cwd(), 'chat_histories'),
+      `session_${safeSessionId}.json`,
+    );
+  }
+
+  private writeHistoryOwner(
+    historyFilePath: string,
+    sessionId: string,
+    userId: string,
+  ): void {
+    const data = JSON.parse(fs.readFileSync(historyFilePath, 'utf-8'));
+    if (data['']?.[sessionId]) {
+      data[''][sessionId].userId = userId;
+      fs.writeFileSync(historyFilePath, JSON.stringify(data, null, 2));
     }
   }
 }
