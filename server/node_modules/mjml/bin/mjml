@@ -1,3 +1,0 @@
-#!/usr/bin/env node
-
-require('mjml-cli/lib/client.js')()
