@@ -77,7 +77,7 @@ npm run dev
 http://localhost:5173
 ```
 
-现在可以注册、登录并开始对话。
+访问后会先进入登录/注册页；认证成功后选择对话人物，再进入聊天页。聊天和记忆接口均需要登录。
 
 > macOS / Linux 用户只需把 `Copy-Item .env.example .env` 换成 `cp .env.example .env`，其他命令相同。
 

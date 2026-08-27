@@ -8,7 +8,7 @@ describe('apiFetch', () => {
     useAuthStore.getState().clearAuthentication();
   });
 
-  it('adds the stable guest header for guest requests', async () => {
+  it('does not attach an identity to unauthenticated requests', async () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(new Response('{}', { status: 200 }));
@@ -16,9 +16,8 @@ describe('apiFetch', () => {
     await apiFetch('/api/chat/history');
 
     const headers = new Headers(fetchMock.mock.calls[0][1]?.headers);
-    expect(headers.get('X-Guest-User-Id')).toBe(
-      useAuthStore.getState().guestUserId,
-    );
+    expect(headers.has('Authorization')).toBe(false);
+    expect(headers.has('X-Guest-User-Id')).toBe(false);
   });
 
   it('uses one refresh for concurrent 401 responses and replays each once', async () => {

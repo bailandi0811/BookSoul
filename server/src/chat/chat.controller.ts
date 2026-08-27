@@ -4,11 +4,11 @@ import { AgentService } from '../agent/agent.service';
 import { RagService } from '../rag/rag.service';
 import { CurrentAuth } from '../auth/decorators/auth-context.decorator';
 import type { AuthContext } from '../auth/auth-context';
-import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ChatDto } from './dto/chat.dto';
 
 @Controller('api/chat')
-@UseGuards(OptionalJwtAuthGuard)
+@UseGuards(JwtAuthGuard)
 export class ChatController {
   private readonly logger = new Logger(ChatController.name);
 

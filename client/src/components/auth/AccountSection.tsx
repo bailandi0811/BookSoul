@@ -1,12 +1,10 @@
 import { useState } from 'react';
-import { LogIn, LogOut, RefreshCw, UserRound } from 'lucide-react';
+import { LogOut, RefreshCw, UserRound } from 'lucide-react';
 import { claimCurrentGuest, logoutCurrentDevice } from '@/lib/auth-api';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useChatStore } from '@/store/useChatStore';
-import { AuthModal } from './AuthModal';
 
 export function AccountSection() {
-  const [open, setOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const user = useAuthStore((state) => state.user);
@@ -15,22 +13,7 @@ export function AccountSection() {
   const sessionId = useChatStore((state) => state.sessionId);
 
   if (!user) {
-    return (
-      <>
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="tap-spring flex w-full items-center justify-between rounded-xl border border-border bg-card px-3 py-2.5 text-sm font-semibold hover:border-primary/40"
-        >
-          <span className="flex items-center gap-2.5">
-            <LogIn className="h-4 w-4 text-primary" />
-            登录或注册
-          </span>
-          <span className="text-xs font-normal text-muted-foreground">保存对话</span>
-        </button>
-        <AuthModal open={open} onClose={() => setOpen(false)} />
-      </>
-    );
+    return null;
   }
 
   return (
