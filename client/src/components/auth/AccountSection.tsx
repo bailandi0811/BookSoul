@@ -7,6 +7,8 @@ import { AuthModal } from './AuthModal';
 
 export function AccountSection() {
   const [open, setOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
   const user = useAuthStore((state) => state.user);
   const claimState = useAuthStore((state) => state.claimState);
   const claimMessage = useAuthStore((state) => state.claimMessage);
@@ -44,15 +46,36 @@ export function AccountSection() {
         <button
           type="button"
           onClick={async () => {
-            await logoutCurrentDevice();
+            setLoggingOut(true);
+            setLogoutError(null);
+            try {
+              await logoutCurrentDevice();
+            } catch {
+              setLogoutError('退出失败，请检查网络后重试');
+            } finally {
+              setLoggingOut(false);
+            }
           }}
+          disabled={loggingOut}
           className="tap-spring rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
           aria-label="退出登录"
           title="退出登录"
         >
-          <LogOut className="h-4 w-4" />
+          {loggingOut ? (
+            <RefreshCw className="h-4 w-4 animate-spin" />
+          ) : (
+            <LogOut className="h-4 w-4" />
+          )}
         </button>
       </div>
+      {logoutError && (
+        <p
+          role="alert"
+          className="rounded-xl bg-destructive/10 px-3 py-2 text-xs text-destructive"
+        >
+          {logoutError}
+        </p>
+      )}
       {(claimState === 'partial' || claimState === 'failed') && (
         <div className="rounded-xl bg-primary/10 p-3 text-xs leading-5 text-foreground">
           <p>{claimMessage ?? '访客数据尚未完整迁移'}</p>

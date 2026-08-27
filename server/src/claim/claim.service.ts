@@ -2,7 +2,6 @@ import {
   ConflictException,
   Injectable,
   Logger,
-  NotFoundException,
 } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -18,7 +17,7 @@ export type ClaimStatus = 'completed' | 'partial' | 'already_claimed';
 
 export interface ClaimGuestResult {
   status: ClaimStatus;
-  history: 'claimed' | 'already_claimed';
+  history: 'claimed' | 'already_claimed' | 'none';
   memory: 'claimed' | 'already_claimed' | 'none';
   vectors: 'claimed' | 'already_claimed' | 'unavailable';
 }
@@ -50,7 +49,7 @@ export class ClaimService {
       return { status: 'partial', history, memory, vectors };
     }
     const already =
-      history === 'already_claimed' &&
+      (history === 'already_claimed' || history === 'none') &&
       (memory === 'already_claimed' || memory === 'none') &&
       vectors === 'already_claimed';
     return {
@@ -65,7 +64,7 @@ export class ClaimService {
     guestUserId: string,
     sessionId: string,
     userId: string,
-  ): Promise<'claimed' | 'already_claimed'> {
+  ): Promise<'claimed' | 'already_claimed' | 'none'> {
     const filePath = resolveWithinRoot(
       path.join(process.cwd(), 'chat_histories'),
       `session_${sessionId}.json`,
@@ -75,16 +74,14 @@ export class ClaimService {
       data = JSON.parse(await fs.readFile(filePath, 'utf8')) as typeof data;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        throw new NotFoundException('访客会话不存在');
+        return 'none';
       }
       throw error;
     }
     const session = data['']?.[sessionId];
-    if (!session) throw new NotFoundException('访客会话不存在');
+    if (!session) return 'none';
     if (session.userId === userId) return 'already_claimed';
-    const isCompatibleUnownedHistory =
-      guestUserId === 'anonymous' && session.userId === undefined;
-    if (session.userId !== guestUserId && !isCompatibleUnownedHistory) {
+    if (session.userId !== guestUserId) {
       throw new ConflictException('会话已归属其他身份');
     }
     session.userId = userId;

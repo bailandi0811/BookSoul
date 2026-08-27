@@ -22,6 +22,7 @@ interface AuthState {
   claimMessage: string | null;
   isAuthenticated: boolean;
   signIn: (data: AuthTokens) => void;
+  restoreSession: (data: AuthTokens) => void;
   updateTokens: (accessToken: string) => void;
   setClaimState: (state: ClaimState, message?: string | null) => void;
   completeClaim: () => void;
@@ -69,6 +70,12 @@ export const useAuthStore = create<AuthState>()(
           claimState: 'idle',
           claimMessage: null,
         }),
+      restoreSession: ({ accessToken, user }) =>
+        set({
+          accessToken,
+          user,
+          isAuthenticated: true,
+        }),
       updateTokens: (accessToken) =>
         set((state) =>
           state.user
@@ -90,7 +97,6 @@ export const useAuthStore = create<AuthState>()(
         set({
           user: null,
           accessToken: null,
-          guestUserId: createGuestUserId(),
           isAuthenticated: false,
           claimState: 'idle',
           claimMessage: null,

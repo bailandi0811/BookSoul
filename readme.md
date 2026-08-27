@@ -1,108 +1,125 @@
 # BookSoul（书魂）
 
-BookSoul 是一套面向《天龙八部》的沉浸式角色对话应用。系统使用 NestJS、React、LangChain、PostgreSQL 和 Milvus，按问题类型在直接回答与小说语义检索之间路由，并通过 SSE 流式输出回答、检索引用和记忆更新。
-
-## 当前能力
-
-- 乔峰、段誉、王语嫣及通用助手四种对话角色
-- Agentic RAG：意图分类、查询改写、检索、结果评估和生成
-- 可中断的 SSE 流式响应，带请求级竞态隔离
-- 会话历史摘要及按身份隔离的文件持久化
-- 用户画像、可编辑记忆和 Milvus 长期记忆检索
-- PostgreSQL 账号体系、Refresh Token 轮换和访客数据认领
-- MCP 默认关闭；仅加载配置了服务且出现在精确白名单中的远程工具
-- 邮件只允许登录用户通过明确确认的 HTTP 接口发送，模型不能自主发送
-
-## 安全边界
-
-- Refresh Token 只存在于 `HttpOnly`、`SameSite=Lax` Cookie 中，不返回给前端 JavaScript。
-- Access Token 短期有效；前端并发遇到 401 时只执行一次刷新并重放请求。
-- Guest ID 必须是 `guest_<uuid>`；共享的旧 `anonymous` 身份已禁用。
-- 历史和记忆归属只采用服务端认证上下文，不信任请求中的 `userId`。
-- 服务端启用 Helmet、CORS 来源白名单、DTO 白名单校验和全局限流。
-- 不再启动本地文件系统 MCP、任意 fetch MCP 或运行时 `npx -y` 子进程。
+一个基于 React、NestJS 和 LangChain 的《天龙八部》角色对话应用，支持流式回答、小说检索、用户记忆和账号登录。
 
 ## 环境要求
 
-- Node.js 22.19.x（仓库提供 `.nvmrc`）
-- npm 10.9.x
+- Node.js 22（推荐 `22.19.0`）
 - PostgreSQL
-- Milvus
-- OpenAI 兼容的 Chat 与 Embedding API
+- OpenAI API 兼容的 Chat 与 Embedding 服务
+- Milvus（可选，只在需要小说向量检索时使用）
 
-## 本地启动
+## 快速启动
 
-```bash
+### 1. 创建数据库
+
+在 PostgreSQL 中创建一个名为 `booksoul` 的数据库。
+
+没有本地 PostgreSQL 时，也可以直接用 Docker：
+
+```powershell
+docker run --name booksoul-postgres -e POSTGRES_USER=booksoul -e POSTGRES_PASSWORD=booksoul -e POSTGRES_DB=booksoul -p 5432:5432 -d postgres:16
+```
+
+### 2. 启动后端
+
+```powershell
 cd server
-npm install
-copy .env.example .env
+npm ci
+Copy-Item .env.example .env
+```
+
+生成 JWT 密钥：
+
+```powershell
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+打开 `server/.env`，至少修改下面这些配置：
+
+```dotenv
+DATABASE_URL=postgresql://booksoul:booksoul@127.0.0.1:5432/booksoul?schema=public
+JWT_ACCESS_SECRET=粘贴刚才生成的随机密钥
+
+OPENAI_API_KEY=你的API密钥
+OPENAI_BASE_URL=你的API地址
+MODEL_NAME=你的对话模型名称
+EMBEDDING_MODEL_NAME=你的向量模型名称
+```
+
+初始化数据库并启动：
+
+```powershell
 npm run prisma:generate
 npm run prisma:migrate:deploy
 npm run start:dev
 ```
 
-另开终端：
+看到以下地址即可：
 
-```bash
+```text
+http://localhost:3000
+```
+
+### 3. 启动前端
+
+另开一个终端：
+
+```powershell
 cd client
-npm install
+npm ci
 npm run dev
 ```
 
-前端默认运行于 `http://localhost:5173`，后端默认运行于 `http://localhost:3000`。开发代理由 Vite 配置处理。
+浏览器访问：
 
-## 必要配置
-
-以 [server/.env.example](server/.env.example) 为准，至少设置：
-
-```dotenv
-DATABASE_URL=postgresql://USER:PASSWORD@127.0.0.1:5432/booksoul?schema=public
-JWT_ACCESS_SECRET=至少32位且仅用于本项目的随机值
-CORS_ORIGINS=http://localhost:5173
-OPENAI_API_KEY=
-OPENAI_BASE_URL=
-MILVUS_ADDRESS=localhost:19530
-MILVUS_TOKEN=
+```text
+http://localhost:5173
 ```
 
-地图 MCP 是可选能力。即便设置了 `AMAP_API_KEY`，仍需在 `MCP_ALLOWED_TOOL_NAMES` 中填写从该服务返回的精确工具名，否则工具保持关闭。
+现在可以注册、登录并开始对话。
 
-SMTP 也是可选能力。配置完成后，登录用户可调用 `POST /api/tools/email`，请求必须包含 `confirmed: true`，且只接受纯文本正文。
+> macOS / Linux 用户只需把 `Copy-Item .env.example .env` 换成 `cp .env.example .env`，其他命令相同。
 
-## 导入电子书
+## 启用小说检索（可选）
 
-```bash
-cd server
+基础账号和对话功能不要求 Milvus。需要小说原文检索时，先启动 Milvus，并在 `server/.env` 中配置：
+
+```dotenv
+MILVUS_ADDRESS=localhost:19530
+MILVUS_TOKEN=root:Milvus
+```
+
+然后在 `server` 目录导入电子书：
+
+```powershell
 npm run ingest -- ../天龙八部.epub
 ```
 
-脚本使用项目内的 `epub2` 读取章节，切分文本、生成向量并写入 Milvus。
+Embedding 模型需要支持输出 1024 维向量。
 
-## 质量门禁
+## 常用命令
 
-```bash
+```powershell
+# 后端检查
+cd server
+npm run check
+
+# 前端检查
 cd client
 npm run check
-
-cd ../server
-npm run check
 ```
 
-两个 `check` 均执行只读 lint、类型检查、测试和生产构建。GitHub Actions 会对前后端分别执行同样的门禁。
+## 常见问题
 
-## 数据说明
+### JWT 密钥错误
 
-- 账号和 Refresh Token 哈希存储在 PostgreSQL。
-- 小说与长期记忆向量存储在 Milvus。
-- 会话历史、画像和记忆正文当前仍保存在 `server/chat_histories` 与 `server/memories`，使用按身份隔离和原子写入；生产横向扩容前应迁移到共享数据库或对象存储。
-- Milvus 不可用时，普通文件记忆仍可使用，语义搜索会退化为文本搜索。
+如果后端提示 `JWT_ACCESS_SECRET must be a private value...`，说明 `.env` 仍在使用模板值。重新生成密钥并替换即可。
 
-仓库已包含对应的 PostgreSQL 表和只复制、不删除源文件的幂等迁移命令。完成数据库备份并应用迁移后，可执行：
+### 数据库连接失败
 
-```bash
-cd server
-npm run prisma:migrate:deploy
-npm run migrate:file-data
-```
+确认 PostgreSQL 已启动、数据库已经创建，并检查 `DATABASE_URL` 中的用户名、密码和端口。
 
-核对数据库记录数与抽样内容后，再安排生产读写切换。当前版本有意保留文件为运行时数据源，避免在未验证真实数据和备份的情况下直接破坏性切换。
+### 登录或接口请求失败
+
+先访问 `http://localhost:3000` 确认后端运行，再访问 `http://localhost:5173`。后端或 `.env` 修改后需要重启服务。

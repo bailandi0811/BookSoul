@@ -2,6 +2,7 @@ import { apiFetch, readApiError } from './api';
 import { useAuthStore, type AuthTokens } from '@/store/useAuthStore';
 
 type AuthMode = 'login' | 'register';
+export type AuthRestoreStatus = 'authenticated' | 'guest' | 'unavailable';
 
 export async function authenticate(
   mode: AuthMode,
@@ -18,6 +19,46 @@ export async function authenticate(
   const result = (await response.json()) as { success: true; data: AuthTokens };
   useAuthStore.getState().signIn(result.data);
   return result.data;
+}
+
+export async function restoreAuthentication(): Promise<AuthRestoreStatus> {
+  const existing = useAuthStore.getState();
+
+  try {
+    if (existing.user && existing.accessToken) {
+      const response = await apiFetch('/api/auth/me');
+      if (response.ok) {
+        const result = (await response.json()) as {
+          success: true;
+          data: { user: AuthTokens['user'] };
+        };
+        const accessToken = useAuthStore.getState().accessToken;
+        if (!accessToken) return 'guest';
+        useAuthStore.getState().restoreSession({
+          accessToken,
+          user: result.data.user,
+        });
+        return 'authenticated';
+      }
+      return response.status === 401 ? 'guest' : 'unavailable';
+    }
+
+    const response = await apiFetch('/api/auth/refresh', {
+      method: 'POST',
+      skipAuth: true,
+      skipRefresh: true,
+    });
+    if (response.status === 401) return 'guest';
+    if (!response.ok) return 'unavailable';
+    const result = (await response.json()) as {
+      success: true;
+      data: AuthTokens;
+    };
+    useAuthStore.getState().restoreSession(result.data);
+    return 'authenticated';
+  } catch {
+    return 'unavailable';
+  }
 }
 
 export async function claimCurrentGuest(sessionId: string): Promise<void> {
@@ -60,15 +101,12 @@ export async function claimCurrentGuest(sessionId: string): Promise<void> {
 
 export async function logoutCurrentDevice(): Promise<void> {
   const auth = useAuthStore.getState();
-  try {
-    if (auth.user) {
-      await apiFetch('/api/auth/logout', {
-        method: 'POST',
-        skipRefresh: true,
-      });
-    }
-  } finally {
-    auth.clearAuthentication();
-    window.dispatchEvent(new Event('booksoul:auth-invalidated'));
-  }
+  if (!auth.user) return;
+  const response = await apiFetch('/api/auth/logout', {
+    method: 'POST',
+    skipRefresh: true,
+  });
+  if (!response.ok) throw new Error(await readApiError(response));
+  useAuthStore.getState().clearAuthentication();
+  window.dispatchEvent(new Event('booksoul:auth-invalidated'));
 }
