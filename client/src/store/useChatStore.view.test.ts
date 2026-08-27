@@ -27,6 +27,17 @@ describe('chat view & character switch', () => {
     expect(localStorage.getItem('booksoul_character')).toBe('qiaofeng');
   });
 
+  it('openEntrance returns an authenticated login flow to character selection', () => {
+    useChatStore.setState({ view: 'dialogue', currentCharacter: 'qiaofeng' });
+
+    useChatStore.getState().openEntrance();
+
+    expect(useChatStore.getState()).toMatchObject({
+      view: 'entrance',
+      currentCharacter: 'qiaofeng',
+    });
+  });
+
   it('switchCharacter clears messages and rotates sessionId', () => {
     useChatStore.setState({
       view: 'dialogue',

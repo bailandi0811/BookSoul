@@ -14,12 +14,8 @@ let refreshPromise: Promise<RefreshResult> | null = null;
 function withIdentityHeaders(options: ApiOptions): Headers {
   const headers = new Headers(options.headers);
   const auth = useAuthStore.getState();
-  if (!options.skipAuth) {
-    if (auth.accessToken) {
-      headers.set('Authorization', `Bearer ${auth.accessToken}`);
-    } else {
-      headers.set('X-Guest-User-Id', auth.guestUserId);
-    }
+  if (!options.skipAuth && auth.accessToken) {
+    headers.set('Authorization', `Bearer ${auth.accessToken}`);
   }
   return headers;
 }

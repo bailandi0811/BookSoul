@@ -3,7 +3,7 @@ import { MemoryService } from './memory.service';
 import { MemoryLevel } from './interfaces/memory.types';
 import { CurrentAuth } from '../auth/decorators/auth-context.decorator';
 import type { AuthContext } from '../auth/auth-context';
-import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import {
   CreateMemoryDto,
   SearchMemoryQueryDto,
@@ -12,7 +12,7 @@ import {
 } from './dto/memory.dto';
 
 @Controller('api/memory')
-@UseGuards(OptionalJwtAuthGuard)
+@UseGuards(JwtAuthGuard)
 export class MemoryController {
   constructor(private readonly memoryService: MemoryService) {}
 
