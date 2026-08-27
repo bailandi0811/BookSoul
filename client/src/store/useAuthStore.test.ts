@@ -49,7 +49,23 @@ describe('useAuthStore', () => {
     });
   });
 
-  it('clears account data and rotates to a new guest on logout', () => {
+  it('restores rotated credentials without resetting guest claim progress', () => {
+    useAuthStore.getState().setClaimState('partial', '稍后重试');
+
+    useAuthStore.getState().restoreSession({
+      accessToken: 'restored-access',
+      user: { id: 'user-1', email: 'reader@example.com', name: '读者' },
+    });
+
+    expect(useAuthStore.getState()).toMatchObject({
+      accessToken: 'restored-access',
+      user: { id: 'user-1' },
+      claimState: 'partial',
+      claimMessage: '稍后重试',
+    });
+  });
+
+  it('clears account data without orphaning pending guest data', () => {
     const guestUserId = useAuthStore.getState().guestUserId;
     useAuthStore.getState().signIn({
       accessToken: 'access',
@@ -63,6 +79,6 @@ describe('useAuthStore', () => {
       accessToken: null,
       isAuthenticated: false,
     });
-    expect(useAuthStore.getState().guestUserId).not.toBe(guestUserId);
+    expect(useAuthStore.getState().guestUserId).toBe(guestUserId);
   });
 });

@@ -87,4 +87,37 @@ describe('apiFetch', () => {
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
     expect(useAuthStore.getState().user).toBeNull();
   });
+
+  it('does not treat a guest 401 as an expired account session', async () => {
+    const guestUserId = useAuthStore.getState().guestUserId;
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('{}', { status: 401 }));
+
+    const response = await apiFetch('/api/private');
+
+    expect(response.status).toBe(401);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(useAuthStore.getState().guestUserId).toBe(guestUserId);
+  });
+
+  it('keeps the local account when refresh is temporarily unavailable', async () => {
+    useAuthStore.getState().signIn({
+      accessToken: 'old-access',
+      user: { id: 'user-1', email: 'reader@example.com', name: '读者' },
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) =>
+      String(input) === '/api/auth/refresh'
+        ? new Response('{}', { status: 503 })
+        : new Response('{}', { status: 401 }),
+    );
+
+    await apiFetch('/api/private');
+
+    expect(useAuthStore.getState()).toMatchObject({
+      isAuthenticated: true,
+      accessToken: 'old-access',
+      user: { id: 'user-1' },
+    });
+  });
 });

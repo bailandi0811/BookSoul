@@ -1,8 +1,7 @@
 import { useChatStore } from '@/store/useChatStore';
 import { useMemoryStore } from '@/store/useMemoryStore';
-import { lazy, Suspense, useEffect } from 'react';
-import { apiFetch } from '@/lib/api';
-import { useAuthStore } from '@/store/useAuthStore';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { restoreAuthentication } from '@/lib/auth-api';
 
 const BookChat = lazy(() => import('@/components/BookChat'));
 const Entrance = lazy(() =>
@@ -13,10 +12,12 @@ const Entrance = lazy(() =>
 
 function App() {
   const view = useChatStore((s) => s.view);
+  const [authReady, setAuthReady] = useState(false);
+
   useEffect(() => {
     const clearPrivateCaches = () => {
       useChatStore.getState().clearMessages();
-      useChatStore.setState({ sessions: [], userId: 'anonymous' });
+      useChatStore.setState({ sessions: [] });
       useMemoryStore.setState({
         profile: null,
         memories: [],
@@ -30,13 +31,23 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!useAuthStore.getState().isAuthenticated) return;
-    void apiFetch('/api/auth/me').then((response) => {
-      if (!response.ok && response.status !== 401) {
-        console.warn('Unable to validate the restored account session');
-      }
+    let active = true;
+    void restoreAuthentication().finally(() => {
+      if (active) setAuthReady(true);
     });
+    return () => {
+      active = false;
+    };
   }, []);
+
+  if (!authReady) {
+    return (
+      <div className="grid min-h-[100dvh] place-items-center bg-background text-sm text-muted-foreground">
+        正在恢复会话…
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-[100dvh] w-full">
       <Suspense

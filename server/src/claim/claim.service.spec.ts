@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { MilvusService } from '../milvus/milvus.service';
 import { ClaimService } from './claim.service';
 
@@ -109,10 +109,45 @@ describe('ClaimService', () => {
     });
   });
 
-  it('rejects missing and conflicting chat histories', async () => {
+  it('continues when chat history is missing', async () => {
     await expect(
       service.claimGuest(guestId, sessionId, userId),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    ).resolves.toEqual({
+      status: 'already_claimed',
+      history: 'none',
+      memory: 'none',
+      vectors: 'already_claimed',
+    });
+  });
+
+  it('claims profile data even when chat history is missing', async () => {
+    writeJson(`memories/profiles/${guestId}/${sessionId}.json`, {
+      userId: guestId,
+      sessionId,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      preferences: { favoriteCharacters: [], interests: [] },
+      facts: { city: '杭州' },
+      summary: '',
+    });
+
+    const result = await service.claimGuest(guestId, sessionId, userId);
+
+    expect(result).toMatchObject({
+      status: 'completed',
+      history: 'none',
+      memory: 'claimed',
+    });
+    const profile = JSON.parse(
+      fs.readFileSync(
+        path.join(root, `memories/profiles/${userId}/${sessionId}.json`),
+        'utf8',
+      ),
+    ) as { userId: string };
+    expect(profile.userId).toBe(userId);
+  });
+
+  it('rejects chat histories owned by another identity', async () => {
 
     writeGuestHistory('user-2');
     await expect(

@@ -5,7 +5,11 @@ interface ApiOptions extends RequestInit {
   skipRefresh?: boolean;
 }
 
-let refreshPromise: Promise<boolean> | null = null;
+type RefreshResult =
+  | { status: 'success'; data: AuthTokens }
+  | { status: 'unauthorized' | 'unavailable' };
+
+let refreshPromise: Promise<RefreshResult> | null = null;
 
 function withIdentityHeaders(options: ApiOptions): Headers {
   const headers = new Headers(options.headers);
@@ -20,40 +24,49 @@ function withIdentityHeaders(options: ApiOptions): Headers {
   return headers;
 }
 
-async function refreshAuthentication(): Promise<boolean> {
+function invalidateAuthentication(): void {
+  useAuthStore.getState().clearAuthentication();
+  window.dispatchEvent(new Event('booksoul:auth-invalidated'));
+}
+
+async function requestTokenRefresh(): Promise<RefreshResult> {
   if (refreshPromise) return refreshPromise;
   refreshPromise = (async () => {
-    const auth = useAuthStore.getState();
-    if (!auth.user) return false;
     try {
       const response = await fetch('/api/auth/refresh', {
         method: 'POST',
         credentials: 'include',
       });
-      if (!response.ok) return false;
+      if (response.status === 401 || response.status === 403) {
+        return { status: 'unauthorized' } as const;
+      }
+      if (!response.ok) return { status: 'unavailable' } as const;
       const payload = (await response.json()) as {
         success: true;
         data: AuthTokens;
       };
-      useAuthStore
-        .getState()
-        .updateTokens(payload.data.accessToken);
-      return true;
+      return { status: 'success', data: payload.data } as const;
     } catch {
-      return false;
+      return { status: 'unavailable' } as const;
     }
   })();
 
   try {
-    const refreshed = await refreshPromise;
-    if (!refreshed) {
-      useAuthStore.getState().clearAuthentication();
-      window.dispatchEvent(new Event('booksoul:auth-invalidated'));
-    }
-    return refreshed;
+    return await refreshPromise;
   } finally {
     refreshPromise = null;
   }
+}
+
+async function refreshAuthentication(): Promise<boolean> {
+  if (!useAuthStore.getState().user) return false;
+  const result = await requestTokenRefresh();
+  if (result.status === 'success') {
+    useAuthStore.getState().restoreSession(result.data);
+    return true;
+  }
+  if (result.status === 'unauthorized') invalidateAuthentication();
+  return false;
 }
 
 export async function apiFetch(
@@ -69,6 +82,7 @@ export async function apiFetch(
   if (response.status !== 401 || skipRefresh || skipAuth) {
     return response;
   }
+  if (!useAuthStore.getState().user) return response;
   const refreshed = await refreshAuthentication();
   if (!refreshed) return response;
   return fetch(input, {

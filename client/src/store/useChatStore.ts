@@ -75,7 +75,6 @@ interface ChatState {
   isLoading: boolean;
   currentCharacter: CharacterType;
   sessionId: string;
-  userId: string;
   sessions: HistorySession[];
   isSessionsLoading: boolean;
   abortController: AbortController | null;
@@ -113,7 +112,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isLoading: false,
   currentCharacter: initialCharacter,
   sessionId: `session_${Date.now()}`,
-  userId: 'anonymous',
   sessions: [],
   isSessionsLoading: false,
   abortController: null,
