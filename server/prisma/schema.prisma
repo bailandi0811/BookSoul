@@ -33,3 +33,43 @@ model RefreshToken {
 
   @@index([userId])
 }
+
+model ChatSessionRecord {
+  sessionId String   @id
+  ownerId   String
+  messages  Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId, updatedAt])
+}
+
+model UserProfileRecord {
+  id          String   @id @default(uuid())
+  ownerId     String
+  sessionId   String
+  preferences Json
+  facts       Json
+  summary     String
+  createdAt   DateTime
+  updatedAt   DateTime
+
+  @@unique([ownerId, sessionId])
+  @@index([ownerId])
+}
+
+model MemoryRecord {
+  id         String   @id
+  ownerId    String
+  sessionId  String
+  level      String
+  content    String
+  importance Float
+  category   String
+  metadata   Json
+  createdAt  DateTime
+  updatedAt  DateTime
+
+  @@index([ownerId, sessionId])
+  @@index([ownerId, level])
+}

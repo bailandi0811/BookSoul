@@ -12,6 +12,8 @@ export interface AuthData {
   user: PublicUser;
 }
 
+export type PublicAuthData = Omit<AuthData, 'refreshToken'>;
+
 export interface SuccessResponse<T> {
   success: true;
   data: T;

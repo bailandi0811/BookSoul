@@ -24,21 +24,21 @@ describe('apiFetch', () => {
   it('uses one refresh for concurrent 401 responses and replays each once', async () => {
     useAuthStore.getState().signIn({
       accessToken: 'old-access',
-      refreshToken: 'old-refresh',
       user: { id: 'user-1', email: 'reader@example.com', name: '读者' },
     });
     let refreshCalls = 0;
+    let refreshRequest: RequestInit | undefined;
     const businessCalls = new Map<string, number>();
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = String(input);
       if (url === '/api/auth/refresh') {
         refreshCalls += 1;
+        refreshRequest = init;
         return new Response(
           JSON.stringify({
             success: true,
             data: {
               accessToken: 'new-access',
-              refreshToken: 'new-refresh',
               user: useAuthStore.getState().user,
             },
           }),
@@ -60,17 +60,20 @@ describe('apiFetch', () => {
 
     expect(results.every((response) => response.status === 200)).toBe(true);
     expect(refreshCalls).toBe(1);
+    expect(refreshRequest).toMatchObject({
+      method: 'POST',
+      credentials: 'include',
+    });
+    expect(refreshRequest?.body).toBeUndefined();
     expect([...businessCalls.values()]).toEqual([2, 2, 2, 2, 2]);
     expect(useAuthStore.getState()).toMatchObject({
       accessToken: 'new-access',
-      refreshToken: 'new-refresh',
     });
   });
 
   it('clears authentication when refresh fails', async () => {
     useAuthStore.getState().signIn({
       accessToken: 'old-access',
-      refreshToken: 'old-refresh',
       user: { id: 'user-1', email: 'reader@example.com', name: '读者' },
     });
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) =>

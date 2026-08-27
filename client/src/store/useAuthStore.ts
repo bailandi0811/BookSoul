@@ -9,7 +9,6 @@ export interface AuthUser {
 
 export interface AuthTokens {
   accessToken: string;
-  refreshToken: string;
   user: AuthUser;
 }
 
@@ -18,13 +17,12 @@ export type ClaimState = 'idle' | 'claiming' | 'partial' | 'failed';
 interface AuthState {
   user: AuthUser | null;
   accessToken: string | null;
-  refreshToken: string | null;
   guestUserId: string;
   claimState: ClaimState;
   claimMessage: string | null;
   isAuthenticated: boolean;
   signIn: (data: AuthTokens) => void;
-  updateTokens: (accessToken: string, refreshToken: string) => void;
+  updateTokens: (accessToken: string) => void;
   setClaimState: (state: ClaimState, message?: string | null) => void;
   completeClaim: () => void;
   clearAuthentication: () => void;
@@ -43,7 +41,6 @@ function createGuestUserId(): string {
 }
 
 export function normalizeGuestUserId(value: unknown): string {
-  if (value === 'anonymous') return 'anonymous';
   if (
     typeof value === 'string' &&
     /^guest_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -60,27 +57,24 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user: null,
       accessToken: null,
-      refreshToken: null,
       guestUserId: createGuestUserId(),
       claimState: 'idle',
       claimMessage: null,
       isAuthenticated: false,
-      signIn: ({ accessToken, refreshToken, user }) =>
+      signIn: ({ accessToken, user }) =>
         set({
           accessToken,
-          refreshToken,
           user,
           isAuthenticated: true,
           claimState: 'idle',
           claimMessage: null,
         }),
-      updateTokens: (accessToken, refreshToken) =>
+      updateTokens: (accessToken) =>
         set((state) =>
           state.user
-            ? { accessToken, refreshToken, isAuthenticated: true }
+            ? { accessToken, isAuthenticated: true }
             : {
                 accessToken: null,
-                refreshToken: null,
                 isAuthenticated: false,
               },
         ),
@@ -96,7 +90,6 @@ export const useAuthStore = create<AuthState>()(
         set({
           user: null,
           accessToken: null,
-          refreshToken: null,
           guestUserId: createGuestUserId(),
           isAuthenticated: false,
           claimState: 'idle',
@@ -105,11 +98,11 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'booksoul-auth',
-      version: 1,
+      version: 2,
       merge: (persisted, current) => {
         const saved = (persisted ?? {}) as Partial<AuthState>;
         const validUserState = Boolean(
-          saved.user && saved.accessToken && saved.refreshToken,
+          saved.user && saved.accessToken,
         );
         return {
           ...current,
@@ -117,14 +110,12 @@ export const useAuthStore = create<AuthState>()(
           guestUserId: normalizeGuestUserId(saved.guestUserId),
           user: validUserState ? saved.user! : null,
           accessToken: validUserState ? saved.accessToken! : null,
-          refreshToken: validUserState ? saved.refreshToken! : null,
           isAuthenticated: validUserState,
         };
       },
       partialize: (state) => ({
         user: state.user,
         accessToken: state.accessToken,
-        refreshToken: state.refreshToken,
         guestUserId: state.guestUserId,
         claimState: state.claimState,
         claimMessage: state.claimMessage,

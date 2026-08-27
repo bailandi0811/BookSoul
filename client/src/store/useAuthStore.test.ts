@@ -15,40 +15,36 @@ describe('useAuthStore', () => {
     expect(useAuthStore.getState().guestUserId).toBe(first);
   });
 
-  it('keeps the legacy anonymous identity for existing local data', () => {
-    expect(normalizeGuestUserId('anonymous')).toBe('anonymous');
+  it('rotates unsafe legacy guest identities', () => {
+    expect(normalizeGuestUserId('anonymous')).toMatch(/^guest_/);
     expect(normalizeGuestUserId('../anonymous')).toMatch(/^guest_/);
   });
 
   it('moves atomically from guest to authenticated user', () => {
     useAuthStore.getState().signIn({
       accessToken: 'access',
-      refreshToken: 'refresh',
       user: { id: 'user-1', email: 'reader@example.com', name: '读者' },
     });
 
     expect(useAuthStore.getState()).toMatchObject({
       accessToken: 'access',
-      refreshToken: 'refresh',
       isAuthenticated: true,
       user: { id: 'user-1' },
     });
   });
 
-  it('updates both tokens without losing pending guest identity', () => {
+  it('updates the access token without losing pending guest identity', () => {
     const guestUserId = useAuthStore.getState().guestUserId;
     useAuthStore.getState().signIn({
       accessToken: 'access-1',
-      refreshToken: 'refresh-1',
       user: { id: 'user-1', email: 'reader@example.com', name: '读者' },
     });
 
-    useAuthStore.getState().updateTokens('access-2', 'refresh-2');
+    useAuthStore.getState().updateTokens('access-2');
 
     expect(useAuthStore.getState()).toMatchObject({
       guestUserId,
       accessToken: 'access-2',
-      refreshToken: 'refresh-2',
       user: { id: 'user-1' },
     });
   });
@@ -57,7 +53,6 @@ describe('useAuthStore', () => {
     const guestUserId = useAuthStore.getState().guestUserId;
     useAuthStore.getState().signIn({
       accessToken: 'access',
-      refreshToken: 'refresh',
       user: { id: 'user-1', email: 'reader@example.com', name: '读者' },
     });
 
@@ -66,7 +61,6 @@ describe('useAuthStore', () => {
     expect(useAuthStore.getState()).toMatchObject({
       user: null,
       accessToken: null,
-      refreshToken: null,
       isAuthenticated: false,
     });
     expect(useAuthStore.getState().guestUserId).not.toBe(guestUserId);

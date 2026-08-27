@@ -5,6 +5,7 @@ import { PassportModule } from '@nestjs/passport';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import cookieParser from 'cookie-parser';
 import { UsersService } from '../users/users.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -20,6 +21,10 @@ describe('AuthController', () => {
   const authData = {
     accessToken: 'access-token',
     refreshToken: 'refresh-token',
+    user: publicUser,
+  };
+  const publicAuthData = {
+    accessToken: authData.accessToken,
     user: publicUser,
   };
 
@@ -68,14 +73,18 @@ describe('AuthController', () => {
         {
           provide: ConfigService,
           useValue: {
-            get: (key: string) =>
-              key === 'auth.accessSecret' ? secret : undefined,
+            get: (key: string) => {
+              if (key === 'auth.accessSecret') return secret;
+              if (key === 'auth.refreshExpiresDays') return 7;
+              return undefined;
+            },
           },
         },
       ],
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.use(cookieParser());
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -103,7 +112,7 @@ describe('AuthController', () => {
   });
 
   it('normalizes a valid registration and returns the response envelope', async () => {
-    await request(httpServer)
+    const response = await request(httpServer)
       .post('/api/auth/register')
       .send({
         email: '  Reader@Example.COM ',
@@ -113,8 +122,14 @@ describe('AuthController', () => {
       .expect(201)
       .expect({
         success: true,
-        data: authData,
+        data: publicAuthData,
       });
+
+    expect(response.headers['set-cookie']?.[0]).toContain(
+      'booksoul_refresh=refresh-token',
+    );
+    expect(response.headers['set-cookie']?.[0]).toContain('HttpOnly');
+    expect(response.headers['set-cookie']?.[0]).toContain('SameSite=Lax');
 
     expect(authService.register).toHaveBeenCalledWith({
       email: 'reader@example.com',
@@ -165,21 +180,20 @@ describe('AuthController', () => {
 
     await request(httpServer)
       .post('/api/auth/refresh')
-      .send({ refreshToken })
+      .set('Cookie', `booksoul_refresh=${refreshToken}`)
       .expect(200)
       .expect({
         success: true,
-        data: authData,
+        data: publicAuthData,
       });
 
     expect(authService.refresh).toHaveBeenCalledWith(refreshToken);
   });
 
-  it('validates the refresh request body', async () => {
+  it('rejects refresh without the HttpOnly cookie', async () => {
     await request(httpServer)
       .post('/api/auth/refresh')
-      .send({ refreshToken: '', unexpected: true })
-      .expect(400);
+      .expect(401);
 
     expect(authService.refresh).not.toHaveBeenCalled();
   });
@@ -189,7 +203,7 @@ describe('AuthController', () => {
 
     await request(httpServer)
       .post('/api/auth/logout')
-      .send({ refreshToken })
+      .set('Cookie', `booksoul_refresh=${refreshToken}`)
       .expect(200)
       .expect({ success: true, data: {} });
 

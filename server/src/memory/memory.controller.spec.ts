@@ -40,24 +40,37 @@ describe('MemoryController identity isolation', () => {
     );
   });
 
-  it('rejects another user id in path, body, and query', async () => {
+  it('rejects another user id in legacy paths', async () => {
     await expect(
       controller.getMemories('user-b', 'session-1', userAuth),
     ).rejects.toBeInstanceOf(ForbiddenException);
-    await expect(
-      controller.updateMemory(
-        'memory-1',
-        { userId: 'user-b', content: 'tampered' },
-        userAuth,
-      ),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    await expect(
-      controller.deleteMemory('memory-1', 'user-b', userAuth),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('always passes the authenticated identity to mutations', async () => {
+    await controller.updateMemory(
+      'memory-1',
+      { content: 'trusted update' },
+      userAuth,
+    );
+    await controller.deleteMemory('memory-1', userAuth);
+
+    expect(memoryService.updateMemory).toHaveBeenCalledWith(
+      'memory-1',
+      'user-a',
+      { content: 'trusted update' },
+    );
+    expect(memoryService.deleteMemory).toHaveBeenCalledWith(
+      'memory-1',
+      'user-a',
+    );
   });
 
   it('keeps trusted user_id filtering for semantic search', async () => {
-    await controller.searchMemories('user-a', userAuth, '乔峰', 3);
+    await controller.searchMemories(
+      'user-a',
+      userAuth,
+      { q: '乔峰', topK: 3 },
+    );
 
     expect(memoryService.searchMemories).toHaveBeenCalledWith(
       '乔峰',

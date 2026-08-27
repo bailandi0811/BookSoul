@@ -33,6 +33,7 @@ export type ChatView = 'entrance' | 'dialogue';
 
 const HAS_CHOSEN_KEY = 'booksoul_has_chosen';
 const CHARACTER_KEY = 'booksoul_character';
+let latestSessionLoadRequest = 0;
 
 function isCharacterType(value: string | null): value is CharacterType {
   return !!value && (CHARACTER_IDS as string[]).includes(value);
@@ -78,11 +79,12 @@ interface ChatState {
   sessions: HistorySession[];
   isSessionsLoading: boolean;
   abortController: AbortController | null;
+  activeRequestId: string | null;
   addMessage: (message: Message) => void;
   updateLastMessage: (content: string, references?: Reference[]) => void;
-  updateStreamingContent: (content: string) => void;
-  finishStreaming: () => void;
-  setThinking: (isThinking: boolean, text?: string) => void;
+  updateStreamingContent: (content: string, requestId?: string) => void;
+  finishStreaming: (requestId?: string) => void;
+  setThinking: (isThinking: boolean, text?: string, requestId?: string) => void;
   setLoading: (loading: boolean) => void;
   sendMessage: (content: string) => Promise<void>;
   stopGenerating: () => void;
@@ -115,6 +117,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sessions: [],
   isSessionsLoading: false,
   abortController: null,
+  activeRequestId: null,
 
   addMessage: (message) =>
     set((state) => ({
@@ -141,8 +144,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return { messages: newMessages };
     }),
 
-  updateStreamingContent: (newContent) =>
+  updateStreamingContent: (newContent, requestId) =>
     set((state) => {
+      if (requestId && state.activeRequestId !== requestId) return state;
       const newMessages = [...state.messages];
       if (newMessages.length > 0) {
         const lastMsg = newMessages[newMessages.length - 1];
@@ -154,8 +158,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return { messages: newMessages };
     }),
 
-  finishStreaming: () =>
+  finishStreaming: (requestId) =>
     set((state) => {
+      if (requestId && state.activeRequestId !== requestId) return state;
       const newMessages = [...state.messages];
       if (newMessages.length > 0) {
         const lastMsg = newMessages[newMessages.length - 1];
@@ -164,11 +169,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
           lastMsg.isThinking = false;
         }
       }
-      return { messages: newMessages, abortController: null };
+      return {
+        messages: newMessages,
+        abortController: null,
+        activeRequestId: null,
+      };
     }),
 
-  setThinking: (isThinking, text) =>
+  setThinking: (isThinking, text, requestId) =>
     set((state) => {
+      if (requestId && state.activeRequestId !== requestId) return state;
       const newMessages = [...state.messages];
       if (newMessages.length > 0) {
         const lastMsg = newMessages[newMessages.length - 1];
@@ -195,20 +205,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
   clearStopNotice: () => set({ lastStopNotice: null }),
 
   stopGenerating: () => {
-    const { abortController } = get();
+    const { abortController, activeRequestId } = get();
     if (!abortController) return;
     abortController.abort();
+    get().finishStreaming(activeRequestId ?? undefined);
     set({ lastStopNotice: '对话已止', isLoading: false });
-    get().finishStreaming();
   },
 
   clearMessages: () => {
+    latestSessionLoadRequest += 1;
     get().stopGenerating();
     set({
       messages: [],
       sessionId: `session_${Date.now()}`,
       isLoading: false,
       abortController: null,
+      activeRequestId: null,
     });
   },
 
@@ -234,6 +246,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       if (!ok) return;
     }
     get().stopGenerating();
+    latestSessionLoadRequest += 1;
     persistChosenCharacter(character);
     set({
       currentCharacter: character,
@@ -243,6 +256,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       hasChosenCharacter: true,
       isLoading: false,
       abortController: null,
+      activeRequestId: null,
     });
   },
 
@@ -288,20 +302,36 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (get().sessionId === sessionId && get().messages.length > 0) return;
 
     get().stopGenerating();
-    set({ isLoading: true, sessionId, lastStopNotice: null });
+    const requestId = ++latestSessionLoadRequest;
+    set({
+      isLoading: true,
+      sessionId,
+      messages: [],
+      lastStopNotice: null,
+    });
 
     try {
       const response = await apiFetch(`/api/chat/history/${sessionId}`);
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
-          set({ messages: result.data });
+          if (
+            requestId === latestSessionLoadRequest &&
+            get().sessionId === sessionId
+          ) {
+            set({ messages: result.data });
+          }
         }
       }
     } catch (error) {
       console.error(`Failed to load session ${sessionId}:`, error);
     } finally {
-      set({ isLoading: false });
+      if (
+        requestId === latestSessionLoadRequest &&
+        get().sessionId === sessionId
+      ) {
+        set({ isLoading: false });
+      }
     }
   },
 
@@ -317,11 +347,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
       fetchSessions,
     } = get();
 
+    latestSessionLoadRequest += 1;
     get().stopGenerating();
     set({ lastStopNotice: null });
 
     const newAbortController = new AbortController();
-    set({ abortController: newAbortController });
+    const requestId =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `${Date.now()}_${Math.random()}`;
+    set({ abortController: newAbortController, activeRequestId: requestId });
 
     addMessage({ role: 'user', content });
     addMessage({
@@ -347,7 +382,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       if (!bufferedContent) return;
       assistantMessage += bufferedContent;
       bufferedContent = '';
-      updateStreamingContent(assistantMessage);
+      updateStreamingContent(assistantMessage, requestId);
     };
 
     const scheduleContentFlush = () => {
@@ -400,8 +435,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                   const data = JSON.parse(dataStr);
 
                   if (data.error) {
-                    updateStreamingContent(`抱歉，发生错误：${data.error}`);
-                    setLoading(false);
+                    updateStreamingContent(`抱歉，发生错误：${data.error}`, requestId);
                     return;
                   }
 
@@ -414,13 +448,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     ) {
                       lastThinkingAt = now;
                       lastThinkingText = data.thinking;
-                      setThinking(true, data.thinking);
+                      setThinking(true, data.thinking, requestId);
                     }
                   }
 
                   if (data.references) {
-                    updateStreamingContent(assistantMessage);
+                    updateStreamingContent(assistantMessage, requestId);
                     set((state) => {
+                      if (state.activeRequestId !== requestId) return state;
                       const newMessages = [...state.messages];
                       if (newMessages.length > 0) {
                         newMessages[newMessages.length - 1].references = data.references;
@@ -432,9 +467,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
                   if (data.content) {
                     if (!hasRenderedFirstToken) {
                       hasRenderedFirstToken = true;
-                      setThinking(false);
+                      setThinking(false, undefined, requestId);
                       assistantMessage += data.content;
-                      updateStreamingContent(assistantMessage);
+                      updateStreamingContent(assistantMessage, requestId);
                     } else {
                       bufferedContent += data.content;
                       scheduleContentFlush();
@@ -458,17 +493,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
         console.log('Request was aborted');
       } else {
         console.error('Failed to send message:', error);
-        updateStreamingContent('抱歉，发生了错误，请稍后再试。');
+        updateStreamingContent('抱歉，发生了错误，请稍后再试。', requestId);
       }
     } finally {
       if (flushTimer) {
         clearTimeout(flushTimer);
         flushTimer = null;
       }
-      flushBufferedContent();
-      finishStreaming();
-      setLoading(false);
-      fetchSessions();
+      if (get().activeRequestId === requestId) {
+        flushBufferedContent();
+        finishStreaming(requestId);
+        setLoading(false);
+        fetchSessions();
+      }
     }
   },
 }));

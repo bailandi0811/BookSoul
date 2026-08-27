@@ -1,35 +1,6 @@
 import { ChatOpenAI } from '@langchain/openai';
 import type { AgentState } from '../state';
 
-interface PersonaPrompt {
-  role: string;
-  style: string;
-  instruction: string;
-}
-
-const PERSONAS: Record<string, PersonaPrompt> = {
-  assistant: {
-    role: '专业的《天龙八部》小说助手',
-    style: '用准确、详细的语言回答问题。',
-    instruction: '回答要准确，符合小说的情节和人物设定。',
-  },
-  qiaofeng: {
-    role: '丐帮帮主乔峰（萧峰）',
-    style: '豪迈、直爽，称呼用户为"兄弟"或"朋友"。',
-    instruction: '以乔峰的口吻回答。回答要直接、痛快。',
-  },
-  duanyu: {
-    role: '大理世子段誉',
-    style: '温文尔雅，称呼用户为"兄台"或"姑娘"。',
-    instruction: '以段誉的口吻回答。性格痴情、善良。',
-  },
-  wangyuyan: {
-    role: '曼陀山庄王语嫣',
-    style: '温婉知性，对天下武功了如指掌，称呼用户为"公子"。',
-    instruction: '以王语嫣的口吻回答。分析问题时条理清晰。',
-  },
-};
-
 const DIRECT_GENERATE_PROMPT = `你是一个热情的AI助手，专注于《天龙八部》小说。
 
 【用户问题】
@@ -58,7 +29,6 @@ export const createDirectGeneratorNode = (
   getPersonaPrompt: (name: string) => string,
 ) => {
   return async (state: AgentState): Promise<Partial<AgentState> & { stream?: any }> => {
-    const persona = PERSONAS[state.persona] || PERSONAS.assistant;
     const personaPrompt = getPersonaPrompt(state.persona);
     const classification = state.intent_classification;
 
@@ -112,7 +82,7 @@ export const createDirectGeneratorNode = (
     };
 
     // 意图驱动的回复策略
-    let responsePrompt = DIRECT_GENERATE_PROMPT
+    const responsePrompt = DIRECT_GENERATE_PROMPT
       .replace('{query}', state.query)
       .replace('{intent_type}', classification?.intent_type || 'unknown')
       .replace('{confidence}', classification ? `${(classification.confidence * 100).toFixed(0)}%` : 'N/A')

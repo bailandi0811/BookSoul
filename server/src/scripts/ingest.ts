@@ -4,9 +4,10 @@ import { MilvusService } from '../milvus/milvus.service';
 import { RagService } from '../rag/rag.service';
 import { ConfigService } from '@nestjs/config';
 import { DataType, IndexType, MetricType } from '@zilliz/milvus2-sdk-node';
-import { EPubLoader } from '@langchain/community/document_loaders/fs/epub';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { parse } from 'path';
+import EPub from 'epub2';
+import { convert } from 'html-to-text';
 
 async function bootstrap() {
   const app = await NestFactory.createApplicationContext(AppModule);
@@ -85,7 +86,7 @@ async function bootstrap() {
         try {
           vector = await ragService.getEmbedding(chunk);
           break;
-        } catch (err) {
+        } catch {
           console.log(`Embedding failed for chunk ${i}, retrying... (${3 - retries + 1}/3)`);
           retries--;
           if (retries === 0) {
@@ -127,8 +128,16 @@ async function bootstrap() {
 
     try {
       console.log('Loading EPUB...');
-      const loader = new EPubLoader(EPUB_FILE);
-      const docs = await loader.load();
+      const epub = await EPub.createAsync(EPUB_FILE);
+      const docs = await Promise.all(
+        epub.flow.map(async (chapter) => {
+          const html = await epub.getChapterAsync(chapter.id);
+          return convert(html, {
+            wordwrap: false,
+            selectors: [{ selector: 'img', format: 'skip' }],
+          });
+        }),
+      );
       console.log(`Loaded ${docs.length} chapters/sections.`);
 
       const textSplitter = new RecursiveCharacterTextSplitter({
@@ -140,11 +149,11 @@ async function bootstrap() {
       const bookId = 'book_' + Date.now();
 
       for (let i = 0; i < docs.length; i++) {
-        const doc = docs[i];
-        if (!doc.pageContent || doc.pageContent.trim().length === 0) continue;
+        const chapterText = docs[i];
+        if (!chapterText || chapterText.trim().length === 0) continue;
 
         console.log(`Processing chapter ${i + 1}...`);
-        const chunks = await textSplitter.splitText(doc.pageContent);
+        const chunks = await textSplitter.splitText(chapterText);
         
         const inserted = await insertChunksBatch(chunks, bookId, i + 1);
         totalInserted += Number(inserted);
@@ -160,4 +169,4 @@ async function bootstrap() {
   await app.close();
 }
 
-bootstrap();
+void bootstrap();

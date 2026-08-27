@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { MemoryEntry, MemoryLevel, MemoryCategory } from '../interfaces/memory.types';
+import { MemoryEntry, MemoryLevel } from '../interfaces/memory.types';
 import { requireSafePathSegment, resolveWithinRoot } from '../../auth/auth-context';
 
 @Injectable()
@@ -32,11 +32,11 @@ export class MemoryEntryRepository {
 
       for (const file of files) {
         if (!file.endsWith('.json')) continue;
-        if (sessionId && !file.includes(sessionId)) continue;
-
         try {
           const data = await fs.readFile(path.join(dir, file), 'utf-8');
           const entry = JSON.parse(data) as MemoryEntry;
+          if (entry.userId !== userId) continue;
+          if (sessionId && entry.sessionId !== sessionId) continue;
           entries.push(entry);
         } catch (e) {
           this.logger.warn(`Failed to parse memory file ${file}: ${e}`);
@@ -46,7 +46,7 @@ export class MemoryEntryRepository {
       return entries.sort((a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
-    } catch (error) {
+    } catch {
       this.logger.error('Failed to load memory entries');
       return [];
     }
@@ -61,8 +61,10 @@ export class MemoryEntryRepository {
     try {
       const dir = this.getUserDirectory(entry.userId);
       await fs.mkdir(dir, { recursive: true });
-      const filePath = path.join(dir, `${entry.id}.json`);
-      await fs.writeFile(filePath, JSON.stringify(entry, null, 2));
+      const filePath = this.getFilePath(entry.userId, entry.id);
+      const temporaryPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+      await fs.writeFile(temporaryPath, JSON.stringify(entry, null, 2));
+      await fs.rename(temporaryPath, filePath);
     } catch (error) {
       this.logger.error('Failed to save memory entry');
       throw error;
@@ -89,6 +91,8 @@ export class MemoryEntryRepository {
       ...updates,
       id: existing.id,
       userId: existing.userId,
+      sessionId: existing.sessionId,
+      createdAt: existing.createdAt,
       updatedAt: new Date().toISOString(),
     };
 

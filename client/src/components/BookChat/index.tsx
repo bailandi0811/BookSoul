@@ -36,12 +36,27 @@ export default function BookChat() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window === 'undefined' ? true : window.matchMedia('(min-width: 768px)').matches,
+  );
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() =>
+    typeof window === 'undefined' ? true : window.matchMedia('(min-width: 768px)').matches,
+  );
   const [switchOpen, setSwitchOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(readSidebarWidth);
   const [isResizing, setIsResizing] = useState(false);
   const sidebarWidthRef = useRef(sidebarWidth);
-  sidebarWidthRef.current = sidebarWidth;
+
+  useEffect(() => {
+    sidebarWidthRef.current = sidebarWidth;
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 768px)');
+    const update = () => setIsDesktop(media.matches);
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -88,15 +103,26 @@ export default function BookChat() {
   return (
     <div className="flex h-[100dvh] min-h-[100dvh] bg-background paper-bg text-foreground overflow-hidden">
       <AnimatePresence initial={false}>
+        {isSidebarOpen && !isDesktop && (
+          <motion.button
+            type="button"
+            aria-label="关闭侧栏"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsSidebarOpen(false)}
+            className="fixed inset-0 z-20 bg-foreground/25 backdrop-blur-[2px] md:hidden"
+          />
+        )}
         {isSidebarOpen && (
           <motion.div
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: sidebarWidth, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
+            initial={isDesktop ? { width: 0, opacity: 0 } : { x: '-100%', opacity: 0 }}
+            animate={isDesktop ? { width: sidebarWidth, opacity: 1 } : { x: 0, opacity: 1 }}
+            exit={isDesktop ? { width: 0, opacity: 0 } : { x: '-100%', opacity: 0 }}
             transition={isResizing ? { duration: 0 } : { duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-            className="relative h-full border-r border-border/60 bg-[#f0eee6] dark:bg-secondary z-30 flex-shrink-0 overflow-hidden"
+            className="fixed inset-y-0 left-0 w-[min(88vw,360px)] md:relative md:w-auto h-full border-r border-border/60 bg-[#f0eee6] dark:bg-secondary z-30 flex-shrink-0 overflow-hidden"
           >
-            <div className="h-full overflow-hidden" style={{ width: sidebarWidth }}>
+            <div className="h-full w-[min(88vw,360px)] md:w-auto overflow-hidden" style={isDesktop ? { width: sidebarWidth } : undefined}>
               <Sidebar onClose={() => setIsSidebarOpen(false)} />
             </div>
             <div
@@ -107,8 +133,17 @@ export default function BookChat() {
               aria-valuemax={SIDEBAR_MAX}
               aria-valuenow={Math.round(sidebarWidth)}
               onPointerDown={onResizePointerDown}
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+                event.preventDefault();
+                const delta = event.key === 'ArrowLeft' ? -16 : 16;
+                const next = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, sidebarWidth + delta));
+                setSidebarWidth(next);
+                localStorage.setItem(SIDEBAR_WIDTH_KEY, String(next));
+              }}
               className={`
-                absolute top-0 right-0 z-40 h-full w-1.5 -mr-0.5
+                hidden md:block absolute top-0 right-0 z-40 h-full w-1.5 -mr-0.5
                 cursor-col-resize touch-none
                 hover:bg-primary/25 active:bg-primary/40
                 ${isResizing ? 'bg-primary/40' : 'bg-transparent'}

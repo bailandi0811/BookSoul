@@ -11,8 +11,7 @@ export type AuthContext =
   | { kind: 'guest'; userId: string };
 
 export function isValidGuestUserId(value: unknown): value is string {
-  return value === 'anonymous' ||
-    (typeof value === 'string' && GUEST_ID_PATTERN.test(value));
+  return typeof value === 'string' && GUEST_ID_PATTERN.test(value);
 }
 
 export function requireGuestUserId(value: unknown): string {

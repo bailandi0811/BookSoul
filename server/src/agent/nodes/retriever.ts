@@ -37,7 +37,7 @@ export const createRetrieverNode = (novelSearchTool: Tool, baseTopK = 3) => {
           : state.current_query_index,
         next_action: hasMore ? 'retrieve' as const : 'critique' as const,
       };
-    } catch (error: any) {
+    } catch {
       return {
         retrieved_documents: [
           ...state.retrieved_documents,

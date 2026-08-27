@@ -15,7 +15,8 @@ import {
 } from './interfaces/memory.types';
 import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessage } from '@langchain/core/messages';
-import { MetricType } from '@zilliz/milvus2-sdk-node';
+import { DataType, IndexType, MetricType } from '@zilliz/milvus2-sdk-node';
+import { CreateMemoryDto, UpdateMemoryDto } from './dto/memory.dto';
 
 @Injectable()
 export class MemoryService {
@@ -145,12 +146,7 @@ ${messages.map(m => `- ${m}`).join('\n')}
       },
     };
 
-    await this.memoryEntryRepo.save(memoryEntry);
-
-    // 如果是长期记忆，同时存入向量数据库
-    if (importanceScore.suggestedLevel === MemoryLevel.LONG_TERM && memoryEntry.vector) {
-      await this.storeToMilvus(memoryEntry);
-    }
+    await this.persistMemory(memoryEntry);
 
     return { hasNewMemories: true, memoryCount: 1 };
   }
@@ -163,6 +159,31 @@ ${messages.map(m => `- ${m}`).join('\n')}
 
   // ========== Memory CRUD ==========
 
+  async createMemory(
+    userId: string,
+    input: CreateMemoryDto,
+  ): Promise<MemoryEntry> {
+    const now = new Date().toISOString();
+    const entry: MemoryEntry = {
+      id: this.memoryEntryRepo.generateId(),
+      userId,
+      sessionId: input.sessionId,
+      level: input.level ?? MemoryLevel.LONG_TERM,
+      content: input.content.trim(),
+      importance: 0.75,
+      category: input.category ?? this.determineCategory(input.content),
+      createdAt: now,
+      updatedAt: now,
+      metadata: {
+        editable: true,
+        verified: true,
+        extractReason: '用户手动添加',
+      },
+    };
+    await this.persistMemory(entry);
+    return entry;
+  }
+
   async getMemories(userId: string, sessionId: string, level?: MemoryLevel): Promise<MemoryEntry[]> {
     if (level) {
       return this.memoryEntryRepo.getByLevel(userId, level, sessionId);
@@ -170,8 +191,38 @@ ${messages.map(m => `- ${m}`).join('\n')}
     return this.memoryEntryRepo.getByUserId(userId, sessionId);
   }
 
-  async updateMemory(memoryId: string, userId: string, updates: Partial<MemoryEntry>): Promise<MemoryEntry | null> {
-    return this.memoryEntryRepo.update(memoryId, userId, updates);
+  async updateMemory(
+    memoryId: string,
+    userId: string,
+    updates: UpdateMemoryDto,
+  ): Promise<MemoryEntry | null> {
+    const existing = await this.memoryEntryRepo.getById(memoryId, userId);
+    if (!existing) return null;
+
+    const updated = await this.memoryEntryRepo.update(memoryId, userId, {
+      ...(updates.content === undefined
+        ? {}
+        : { content: updates.content.trim() }),
+      ...(updates.importance === undefined
+        ? {}
+        : { importance: updates.importance }),
+      ...(updates.verified === undefined
+        ? {}
+        : {
+            metadata: {
+              ...existing.metadata,
+              verified: updates.verified,
+            },
+          }),
+    });
+    if (
+      updated &&
+      updates.content !== undefined &&
+      updated.level === MemoryLevel.LONG_TERM
+    ) {
+      await this.storeToMilvus(updated);
+    }
+    return updated;
   }
 
   async deleteMemory(memoryId: string, userId: string): Promise<void> {
@@ -233,22 +284,51 @@ ${messages.map(m => `- ${m}`).join('\n')}
   private async ensureCollection(): Promise<void> {
     try {
       const client = this.milvusService.getClient();
-      const collections = await client.describeCollection({ collection_name: this.COLLECTION_NAME });
-      if (!collections) {
+      const collection = await client.hasCollection({
+        collection_name: this.COLLECTION_NAME,
+      });
+      if (!collection.value) {
+        const vectorDim =
+          this.configService.get<number>('milvus.vectorDim') || 1024;
         await client.createCollection({
           collection_name: this.COLLECTION_NAME,
-          dimension: this.configService.get<number>('milvus.vectorDim') || 1024,
-          metric_type: MetricType.COSINE,
+          fields: [
+            {
+              name: 'id',
+              data_type: DataType.VarChar,
+              max_length: 128,
+              is_primary_key: true,
+            },
+            { name: 'user_id', data_type: DataType.VarChar, max_length: 128 },
+            { name: 'session_id', data_type: DataType.VarChar, max_length: 128 },
+            { name: 'content', data_type: DataType.VarChar, max_length: 4_000 },
+            { name: 'vector', data_type: DataType.FloatVector, dim: vectorDim },
+            { name: 'level', data_type: DataType.VarChar, max_length: 32 },
+            { name: 'importance', data_type: DataType.Float },
+            { name: 'category', data_type: DataType.VarChar, max_length: 32 },
+            { name: 'created_at', data_type: DataType.VarChar, max_length: 40 },
+            { name: 'updated_at', data_type: DataType.VarChar, max_length: 40 },
+            { name: 'metadata', data_type: DataType.JSON },
+          ],
         });
         await client.createIndex({
           collection_name: this.COLLECTION_NAME,
           field_name: 'vector',
-          index_type: 'IVF_FLAT',
+          index_type: IndexType.IVF_FLAT,
+          metric_type: MetricType.COSINE,
+          params: { nlist: 128 },
         });
       }
+      await client.loadCollection({ collection_name: this.COLLECTION_NAME });
     } catch (error) {
-      // Collection might already exist, ignore error
-      this.logger.log(`Memory collection initialized`);
+      this.logger.warn(`Memory vector collection is unavailable: ${String(error)}`);
+    }
+  }
+
+  private async persistMemory(memory: MemoryEntry): Promise<void> {
+    await this.memoryEntryRepo.save(memory);
+    if (memory.level === MemoryLevel.LONG_TERM) {
+      await this.storeToMilvus(memory);
     }
   }
 
@@ -257,7 +337,7 @@ ${messages.map(m => `- ${m}`).join('\n')}
       const vector = await this.embeddings.embedQuery(memory.content);
       memory.vector = vector;
 
-      await this.milvusService.getClient().insert({
+      await this.milvusService.getClient().upsert({
         collection_name: this.COLLECTION_NAME,
         data: [{
           id: memory.id,
@@ -269,6 +349,8 @@ ${messages.map(m => `- ${m}`).join('\n')}
           importance: memory.importance,
           category: memory.category,
           created_at: memory.createdAt,
+          updated_at: memory.updatedAt,
+          metadata: memory.metadata,
         }],
       });
     } catch (error) {
