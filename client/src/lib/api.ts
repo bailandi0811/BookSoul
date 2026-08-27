@@ -24,12 +24,11 @@ async function refreshAuthentication(): Promise<boolean> {
   if (refreshPromise) return refreshPromise;
   refreshPromise = (async () => {
     const auth = useAuthStore.getState();
-    if (!auth.refreshToken) return false;
+    if (!auth.user) return false;
     try {
       const response = await fetch('/api/auth/refresh', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: auth.refreshToken }),
+        credentials: 'include',
       });
       if (!response.ok) return false;
       const payload = (await response.json()) as {
@@ -38,7 +37,7 @@ async function refreshAuthentication(): Promise<boolean> {
       };
       useAuthStore
         .getState()
-        .updateTokens(payload.data.accessToken, payload.data.refreshToken);
+        .updateTokens(payload.data.accessToken);
       return true;
     } catch {
       return false;
@@ -61,18 +60,20 @@ export async function apiFetch(
   input: RequestInfo | URL,
   options: ApiOptions = {},
 ): Promise<Response> {
-  const { skipAuth: _skipAuth, skipRefresh, ...requestOptions } = options;
+  const { skipAuth, skipRefresh, ...requestOptions } = options;
   const response = await fetch(input, {
     ...requestOptions,
+    credentials: 'include',
     headers: withIdentityHeaders(options),
   });
-  if (response.status !== 401 || skipRefresh || options.skipAuth) {
+  if (response.status !== 401 || skipRefresh || skipAuth) {
     return response;
   }
   const refreshed = await refreshAuthentication();
   if (!refreshed) return response;
   return fetch(input, {
     ...requestOptions,
+    credentials: 'include',
     headers: withIdentityHeaders(options),
   });
 }

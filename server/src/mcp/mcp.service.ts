@@ -18,18 +18,7 @@ export class McpService implements OnModuleDestroy {
       return this.mcpClient;
     }
 
-    const mcpServers: Record<string, any> = {
-      filesystem: {
-        command: 'npx',
-        args: ['-y', '@modelcontextprotocol/server-filesystem', process.cwd()],
-      },
-      // 引入了外部的 fetch MCP Server 来替代手写的定位功能
-      // 它可以发起网络请求，配合提示词可以让 Agent 自由调用 IP 定位 API
-      fetch: {
-        command: 'npx',
-        args: ['-y', '@modelcontextprotocol/server-fetch'],
-      }
-    };
+    const mcpServers: Record<string, { url: string }> = {};
 
     const amapApiKey = this.configService.get<string>('mcp.amapApiKey');
     if (amapApiKey) {
@@ -42,11 +31,26 @@ export class McpService implements OnModuleDestroy {
       mcpServers: mcpServers,
     });
 
-    this.logger.log(`Initializing MCP Client with servers: ${Object.keys(mcpServers).join(', ')}`);
+    this.logger.log(
+      `Initializing MCP client with configured servers: ${Object.keys(mcpServers).join(', ') || 'none'}`,
+    );
     return this.mcpClient;
   }
 
   async getMcpTools(): Promise<any[]> {
+    const allowedToolNames = new Set(
+      this.configService.get<string[]>('mcp.allowedTools') ?? [],
+    );
+    if (allowedToolNames.size === 0) {
+      this.logger.debug('MCP tools are disabled because the allowlist is empty');
+      return [];
+    }
+
+    if (!this.configService.get<string>('mcp.amapApiKey')) {
+      this.logger.warn('MCP tool allowlist is set, but no MCP server is configured');
+      return [];
+    }
+
     const now = Date.now();
     if (this.cachedTools && now - this.toolsCachedAt < this.TOOLS_CACHE_TTL_MS) {
       return this.cachedTools;
@@ -59,7 +63,9 @@ export class McpService implements OnModuleDestroy {
     this.toolsLoadPromise = (async () => {
       try {
         const client = await this.getMcpClient();
-        const tools = await client.getTools();
+        const tools = (await client.getTools()).filter((candidate) =>
+          allowedToolNames.has(candidate.name),
+        );
         this.cachedTools = tools;
         this.toolsCachedAt = Date.now();
         this.logger.log(`Loaded ${tools.length} tools: ${tools.map((t) => t.name).join(', ')}`);
@@ -77,10 +83,11 @@ export class McpService implements OnModuleDestroy {
 
   async onModuleDestroy() {
     if (this.mcpClient) {
-      // @ts-ignore
-      if (typeof this.mcpClient.close === 'function') {
-        // @ts-ignore
-        await this.mcpClient.close();
+      const closeableClient = this.mcpClient as MultiServerMCPClient & {
+        close?: () => Promise<void>;
+      };
+      if (typeof closeableClient.close === 'function') {
+        await closeableClient.close();
       }
       this.mcpClient = null;
     }

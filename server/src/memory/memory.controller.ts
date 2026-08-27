@@ -1,9 +1,15 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, ForbiddenException } from '@nestjs/common';
 import { MemoryService } from './memory.service';
-import { MemoryLevel, MemoryCategory } from './interfaces/memory.types';
+import { MemoryLevel } from './interfaces/memory.types';
 import { CurrentAuth } from '../auth/decorators/auth-context.decorator';
 import type { AuthContext } from '../auth/auth-context';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import {
+  CreateMemoryDto,
+  SearchMemoryQueryDto,
+  UpdateMemoryDto,
+  UpdateProfileDto,
+} from './dto/memory.dto';
 
 @Controller('api/memory')
 @UseGuards(OptionalJwtAuthGuard)
@@ -26,7 +32,7 @@ export class MemoryController {
   async updateProfile(
     @Param('userId') userId: string,
     @Param('sessionId') sessionId: string,
-    @Body() body: { preferences?: any; facts?: Record<string, string>; summary?: string },
+    @Body() body: UpdateProfileDto,
     @CurrentAuth() auth: AuthContext,
   ) {
     this.assertCompatibleUserId(userId, auth);
@@ -39,11 +45,10 @@ export class MemoryController {
   async searchMemories(
     @Param('userId') userId: string,
     @CurrentAuth() auth: AuthContext,
-    @Query('q') query: string,
-    @Query('topK') topK: number = 5,
+    @Query() query: SearchMemoryQueryDto,
   ) {
     this.assertCompatibleUserId(userId, auth);
-    return this.memoryService.searchMemories(query, auth.userId, topK);
+    return this.memoryService.searchMemories(query.q, auth.userId, query.topK);
   }
 
   @Get(':userId/:sessionId')
@@ -58,36 +63,27 @@ export class MemoryController {
   }
 
   @Post()
-  async createMemory(@Body() body: {
-    userId?: string;
-    sessionId: string;
-    content: string;
-    level?: MemoryLevel;
-    category?: MemoryCategory;
-  }, @CurrentAuth() auth: AuthContext) {
-    if (body.userId) this.assertCompatibleUserId(body.userId, auth);
-    return this.memoryService.processAndStoreMemory(auth.userId, body.sessionId, body.content);
+  async createMemory(
+    @Body() body: CreateMemoryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.memoryService.createMemory(auth.userId, body);
   }
 
   @Patch(':memoryId')
   async updateMemory(
     @Param('memoryId') memoryId: string,
-    @Body() body: { userId?: string; content?: string; importance?: number; verified?: boolean },
+    @Body() body: UpdateMemoryDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    if (body.userId) this.assertCompatibleUserId(body.userId, auth);
-    const updates = { ...body };
-    delete updates.userId;
-    return this.memoryService.updateMemory(memoryId, auth.userId, updates);
+    return this.memoryService.updateMemory(memoryId, auth.userId, body);
   }
 
   @Delete(':memoryId')
   async deleteMemory(
     @Param('memoryId') memoryId: string,
-    @Query('userId') userId: string | undefined,
     @CurrentAuth() auth: AuthContext,
   ) {
-    if (userId) this.assertCompatibleUserId(userId, auth);
     await this.memoryService.deleteMemory(memoryId, auth.userId);
     return { success: true };
   }

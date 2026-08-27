@@ -215,7 +215,7 @@ export class ClaimService {
         filter: `user_id == "${guestUserId}" && session_id == "${sessionId}"`,
       });
       return 'claimed';
-    } catch (error) {
+    } catch {
       this.logger.warn('Guest vector claim is incomplete; retry is safe');
       return 'unavailable';
     }

@@ -1,10 +1,11 @@
-import { Controller, Post, Get, Delete, Param, Body, Res, Req, BadRequestException, Logger, UseGuards, HttpException } from '@nestjs/common';
-import type { Response, Request } from 'express';
+import { Controller, Post, Get, Delete, Param, Body, Res, BadRequestException, Logger, UseGuards, HttpException } from '@nestjs/common';
+import type { Response } from 'express';
 import { AgentService } from '../agent/agent.service';
 import { RagService } from '../rag/rag.service';
 import { CurrentAuth } from '../auth/decorators/auth-context.decorator';
 import type { AuthContext } from '../auth/auth-context';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import { ChatDto } from './dto/chat.dto';
 
 @Controller('api/chat')
 @UseGuards(OptionalJwtAuthGuard)
@@ -76,7 +77,7 @@ export class ChatController {
   }
 
   @Post()
-  async chat(@Body() body: { message: string; character?: string; sessionId?: string; userId?: string }, @Res() res: Response, @Req() req: Request, @CurrentAuth() auth: AuthContext) {
+  async chat(@Body() body: ChatDto, @Res() res: Response, @CurrentAuth() auth: AuthContext) {
     const { message, character, sessionId = 'default_session' } = body;
     const userId = auth.userId;
 
@@ -94,10 +95,16 @@ export class ChatController {
     // Create an AbortController to pass the cancellation signal to the Agent
     const abortController = new AbortController();
 
-    req.on('close', () => {
+    res.on('close', () => {
       this.logger.log('Client disconnected, aborting agent stream...');
       abortController.abort();
     });
+
+    const writeEvent = (data: unknown): void => {
+      if (!res.writableEnded && !res.destroyed) {
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+      }
+    };
 
     try {
       this.logger.log(`Received chat request. Character: ${character || 'assistant'}, SessionId: ${sessionId}`);
@@ -110,7 +117,7 @@ export class ChatController {
           case 'references':
             // 发送引用卡片（只发送一次）
             if (!hasSentReferences && event.data.length > 0) {
-              res.write(`data: ${JSON.stringify({ references: event.data })}\n\n`);
+              writeEvent({ references: event.data });
               hasSentReferences = true;
             }
             break;
@@ -118,23 +125,23 @@ export class ChatController {
           case 'content':
             // 发送内容块
             if (event.data) {
-              res.write(`data: ${JSON.stringify({ content: event.data })}\n\n`);
+              writeEvent({ content: event.data });
             }
             break;
 
           case 'thinking':
             // 发送思考进度
-            res.write(`data: ${JSON.stringify({ thinking: event.data })}\n\n`);
+            writeEvent({ thinking: event.data });
             break;
 
           case 'memory_update':
             // 发送记忆更新事件
-            res.write(`data: ${JSON.stringify({ memoryUpdate: event.data })}\n\n`);
+            writeEvent({ memoryUpdate: event.data });
             break;
 
           case 'metrics':
             // 发送性能指标事件（前端可选消费）
-            res.write(`data: ${JSON.stringify({ metrics: event.data })}\n\n`);
+            writeEvent({ metrics: event.data });
             break;
 
           case 'final':
@@ -144,17 +151,19 @@ export class ChatController {
           case 'error':
             // 错误处理
             this.logger.error(`Agent error: ${event.data}`);
-            res.write(`data: ${JSON.stringify({ error: event.data })}\n\n`);
+            writeEvent({ error: event.data });
             break;
         }
       }
 
-      res.write('data: [DONE]\n\n');
-      res.end();
+      if (!res.writableEnded && !res.destroyed) {
+        res.write('data: [DONE]\n\n');
+        res.end();
+      }
     } catch (error) {
       this.logger.error('Chat API Error:', error);
-      res.write(`data: ${JSON.stringify({ error: 'Internal Server Error' })}\n\n`);
-      res.end();
+      writeEvent({ error: 'Internal Server Error' });
+      if (!res.writableEnded && !res.destroyed) res.end();
     }
   }
 }

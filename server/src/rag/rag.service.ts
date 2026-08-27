@@ -4,7 +4,6 @@ import { OpenAIEmbeddings, ChatOpenAI } from '@langchain/openai';
 import { MetricType } from '@zilliz/milvus2-sdk-node';
 import { MilvusService } from '../milvus/milvus.service';
 import { McpService } from '../mcp/mcp.service';
-import { ToolsService } from '../tools/tools.service';
 import { ToolMessage } from '@langchain/core/messages';
 import { Response } from 'express';
 
@@ -41,7 +40,6 @@ export class RagService {
     private configService: ConfigService,
     private milvusService: MilvusService,
     private mcpService: McpService,
-    private toolsService: ToolsService,
   ) {
     this.embeddings = new OpenAIEmbeddings({
       apiKey: this.configService.get<string>('openai.apiKey'),
@@ -112,13 +110,7 @@ ${question}
      - **必须**调用工具 \`get_current_location\` 来获取用户的真实位置。
      - 获得位置后，用${persona.role}的口吻进行点评（例如：“原来兄台身处...，离大理有千里之遥啊”）。
    
-   - **情况 B：用户要求发送邮件或将内容发到邮箱**
-     - **必须**调用工具 \`send_mail\` 来发送邮件。
-     - 如果用户没有提供邮箱地址，需要先询问用户的邮箱。
-     - 邮件内容应该包含用户要求的主题相关信息（例如小说片段或你的解答）。
-     - 发送成功后，用${persona.role}的口吻告知用户（例如：“飞鸽传书已送达兄台的信箱...”）。
-
-   - **情况 C：用户问小说情节**
+   - **情况 B：用户问小说情节**
      - 结合【上下文信息】和你的背景知识进行回答。
      - 如果涉及地名，可以调用地图工具进行古今对照。
 
@@ -131,8 +123,7 @@ ${persona.role}的回答:
 
     try {
       const mcpTools = await this.mcpService.getMcpTools();
-      const sendMailTool = this.toolsService.getSendMailTool();
-      const tools = [...mcpTools, sendMailTool];
+      const tools = [...mcpTools];
       
       let stream;
 

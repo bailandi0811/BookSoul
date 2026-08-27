@@ -82,4 +82,32 @@ describe('AgentService history ownership', () => {
       service.getSessionHistory('../secret', 'user-a'),
     ).rejects.toBeDefined();
   });
+
+  it('serializes concurrent writes without losing either message pair', async () => {
+    Object.defineProperty(service, 'historyLocks', { value: new Map() });
+    const persistHistory = (
+      service as unknown as {
+        persistHistory: (
+          sessionId: string,
+          userId: string,
+          query: string,
+          response: string,
+        ) => Promise<void>;
+      }
+    ).persistHistory.bind(service);
+
+    await Promise.all([
+      persistHistory('owned', 'user-a', '问题一', '回答一'),
+      persistHistory('owned', 'user-a', '问题二', '回答二'),
+    ]);
+
+    const stored = JSON.parse(
+      fs.readFileSync(
+        path.join(root, 'chat_histories', 'session_owned.json'),
+        'utf-8',
+      ),
+    );
+    expect(stored[''].owned.messages).toHaveLength(4);
+    expect(stored[''].owned.userId).toBe('user-a');
+  });
 });

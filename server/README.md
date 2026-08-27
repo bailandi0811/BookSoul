@@ -1,137 +1,44 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# BookSoul Server
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+NestJS 11 API，提供认证、访客认领、聊天 SSE、RAG、历史、画像、记忆、受控 MCP 和显式确认邮件接口。
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
-
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
+## 命令
 
 ```bash
-$ npm install
+npm install
+npm run prisma:generate
+npm run prisma:migrate:deploy
+npm run start:dev
+npm run check
 ```
 
-Copy `.env.example` to `.env`, then configure PostgreSQL and authentication:
+`npm run check` 依次执行 lint、TypeScript 检查、60 项单元测试和生产构建。`npm run lint` 不修改文件；需要自动修复时显式执行 `npm run lint:fix`。
 
-```dotenv
-DATABASE_URL=postgresql://USER:PASSWORD@127.0.0.1:5432/booksoul?schema=public
-JWT_ACCESS_SECRET=replace-with-a-long-random-secret
-JWT_ACCESS_EXPIRES=15m
-REFRESH_TOKEN_EXPIRES_DAYS=7
-```
+## 认证约定
 
-Apply the committed database migrations and generate Prisma Client:
+- 登录和注册返回 `{ accessToken, user }`，同时设置 `booksoul_refresh` HttpOnly Cookie。
+- `POST /api/auth/refresh` 与 `POST /api/auth/logout` 从 Cookie 读取刷新令牌，请求体不接受该令牌。
+- 账号请求使用 `Authorization: Bearer <access-token>`。
+- 访客业务请求使用 `X-Guest-User-Id: guest_<uuid>`。
+- 带有无效 Bearer Token 的请求不会降级为访客。
 
-```bash
-$ npm run prisma:migrate:deploy
-$ npm run prisma:generate
-```
+## 配置
 
-Authentication endpoints:
+复制 `.env.example` 为 `.env`。启动时会拒绝缺失的 `DATABASE_URL`、少于 32 位或仍为示例值的 `JWT_ACCESS_SECRET`，以及非法的刷新令牌有效期。
 
-- `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`
-- `POST /api/auth/refresh`, `POST /api/auth/logout`, `POST /api/auth/logout-all`
-- `POST /api/auth/claim-guest`
+生产环境必须：
 
-Protected requests use `Authorization: Bearer <access-token>`. Guest business
-requests use `X-Guest-User-Id: guest_<uuid>`; the legacy value `anonymous` is
-accepted only for old local data. A supplied invalid Bearer token is rejected
-and never falls back to Guest mode.
+- 将 `CORS_ORIGINS` 设置为实际前端来源，可用逗号分隔多个来源；
+- 使用独立且随机的 JWT 密钥；
+- 通过密钥管理服务注入数据库、模型、Milvus 和 SMTP 凭据；
+- 不记录密码、Token、Cookie、完整 Guest ID 或私有数据路径。
 
-Chat history and memory APIs derive ownership from this trusted identity
-context. Client-supplied `userId` values cannot override it. Refresh tokens are
-opaque 32-byte values; only SHA-256 hashes are stored in PostgreSQL.
+## 工具策略
 
-Guest claim migrates the selected session history, profile, long-term memory,
-and Milvus ownership. If Milvus is unavailable the endpoint returns `partial`;
-the same request can safely be retried after Milvus recovers.
+MCP 默认不向模型暴露任何能力。地图服务必须同时配置 `AMAP_API_KEY` 和 `MCP_ALLOWED_TOOL_NAMES`。本服务不会启动文件系统或任意网络抓取 MCP。
 
-## Compile and run the project
+邮件不是模型工具。`POST /api/tools/email` 要求有效 Access Token、合法 DTO 和 `confirmed: true`，只发送纯文本并受全局限流保护。
 
-```bash
-# development
-$ npm run start
+## 文件数据迁移准备
 
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
-```
-
-## Run tests
-
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
-```
-
-For production, configure an explicit CORS allowlist instead of the current
-development-wide CORS setting. Never log authorization headers, passwords,
-refresh tokens, token hashes, full Guest IDs, or resolved private data paths.
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Prisma schema 已包含 `ChatSessionRecord`、`UserProfileRecord` 和 `MemoryRecord`。应用数据库迁移后，执行 `npm run migrate:file-data` 可幂等复制现有文件数据；该命令不会删除源文件。当前运行时仍读取文件，生产切换前需要先完成备份、记录数核对和抽样验证。

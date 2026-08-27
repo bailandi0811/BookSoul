@@ -1,10 +1,15 @@
-import BookChat from '@/components/BookChat';
-import { Entrance } from '@/components/Entrance';
 import { useChatStore } from '@/store/useChatStore';
 import { useMemoryStore } from '@/store/useMemoryStore';
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { apiFetch } from '@/lib/api';
 import { useAuthStore } from '@/store/useAuthStore';
+
+const BookChat = lazy(() => import('@/components/BookChat'));
+const Entrance = lazy(() =>
+  import('@/components/Entrance').then((module) => ({
+    default: module.Entrance,
+  })),
+);
 
 function App() {
   const view = useChatStore((s) => s.view);
@@ -34,7 +39,15 @@ function App() {
   }, []);
   return (
     <div className="min-h-[100dvh] w-full">
-      {view === 'entrance' ? <Entrance /> : <BookChat />}
+      <Suspense
+        fallback={
+          <div className="grid min-h-[100dvh] place-items-center bg-background text-sm text-muted-foreground">
+            正在翻开书页…
+          </div>
+        }
+      >
+        {view === 'entrance' ? <Entrance /> : <BookChat />}
+      </Suspense>
     </div>
   );
 }

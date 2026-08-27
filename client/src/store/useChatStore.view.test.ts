@@ -13,6 +13,7 @@ describe('chat view & character switch', () => {
       sessionId: 'session_test',
       isLoading: false,
       abortController: null,
+      activeRequestId: null,
       hasChosenCharacter: false,
     });
   });
@@ -60,5 +61,30 @@ describe('chat view & character switch', () => {
     useChatStore.getState().addMessage({ role: 'assistant', content: '你好' });
     const msg = useChatStore.getState().messages[0];
     expect(msg.characterId).toBe('wangyuyan');
+  });
+
+  it('ignores completion from an older streaming request', () => {
+    const activeController = new AbortController();
+    useChatStore.setState({
+      activeRequestId: 'new-request',
+      abortController: activeController,
+      isLoading: true,
+      messages: [
+        {
+          role: 'assistant',
+          content: 'new answer',
+          isStreaming: true,
+        },
+      ],
+    });
+
+    useChatStore.getState().finishStreaming('old-request');
+
+    expect(useChatStore.getState()).toMatchObject({
+      activeRequestId: 'new-request',
+      abortController: activeController,
+      isLoading: true,
+    });
+    expect(useChatStore.getState().messages[0].isStreaming).toBe(true);
   });
 });

@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useChatStore } from '@/store/useChatStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useMemoryStore, MemoryEntry } from '@/store/useMemoryStore';
 import { Brain, ChevronDown, Heart, Info, Bookmark, Plus, Sparkles, Archive } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 export const MemoryPanel = () => {
   const { sessionId } = useChatStore();
@@ -18,7 +19,15 @@ export const MemoryPanel = () => {
     fetchMemories,
     setSelectedMemory,
     deleteMemory,
+    createMemory,
+    updateMemory,
+    selectedMemory,
+    error,
   } = useMemoryStore();
+  const [isAdding, setIsAdding] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<MemoryEntry | null>(null);
 
   const userId = useAuthStore(
     (state) => state.user?.id ?? state.guestUserId,
@@ -39,6 +48,36 @@ export const MemoryPanel = () => {
 
   const totalMemories = memories.length;
   const hasContent = totalMemories > 0 || profile?.summary;
+
+  const beginEdit = (memory: MemoryEntry) => {
+    setSelectedMemory(memory);
+    setIsAdding(false);
+    setDraft(memory.content);
+  };
+
+  const closeEditor = () => {
+    setSelectedMemory(null);
+    setIsAdding(false);
+    setDraft('');
+  };
+
+  const saveDraft = async () => {
+    const content = draft.trim();
+    if (!content || isSaving) return;
+    setIsSaving(true);
+    try {
+      if (selectedMemory) {
+        await updateMemory(selectedMemory.id, { content });
+      } else {
+        await createMemory(sessionId, content);
+      }
+      closeEditor();
+    } catch {
+      // Store action exposes the user-facing error in panel state.
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="border-t border-border/50 bg-gradient-to-b from-card/50 to-card">
@@ -136,8 +175,8 @@ export const MemoryPanel = () => {
                   label="偏好"
                   color="rose"
                   memories={groupedMemories.preference}
-                  onEdit={setSelectedMemory}
-                  onDelete={(id) => deleteMemory(id, userId)}
+                  onEdit={beginEdit}
+                  onDelete={(memory) => setPendingDelete(memory)}
                   delay={0.15}
                 />
 
@@ -147,8 +186,8 @@ export const MemoryPanel = () => {
                   label="事实"
                   color="blue"
                   memories={groupedMemories.fact}
-                  onEdit={setSelectedMemory}
-                  onDelete={(id) => deleteMemory(id, userId)}
+                  onEdit={beginEdit}
+                  onDelete={(memory) => setPendingDelete(memory)}
                   delay={0.2}
                 />
 
@@ -158,8 +197,8 @@ export const MemoryPanel = () => {
                   label="其他"
                   color="amber"
                   memories={groupedMemories.other}
-                  onEdit={setSelectedMemory}
-                  onDelete={(id) => deleteMemory(id, userId)}
+                  onEdit={beginEdit}
+                  onDelete={(memory) => setPendingDelete(memory)}
                   delay={0.25}
                 />
               </div>
@@ -180,11 +219,54 @@ export const MemoryPanel = () => {
                 </motion.div>
               )}
 
+              {error && (
+                <p role="alert" className="text-xs text-destructive px-1">
+                  {error}
+                </p>
+              )}
+
+              {(isAdding || selectedMemory) && (
+                <div className="rounded-xl border border-primary/20 bg-card p-3 space-y-3">
+                  <label htmlFor="memory-editor" className="text-xs font-medium text-foreground">
+                    {selectedMemory ? '编辑记忆' : '添加一条确定的记忆'}
+                  </label>
+                  <textarea
+                    id="memory-editor"
+                    value={draft}
+                    onChange={(event) => setDraft(event.target.value)}
+                    maxLength={2000}
+                    rows={3}
+                    autoFocus
+                    className="w-full resize-none rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+                    placeholder="例如：我更喜欢从人物动机分析情节"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={closeEditor} className="px-3 py-2 text-xs text-muted-foreground hover:text-foreground">
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!draft.trim() || isSaving}
+                      onClick={() => void saveDraft()}
+                      className="rounded-xl bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-40"
+                    >
+                      {isSaving ? '保存中' : '保存'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Add Memory Button */}
               <motion.button
                 initial={{ y: 10, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.35 }}
+                type="button"
+                onClick={() => {
+                  setSelectedMemory(null);
+                  setIsAdding(true);
+                  setDraft('');
+                }}
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all duration-200 group"
               >
                 <Plus className="w-4 h-4 text-muted-foreground/60 group-hover:text-primary transition-colors" />
@@ -194,6 +276,20 @@ export const MemoryPanel = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="删除这条记忆？"
+        description="删除后无法在当前设备上恢复。"
+        confirmLabel="删除"
+        tone="danger"
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (!pendingDelete) return;
+          void deleteMemory(pendingDelete.id).catch(() => undefined);
+          setPendingDelete(null);
+        }}
+      />
     </div>
   );
 };
@@ -205,7 +301,7 @@ interface MemoryCategoryProps {
   color: 'rose' | 'blue' | 'amber';
   memories: MemoryEntry[];
   onEdit: (memory: MemoryEntry) => void;
-  onDelete: (id: string) => void;
+  onDelete: (memory: MemoryEntry) => void;
   delay: number;
 }
 
@@ -257,7 +353,7 @@ const MemoryCategory = ({ icon: Icon, label, color, memories, onEdit, onDelete, 
             memory={memory}
             color={color}
             onEdit={() => onEdit(memory)}
-            onDelete={() => onDelete(memory.id)}
+            onDelete={() => onDelete(memory)}
             delay={delay + index * 0.05}
           />
         ))}
@@ -328,11 +424,12 @@ const MemoryItem = ({ memory, color, onEdit, onDelete, delay }: MemoryItemProps)
         </div>
 
         {/* Action buttons - show on hover */}
-        <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center gap-1 -mt-1">
+        <div className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-all duration-200 flex items-center gap-1 -mt-1">
           <button
             onClick={onEdit}
             className="p-1.5 rounded-md hover:bg-muted transition-colors"
             title="编辑"
+            aria-label="编辑记忆"
           >
             <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -342,6 +439,7 @@ const MemoryItem = ({ memory, color, onEdit, onDelete, delay }: MemoryItemProps)
             onClick={onDelete}
             className="p-1.5 rounded-md hover:bg-rose-500/10 transition-colors"
             title="删除"
+            aria-label="删除记忆"
           >
             <svg className="w-3.5 h-3.5 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

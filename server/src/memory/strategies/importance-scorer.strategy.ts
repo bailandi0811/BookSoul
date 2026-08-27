@@ -29,7 +29,7 @@ export class ImportanceScorerStrategy {
     /其实.*是/i,
   ];
 
-  async score(message: string, context: string[] = []): Promise<ImportanceScore> {
+  async score(message: string, _context: string[] = []): Promise<ImportanceScore> {
     let score = 0.5; // 基础分
     const reasons: string[] = [];
 

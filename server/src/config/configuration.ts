@@ -22,5 +22,9 @@ export default () => ({
   },
   mcp: {
     amapApiKey: process.env.AMAP_API_KEY,
+    allowedTools: (process.env.MCP_ALLOWED_TOOL_NAMES || '')
+      .split(',')
+      .map((name) => name.trim())
+      .filter(Boolean),
   },
 });

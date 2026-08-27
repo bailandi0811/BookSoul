@@ -60,13 +60,10 @@ export async function claimCurrentGuest(sessionId: string): Promise<void> {
 
 export async function logoutCurrentDevice(): Promise<void> {
   const auth = useAuthStore.getState();
-  const refreshToken = auth.refreshToken;
   try {
-    if (refreshToken) {
+    if (auth.user) {
       await apiFetch('/api/auth/logout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
         skipRefresh: true,
       });
     }

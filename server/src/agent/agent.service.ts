@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
 import { MilvusService } from '../milvus/milvus.service';
 import { McpService } from '../mcp/mcp.service';
-import { ToolsService } from '../tools/tools.service';
 import { PersonaService } from '../persona/persona.service';
 import { MemoryService } from '../memory/memory.service';
 import {
@@ -13,12 +12,10 @@ import {
   createCritiqueNode,
   createGeneratorNode,
   createHybridGeneratorNode,
-  createHybridRouterNode,
 } from './nodes';
-import { AgentState, INITIAL_STATE, NODES, ROUTING_THRESHOLDS } from './state';
+import { AgentState } from './state';
 import { MetricType } from '@zilliz/milvus2-sdk-node';
-import { FileSystemChatMessageHistory } from '@langchain/community/stores/message/file_system';
-import { HumanMessage, AIMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
+import { HumanMessage } from '@langchain/core/messages';
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import * as path from 'path';
@@ -33,6 +30,14 @@ interface QueryAnalysis {
   reasoning: string;
 }
 
+interface StoredHistoryMessage {
+  type: 'human' | 'ai' | 'system' | 'tool';
+  data: {
+    content: unknown;
+    tool_calls?: unknown[];
+  };
+}
+
 @Injectable()
 export class AgentService implements OnModuleInit {
   private model: ChatOpenAI;
@@ -41,12 +46,12 @@ export class AgentService implements OnModuleInit {
   private embeddingCache = new Map<string, { vector: number[]; ts: number }>();
   private readonly EMBEDDING_CACHE_TTL_MS = 10 * 60 * 1000;
   private readonly EMBEDDING_CACHE_MAX_SIZE = 200;
+  private readonly historyLocks = new Map<string, Promise<void>>();
 
   constructor(
     private configService: ConfigService,
     private milvusService: MilvusService,
     private mcpService: McpService,
-    private toolsService: ToolsService,
     private personaService: PersonaService,
     private memoryService: MemoryService,
   ) {
@@ -313,7 +318,7 @@ export class AgentService implements OnModuleInit {
           current_query_index: state.rewritten_queries.length,
           next_action: 'critique' as const,
         };
-      } catch (error: any) {
+      } catch {
         const failedResults = pendingQueries.map((q) => ({ query: q, docs: [] }));
         return {
           retrieved_documents: [...state.retrieved_documents, ...failedResults],
@@ -350,7 +355,6 @@ export class AgentService implements OnModuleInit {
       const directGeneratorNode = createDirectGeneratorNode(this.model, this.personaService.getPersonaPrompt.bind(this.personaService));
       const queryRewriterNode = createQueryRewriterNode(this.model);
       const critiqueNode = createCritiqueNode(this.model);
-      const hybridRouterNode = createHybridRouterNode();
 
       let searchNovelTool: any | null = null;
       let retrieverNode: any | null = null;
@@ -370,7 +374,7 @@ export class AgentService implements OnModuleInit {
 
       const ensureGenerationNodes = async () => {
         if (generatorNode && hybridGeneratorNode) return;
-        const toolIntentPattern = /发邮件|发送邮件|邮箱|mail|email|位置|定位|地图|导航|路线|附近|高德|amap/i;
+        const toolIntentPattern = /位置|定位|地图|导航|路线|附近|高德|amap/i;
         const enableTools = toolIntentPattern.test(query);
         let tools: any[] = [];
 
@@ -381,8 +385,7 @@ export class AgentService implements OnModuleInit {
             });
           }
           const mcpTools = await this.mcpService.getMcpTools();
-          const sendMailTool = this.toolsService.getSendMailTool();
-          tools = [searchNovelTool, ...mcpTools, sendMailTool];
+          tools = [searchNovelTool, ...mcpTools];
         }
 
         generatorNode = createGeneratorNode(this.model, tools, this.personaService.getPersonaPrompt.bind(this.personaService));
@@ -588,98 +591,26 @@ export class AgentService implements OnModuleInit {
 
       // ========== History Management ==========
 
-      const historyDir = path.join(process.cwd(), 'chat_histories');
-      if (!fs.existsSync(historyDir)) {
-        fs.mkdirSync(historyDir, { recursive: true });
-      }
-      const historyFilePath = this.getHistoryFilePath(sessionId);
-
-      const history = new FileSystemChatMessageHistory({
-        sessionId: sessionId,
-        filePath: historyFilePath,
-      });
-
       if (!abortSignal?.aborted) {
-        const userMsg = new HumanMessage(query);
-        const aiMsg = new AIMessage(currentState.final_response || '');
+        await this.persistHistory(
+          sessionId,
+          userId,
+          query,
+          currentState.final_response || '',
+        );
 
-        // Load existing messages for summarization check
-        let oldMessages = await history.getMessages();
-
-        // 查找现有的摘要消息
-        const SUMMARY_PREFIX = '【历史对话摘要】\n';
-        let existingSummary = '';
-        let summaryMsgIndex = -1;
-
-        for (let i = 0; i < oldMessages.length; i++) {
-          const msg = oldMessages[i];
-          if (msg instanceof SystemMessage && typeof msg.content === 'string' && msg.content.startsWith(SUMMARY_PREFIX)) {
-            existingSummary = msg.content.substring(SUMMARY_PREFIX.length);
-            summaryMsgIndex = i;
-            break;
+        try {
+          const memoryUpdate = await this.memoryService.processAndStoreMemory(
+            userId,
+            sessionId,
+            query,
+          );
+          if (memoryUpdate.hasNewMemories) {
+            yield { type: 'memory_update', data: memoryUpdate };
           }
+        } catch (error) {
+          this.logger.warn(`Failed to process memory: ${String(error)}`);
         }
-
-        // 提取纯对话消息
-        let conversationMessages = oldMessages;
-        if (summaryMsgIndex !== -1) {
-          conversationMessages = oldMessages.filter((_, index) => index !== summaryMsgIndex);
-        }
-
-        conversationMessages = conversationMessages.filter((msg) => {
-          if (msg instanceof ToolMessage) return false;
-          if (msg instanceof AIMessage && msg.tool_calls && msg.tool_calls.length > 0) return false;
-          return true;
-        });
-
-        const MAX_WINDOW_SIZE = 10;
-        const SUMMARY_TRIGGER_THRESHOLD = 14;
-
-        if (conversationMessages.length >= SUMMARY_TRIGGER_THRESHOLD) {
-          const numMessagesToSummarize = conversationMessages.length - MAX_WINDOW_SIZE;
-          const messagesToSummarize = conversationMessages.slice(0, numMessagesToSummarize);
-          conversationMessages = conversationMessages.slice(numMessagesToSummarize);
-
-          const formattedMessagesForSummary = messagesToSummarize
-            .map((m) => `${m instanceof HumanMessage ? 'User' : 'Assistant'}: ${m.content}`)
-            .join('\n');
-
-          // Generate summary asynchronously
-          const summaryPrompt = `你是一个有用的AI助手。请根据以下先前的对话摘要（如果有）和新的对话记录，生成一个简短且连贯的更新版对话摘要。请保留重要的事实、偏好和上下文信息。只返回摘要文本，不要有任何其他多余的解释。
-
-之前的摘要：
-${existingSummary || '无'}
-
-新的对话记录：
-${formattedMessagesForSummary}`;
-
-          this.model.invoke([new HumanMessage(summaryPrompt)])
-            .then(async (summaryResponse) => {
-              const newSummary = summaryResponse.content as string;
-              await history.clear();
-              await history.addMessage(new SystemMessage(`${SUMMARY_PREFIX}${newSummary}`));
-              for (const msg of conversationMessages) {
-                await history.addMessage(msg);
-              }
-              await history.addMessage(userMsg);
-              await history.addMessage(aiMsg);
-              this.writeHistoryOwner(historyFilePath, sessionId, userId);
-            })
-            .catch(async (error) => {
-              this.logger.error('Failed to generate history summary:', error);
-              await history.addMessage(userMsg);
-              await history.addMessage(aiMsg);
-              this.writeHistoryOwner(historyFilePath, sessionId, userId);
-            });
-        } else {
-          await history.addMessage(userMsg);
-          await history.addMessage(aiMsg);
-          this.writeHistoryOwner(historyFilePath, sessionId, userId);
-        }
-
-        // 后台异步处理并存储重要记忆，避免阻塞 HTTP 响应结束（前端并未依赖该 stream event，而是独立刷新）
-        this.memoryService.processAndStoreMemory(userId, sessionId, query)
-          .catch((e) => this.logger.warn(`Failed to process memory: ${e}`));
       }
 
     } catch (error: any) {
@@ -705,6 +636,127 @@ ${formattedMessagesForSummary}`;
     }
 
     return { response, references };
+  }
+
+  private async persistHistory(
+    sessionId: string,
+    userId: string,
+    query: string,
+    response: string,
+  ): Promise<void> {
+    await this.withHistoryLock(sessionId, async () => {
+      const historyFilePath = this.getHistoryFilePath(sessionId);
+      const historyDir = path.dirname(historyFilePath);
+      fs.mkdirSync(historyDir, { recursive: true });
+
+      let oldMessages: StoredHistoryMessage[] = [];
+      if (fs.existsSync(historyFilePath)) {
+        const stored = JSON.parse(fs.readFileSync(historyFilePath, 'utf-8'));
+        const session = stored['']?.[sessionId];
+        if (session?.userId !== userId) {
+          throw new ForbiddenException('无权写入该会话');
+        }
+        oldMessages = Array.isArray(session.messages) ? session.messages : [];
+      }
+
+      const summaryPrefix = '【历史对话摘要】\n';
+      const summaryMessage = oldMessages.find(
+        (message) =>
+          message.type === 'system' &&
+          typeof message.data?.content === 'string' &&
+          message.data.content.startsWith(summaryPrefix),
+      );
+      const existingSummary =
+        typeof summaryMessage?.data.content === 'string'
+          ? summaryMessage.data.content.slice(summaryPrefix.length)
+          : '';
+      let conversationMessages = oldMessages.filter(
+        (message) =>
+          message !== summaryMessage &&
+          message.type !== 'tool' &&
+          !(message.type === 'ai' && (message.data.tool_calls?.length ?? 0) > 0),
+      );
+
+      const userMessage: StoredHistoryMessage = {
+        type: 'human',
+        data: { content: query },
+      };
+      const assistantMessage: StoredHistoryMessage = {
+        type: 'ai',
+        data: { content: response },
+      };
+      let nextMessages = [...oldMessages, userMessage, assistantMessage];
+
+      const maxWindowSize = 10;
+      const summaryTriggerThreshold = 14;
+      if (conversationMessages.length >= summaryTriggerThreshold) {
+        const summarizeCount = conversationMessages.length - maxWindowSize;
+        const messagesToSummarize = conversationMessages.slice(0, summarizeCount);
+        conversationMessages = conversationMessages.slice(summarizeCount);
+        const formattedMessages = messagesToSummarize
+          .map((message) =>
+            `${message.type === 'human' ? 'User' : 'Assistant'}: ${String(message.data.content ?? '')}`,
+          )
+          .join('\n');
+        const summaryPrompt = `你是一个有用的AI助手。请根据以下先前的对话摘要（如果有）和新的对话记录，生成一个简短且连贯的更新版对话摘要。请保留重要的事实、偏好和上下文信息。只返回摘要文本，不要有任何其他多余的解释。
+
+之前的摘要：
+${existingSummary || '无'}
+
+新的对话记录：
+${formattedMessages}`;
+
+        try {
+          const summaryResponse = await this.model.invoke([
+            new HumanMessage(summaryPrompt),
+          ]);
+          const newSummary = this.extractTextFromChunk(summaryResponse);
+          nextMessages = [
+            {
+              type: 'system',
+              data: { content: `${summaryPrefix}${newSummary}` },
+            },
+            ...conversationMessages,
+            userMessage,
+            assistantMessage,
+          ];
+        } catch (error) {
+          this.logger.error('Failed to generate history summary', error);
+        }
+      }
+
+      const serialized = JSON.stringify(
+        { '': { [sessionId]: { messages: nextMessages, userId } } },
+        null,
+        2,
+      );
+      const temporaryPath = `${historyFilePath}.${process.pid}.${Date.now()}.tmp`;
+      fs.writeFileSync(temporaryPath, serialized, 'utf-8');
+      fs.renameSync(temporaryPath, historyFilePath);
+    });
+  }
+
+  private async withHistoryLock<T>(
+    sessionId: string,
+    task: () => Promise<T>,
+  ): Promise<T> {
+    const previous = this.historyLocks.get(sessionId) ?? Promise.resolve();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const queued = previous.then(() => gate);
+    this.historyLocks.set(sessionId, queued);
+    await previous;
+
+    try {
+      return await task();
+    } finally {
+      release();
+      if (this.historyLocks.get(sessionId) === queued) {
+        this.historyLocks.delete(sessionId);
+      }
+    }
   }
 
   async getHistoryList(userId: string): Promise<{ sessionId: string; title: string; updatedAt: number }[]> {
@@ -833,15 +885,4 @@ ${formattedMessagesForSummary}`;
     );
   }
 
-  private writeHistoryOwner(
-    historyFilePath: string,
-    sessionId: string,
-    userId: string,
-  ): void {
-    const data = JSON.parse(fs.readFileSync(historyFilePath, 'utf-8'));
-    if (data['']?.[sessionId]) {
-      data[''][sessionId].userId = userId;
-      fs.writeFileSync(historyFilePath, JSON.stringify(data, null, 2));
-    }
-  }
 }

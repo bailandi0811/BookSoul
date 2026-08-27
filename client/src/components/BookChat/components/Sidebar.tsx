@@ -20,16 +20,29 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
     sessionId,
     clearMessages,
   } = useChatStore();
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(() => {
+    const saved = localStorage.getItem('booksoul_theme');
+    if (saved) return saved === 'dark';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
   const [pendingChar, setPendingChar] = useState<CharacterType | null>(null);
+  const [pendingDeleteSession, setPendingDeleteSession] = useState<{
+    sessionId: string;
+    title: string;
+  } | null>(null);
 
   useEffect(() => {
     fetchSessions();
   }, [fetchSessions]);
 
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDark);
+  }, [isDark]);
+
   const toggleTheme = () => {
-    setIsDark(!isDark);
-    document.documentElement.classList.toggle('dark');
+    const next = !isDark;
+    setIsDark(next);
+    localStorage.setItem('booksoul_theme', next ? 'dark' : 'light');
   };
 
   const pending = pendingChar ? getCharacter(pendingChar) : null;
@@ -163,10 +176,14 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        deleteSession(session.sessionId);
+                        setPendingDeleteSession({
+                          sessionId: session.sessionId,
+                          title: session.title,
+                        });
                       }}
                       className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded-xl transition-all"
                       title="删除会话"
+                      aria-label={`删除会话：${session.title}`}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -262,6 +279,19 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
           if (!pendingChar) return;
           switchCharacter(pendingChar);
           setPendingChar(null);
+        }}
+      />
+      <ConfirmDialog
+        open={!!pendingDeleteSession}
+        title="删除这段会话？"
+        description={pendingDeleteSession ? `「${pendingDeleteSession.title}」将被永久删除。` : undefined}
+        confirmLabel="删除"
+        tone="danger"
+        onCancel={() => setPendingDeleteSession(null)}
+        onConfirm={() => {
+          if (!pendingDeleteSession) return;
+          void deleteSession(pendingDeleteSession.sessionId);
+          setPendingDeleteSession(null);
         }}
       />
     </div>

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { UserProfile, UserPreferences } from '../interfaces/memory.types';
+import { UserProfile } from '../interfaces/memory.types';
 import { requireSafePathSegment, resolveWithinRoot } from '../../auth/auth-context';
 
 @Injectable()
@@ -27,8 +27,10 @@ export class UserProfileRepository {
     try {
       const dir = this.getUserDirectory(profile.userId);
       await fs.mkdir(dir, { recursive: true });
-      const filePath = path.join(dir, `${profile.sessionId}.json`);
-      await fs.writeFile(filePath, JSON.stringify(profile, null, 2));
+      const filePath = this.getFilePath(profile.userId, profile.sessionId);
+      const temporaryPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+      await fs.writeFile(temporaryPath, JSON.stringify(profile, null, 2));
+      await fs.rename(temporaryPath, filePath);
     } catch (error) {
       this.logger.error('Failed to save user profile');
       throw error;
@@ -37,15 +39,20 @@ export class UserProfileRepository {
 
   async update(userId: string, sessionId: string, updates: Partial<UserProfile>): Promise<UserProfile> {
     const existing = await this.get(userId, sessionId);
+    const currentPreferences = existing?.preferences || {
+      favoriteCharacters: [],
+      interests: [],
+    };
     const updated: UserProfile = {
       userId,
       sessionId,
       createdAt: existing?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      preferences: existing?.preferences || { favoriteCharacters: [], interests: [] },
-      facts: existing?.facts || {},
-      summary: existing?.summary || '',
-      ...updates,
+      preferences: updates.preferences
+        ? { ...currentPreferences, ...updates.preferences }
+        : currentPreferences,
+      facts: updates.facts ?? existing?.facts ?? {},
+      summary: updates.summary ?? existing?.summary ?? '',
     };
 
     await this.save(updated);

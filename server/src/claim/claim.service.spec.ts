@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { MilvusService } from '../milvus/milvus.service';
 import { ClaimService } from './claim.service';
 
@@ -120,14 +120,14 @@ describe('ClaimService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('allows legacy anonymous history to gain trusted ownership', async () => {
+  it('rejects the legacy shared anonymous identity', async () => {
     writeJson(`chat_histories/session_${sessionId}.json`, {
       '': { [sessionId]: { messages: [] } },
     });
 
-    const result = await service.claimGuest('anonymous', sessionId, userId);
-
-    expect(result.history).toBe('claimed');
+    await expect(
+      service.claimGuest('anonymous', sessionId, userId),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('reports partial when Milvus is unavailable and remains retryable', async () => {
