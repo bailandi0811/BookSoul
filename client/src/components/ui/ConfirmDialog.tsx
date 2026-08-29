@@ -1,6 +1,6 @@
-import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import { AnimatePresence, motion } from "framer-motion";
+import { useEffect } from "react";
+import { createPortal } from "react-dom";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -8,7 +8,7 @@ interface ConfirmDialogProps {
   description?: string;
   confirmLabel?: string;
   cancelLabel?: string;
-  tone?: 'default' | 'danger';
+  tone?: "default" | "danger";
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -17,34 +17,34 @@ export function ConfirmDialog({
   open,
   title,
   description,
-  confirmLabel = '确认',
-  cancelLabel = '取消',
-  tone = 'default',
+  confirmLabel = "确认",
+  cancelLabel = "取消",
+  tone = "default",
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel();
+      if (e.key === "Escape") onCancel();
     };
     const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    window.addEventListener('keydown', onKey);
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = prev;
-      window.removeEventListener('keydown', onKey);
+      window.removeEventListener("keydown", onKey);
     };
   }, [open, onCancel]);
 
-  if (typeof document === 'undefined') return null;
+  if (typeof document === "undefined") return null;
 
   return createPortal(
     <AnimatePresence>
       {open && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-          style={{ position: 'fixed', inset: 0 }}
+          style={{ position: "fixed", inset: 0 }}
         >
           <motion.button
             type="button"
@@ -63,7 +63,7 @@ export function ConfirmDialog({
             initial={{ opacity: 0, scale: 0.94 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
-            transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+            transition={{ type: "spring", stiffness: 420, damping: 32 }}
             className="relative z-10 w-full max-w-sm soft-surface rounded-3xl p-5 sm:p-6"
           >
             <h2
@@ -94,9 +94,10 @@ export function ConfirmDialog({
                 onClick={onConfirm}
                 className={`
                   px-5 py-2.5 rounded-2xl text-sm font-medium transition-colors
-                  ${tone === 'danger'
-                    ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
-                    : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  ${
+                    tone === "danger"
+                      ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      : "bg-primary text-primary-foreground hover:bg-primary/90"
                   }
                 `}
               >

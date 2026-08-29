@@ -1,7 +1,7 @@
-import { Reference } from '@/store/useChatStore';
-import { BookOpen, ChevronDown, ChevronUp, FileText } from 'lucide-react';
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Reference } from "@/store/useChatStore";
+import { BookOpen, ChevronDown, ChevronUp, FileText } from "lucide-react";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface ReferenceCardProps {
   references: Reference[];
@@ -27,16 +27,17 @@ export const ReferenceCard = ({ references }: ReferenceCardProps) => {
         className={`
           flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium
           transition-all duration-200 border border-border
-          ${isExpanded
-            ? 'bg-secondary text-foreground'
-            : 'bg-secondary/80 text-muted-foreground hover:text-foreground'
+          ${
+            isExpanded
+              ? "bg-secondary text-foreground"
+              : "bg-secondary/80 text-muted-foreground hover:text-foreground"
           }
         `}
       >
         <BookOpen className="w-3.5 h-3.5" />
         <span>
-          出自《{references[0]?.book_name}》第 {references[0]?.chapter_num} 回
-          {references.length > 1 ? `等 ${references.length} 处` : ''}
+          引用第 {references[0]?.sectionOrder} 节「{references[0]?.sectionTitle}
+          」{references.length > 1 ? `等 ${references.length} 处` : ""}
         </span>
         <div className="ml-auto">
           {isExpanded ? (
@@ -51,7 +52,7 @@ export const ReferenceCard = ({ references }: ReferenceCardProps) => {
         {isExpanded && (
           <motion.div
             initial={{ opacity: 0, height: 0, marginTop: 0 }}
-            animate={{ opacity: 1, height: 'auto', marginTop: 8 }}
+            animate={{ opacity: 1, height: "auto", marginTop: 8 }}
             exit={{ opacity: 0, height: 0, marginTop: 0 }}
             transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
             className="overflow-hidden"
@@ -68,11 +69,11 @@ export const ReferenceCard = ({ references }: ReferenceCardProps) => {
                   <div className="flex items-center gap-1.5 text-muted-foreground mb-2">
                     <FileText className="w-3.5 h-3.5" />
                     <span className="text-xs font-medium">
-                      第 {ref.chapter_num} 回
+                      第 {ref.sectionOrder} 节 · {ref.sectionTitle}
                     </span>
                   </div>
                   <p className="text-[13px] text-muted-foreground leading-relaxed line-clamp-3">
-                    {ref.content}
+                    {ref.excerpt}
                   </p>
                 </motion.div>
               ))}

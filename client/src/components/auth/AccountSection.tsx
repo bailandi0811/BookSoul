@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import { LogOut, RefreshCw, UserRound } from 'lucide-react';
-import { claimCurrentGuest, logoutCurrentDevice } from '@/lib/auth-api';
-import { useAuthStore } from '@/store/useAuthStore';
-import { useChatStore } from '@/store/useChatStore';
+import { useState } from "react";
+import { LogOut, RefreshCw, UserRound } from "lucide-react";
+import { claimCurrentGuest, logoutCurrentDevice } from "@/lib/auth-api";
+import { useAuthStore } from "@/store/useAuthStore";
+import { useChatStore } from "@/store/useChatStore";
 
 export function AccountSection() {
   const [loggingOut, setLoggingOut] = useState(false);
@@ -24,7 +24,9 @@ export function AccountSection() {
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">{user.name}</p>
-          <p className="truncate text-[11px] text-muted-foreground">{user.email}</p>
+          <p className="truncate text-[11px] text-muted-foreground">
+            {user.email}
+          </p>
         </div>
         <button
           type="button"
@@ -34,7 +36,7 @@ export function AccountSection() {
             try {
               await logoutCurrentDevice();
             } catch {
-              setLogoutError('退出失败，请检查网络后重试');
+              setLogoutError("退出失败，请检查网络后重试");
             } finally {
               setLoggingOut(false);
             }
@@ -59,9 +61,9 @@ export function AccountSection() {
           {logoutError}
         </p>
       )}
-      {(claimState === 'partial' || claimState === 'failed') && (
+      {sessionId && (claimState === "partial" || claimState === "failed") && (
         <div className="rounded-xl bg-primary/10 p-3 text-xs leading-5 text-foreground">
-          <p>{claimMessage ?? '访客数据尚未完整迁移'}</p>
+          <p>{claimMessage ?? "访客数据尚未完整迁移"}</p>
           <button
             type="button"
             onClick={() => claimCurrentGuest(sessionId)}

@@ -1,21 +1,21 @@
-import { create } from 'zustand';
-import { apiFetch } from '@/lib/api';
-import { readApiError } from '@/lib/api';
+import { create } from "zustand";
+import { apiFetch } from "@/lib/api";
+import { readApiError } from "@/lib/api";
 
 export interface MemoryEntry {
   id: string;
   userId: string;
   sessionId: string;
-  level: 'episodic' | 'semantic' | 'long_term';
+  level: "episodic" | "semantic" | "long_term";
   content: string;
   importance: number;
-  category: 'preference' | 'fact' | 'other';
+  category: "preference" | "fact" | "other";
   createdAt: string;
   updatedAt: string;
   metadata: {
     editable: boolean;
     verified: boolean;
-    source?: 'automatic' | 'manual';
+    source?: "automatic" | "manual";
     sourceMessage?: string;
     extractReason?: string;
   };
@@ -50,8 +50,15 @@ interface MemoryState {
   fetchProfile: (sessionId: string) => Promise<void>;
   fetchMemories: (sessionId: string) => Promise<void>;
   searchMemories: (query: string, topK?: number) => Promise<MemoryEntry[]>;
-  createMemory: (sessionId: string, content: string, category?: MemoryEntry['category']) => Promise<void>;
-  updateMemory: (memoryId: string, updates: { content?: string; importance?: number; verified?: boolean }) => Promise<void>;
+  createMemory: (
+    sessionId: string,
+    content: string,
+    category?: MemoryEntry["category"],
+  ) => Promise<void>;
+  updateMemory: (
+    memoryId: string,
+    updates: { content?: string; importance?: number; verified?: boolean },
+  ) => Promise<void>;
   deleteMemory: (memoryId: string) => Promise<void>;
   setSelectedMemory: (memory: MemoryEntry | null) => void;
   setEditing: (editing: boolean) => void;
@@ -95,7 +102,7 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
       } else throw new Error(await readApiError(response));
     } catch (error) {
       if (requestId === latestProfileRequest) {
-        set({ error: error instanceof Error ? error.message : '画像加载失败' });
+        set({ error: error instanceof Error ? error.message : "画像加载失败" });
       }
     } finally {
       set((state) => {
@@ -123,7 +130,7 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
       } else throw new Error(await readApiError(response));
     } catch (error) {
       if (requestId === latestMemoryRequest) {
-        set({ error: error instanceof Error ? error.message : '记忆加载失败' });
+        set({ error: error instanceof Error ? error.message : "记忆加载失败" });
       }
     } finally {
       set((state) => {
@@ -143,16 +150,16 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
       }
       return [];
     } catch (error) {
-      console.error('Failed to search memories:', error);
+      console.error("Failed to search memories:", error);
       return [];
     }
   },
 
   createMemory: async (sessionId, content, category) => {
     set({ error: null });
-    const response = await apiFetch('/api/memory', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const response = await apiFetch("/api/memory", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sessionId, content, category }),
     });
     if (!response.ok) {
@@ -167,20 +174,22 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
   updateMemory: async (memoryId, updates) => {
     try {
       const response = await apiFetch(`/api/memory/${memoryId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updates),
       });
       if (response.ok) {
         const updated = await response.json();
-        set(state => ({
-          memories: state.memories.map(m => m.id === memoryId ? updated : m),
+        set((state) => ({
+          memories: state.memories.map((m) =>
+            m.id === memoryId ? updated : m,
+          ),
           selectedMemory: null,
           isEditing: false,
         }));
       } else throw new Error(await readApiError(response));
     } catch (error) {
-      const message = error instanceof Error ? error.message : '记忆更新失败';
+      const message = error instanceof Error ? error.message : "记忆更新失败";
       set({ error: message });
       throw error;
     }
@@ -189,16 +198,16 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
   deleteMemory: async (memoryId) => {
     try {
       const response = await apiFetch(`/api/memory/${memoryId}`, {
-        method: 'DELETE',
+        method: "DELETE",
       });
       if (response.ok) {
-        set(state => ({
-          memories: state.memories.filter(m => m.id !== memoryId),
+        set((state) => ({
+          memories: state.memories.filter((m) => m.id !== memoryId),
           selectedMemory: null,
         }));
       } else throw new Error(await readApiError(response));
     } catch (error) {
-      const message = error instanceof Error ? error.message : '记忆删除失败';
+      const message = error instanceof Error ? error.message : "记忆删除失败";
       set({ error: message });
       throw error;
     }

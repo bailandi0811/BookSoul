@@ -1,11 +1,11 @@
-import type { ChatView } from '@/store/useChatStore';
+import type { BooksView } from "@/store/useBooksStore";
 
-export type AppScreen = 'loading' | 'auth' | ChatView;
+export type AppScreen = "loading" | "auth" | BooksView;
 
 interface AppFlowState {
   authReady: boolean;
   isAuthenticated: boolean;
-  view: ChatView;
+  view: BooksView;
 }
 
 export function resolveAppScreen({
@@ -13,7 +13,7 @@ export function resolveAppScreen({
   isAuthenticated,
   view,
 }: AppFlowState): AppScreen {
-  if (!authReady) return 'loading';
-  if (!isAuthenticated) return 'auth';
+  if (!authReady) return "loading";
+  if (!isAuthenticated) return "auth";
   return view;
 }

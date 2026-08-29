@@ -1,98 +1,146 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useChatStore } from './useChatStore';
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useChatStore } from "./useChatStore";
 
-describe('chat view & character switch', () => {
+function success(data: unknown, init?: ResponseInit): Response {
+  return new Response(JSON.stringify({ success: true, data }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+    ...init,
+  });
+}
+
+describe("book-scoped chat state", () => {
   beforeEach(() => {
-    localStorage.clear();
+    vi.restoreAllMocks();
     useChatStore.setState({
-      view: 'entrance',
+      currentBookId: null,
       messages: [],
-      currentCharacter: 'assistant',
-      draftInput: '',
+      draftInput: "",
       lastStopNotice: null,
-      sessionId: 'session_test',
+      sessionId: null,
+      sessions: [],
       isLoading: false,
+      isSessionsLoading: false,
       abortController: null,
       activeRequestId: null,
-      hasChosenCharacter: false,
     });
   });
 
-  it('enterDialogue sets view and character', () => {
-    useChatStore.getState().enterDialogue('qiaofeng');
-    const s = useChatStore.getState();
-    expect(s.view).toBe('dialogue');
-    expect(s.currentCharacter).toBe('qiaofeng');
-    expect(localStorage.getItem('booksoul_has_chosen')).toBe('1');
-    expect(localStorage.getItem('booksoul_character')).toBe('qiaofeng');
-  });
+  it("prepares a book using only its server sessions", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(success([]));
 
-  it('openEntrance returns an authenticated login flow to character selection', () => {
-    useChatStore.setState({ view: 'dialogue', currentCharacter: 'qiaofeng' });
+    await useChatStore.getState().prepareBook("book-a");
 
-    useChatStore.getState().openEntrance();
-
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/books/book-a/sessions",
+      expect.objectContaining({ credentials: "include" }),
+    );
     expect(useChatStore.getState()).toMatchObject({
-      view: 'entrance',
-      currentCharacter: 'qiaofeng',
+      currentBookId: "book-a",
+      sessionId: null,
+      messages: [],
     });
   });
 
-  it('switchCharacter clears messages and rotates sessionId', () => {
+  it("uses the server generated session id for a new conversation", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      success({
+        sessionId: "server-session",
+        title: "新对话",
+        updatedAt: "2026-08-29T00:00:00.000Z",
+      }),
+    );
+    useChatStore.setState({ currentBookId: "book-a" });
+
+    await expect(useChatStore.getState().startNewSession()).resolves.toBe(
+      "server-session",
+    );
+    expect(useChatStore.getState()).toMatchObject({
+      sessionId: "server-session",
+      messages: [],
+    });
+  });
+
+  it("sends only message, session, and one-time spoiler choice", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async (input) => {
+        if (input === "/api/chat") {
+          return new Response('data: {"content":"回答"}\n\ndata: [DONE]\n\n', {
+            status: 200,
+            headers: { "Content-Type": "text/event-stream" },
+          });
+        }
+        return success([]);
+      });
     useChatStore.setState({
-      view: 'dialogue',
-      messages: [{ role: 'user', content: 'hi', createdAt: 1 }],
-      sessionId: 'session_old',
-      isLoading: true,
+      currentBookId: "book-a",
+      sessionId: "server-session",
     });
-    useChatStore.getState().switchCharacter('duanyu');
-    const s = useChatStore.getState();
-    expect(s.currentCharacter).toBe('duanyu');
-    expect(s.messages).toEqual([]);
-    expect(s.sessionId).not.toBe('session_old');
-    expect(s.isLoading).toBe(false);
-    expect(localStorage.getItem('booksoul_character')).toBe('duanyu');
+
+    await useChatStore.getState().sendMessage("问题", true);
+
+    const chatCall = fetchMock.mock.calls.find(
+      ([input]) => input === "/api/chat",
+    );
+    expect(chatCall).toBeDefined();
+    const body = JSON.parse(String(chatCall?.[1]?.body)) as Record<
+      string,
+      unknown
+    >;
+    expect(body).toEqual({
+      message: "问题",
+      sessionId: "server-session",
+      spoilerOverride: true,
+    });
+    expect(body).not.toHaveProperty("character");
+    expect(body).not.toHaveProperty("bookId");
+    expect(useChatStore.getState().messages.at(-1)?.content).toBe("回答");
   });
 
-  it('clearMessages aborts in-flight generation', () => {
+  it("resetBookChat aborts an in-flight response and clears private state", () => {
     const abort = vi.fn();
     useChatStore.setState({
+      currentBookId: "book-a",
+      sessionId: "server-session",
       isLoading: true,
       abortController: { abort } as unknown as AbortController,
-      messages: [{ role: 'user', content: 'hi', createdAt: 1 }],
+      activeRequestId: "request-a",
+      messages: [{ role: "user", content: "问题", createdAt: 1 }],
     });
-    useChatStore.getState().clearMessages();
+
+    useChatStore.getState().resetBookChat();
+
     expect(abort).toHaveBeenCalled();
-    expect(useChatStore.getState().isLoading).toBe(false);
-    expect(useChatStore.getState().messages).toEqual([]);
+    expect(useChatStore.getState()).toMatchObject({
+      currentBookId: null,
+      sessionId: null,
+      isLoading: false,
+      messages: [],
+    });
   });
 
-  it('addMessage stamps characterId from currentCharacter', () => {
-    useChatStore.setState({ currentCharacter: 'wangyuyan' });
-    useChatStore.getState().addMessage({ role: 'assistant', content: '你好' });
-    const msg = useChatStore.getState().messages[0];
-    expect(msg.characterId).toBe('wangyuyan');
-  });
-
-  it('ignores completion from an older streaming request', () => {
+  it("ignores completion from an older streaming request", () => {
     const activeController = new AbortController();
     useChatStore.setState({
-      activeRequestId: 'new-request',
+      activeRequestId: "new-request",
       abortController: activeController,
       isLoading: true,
       messages: [
         {
-          role: 'assistant',
-          content: 'new answer',
+          role: "assistant",
+          content: "new answer",
           isStreaming: true,
         },
       ],
     });
 
-    useChatStore.getState().finishStreaming('old-request');
+    useChatStore.getState().finishStreaming("old-request");
 
     expect(useChatStore.getState()).toMatchObject({
-      activeRequestId: 'new-request',
+      activeRequestId: "new-request",
       abortController: activeController,
       isLoading: true,
     });

@@ -7,7 +7,7 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const allowedOrigins = new Set(
-    (process.env.CORS_ORIGINS || 'http://localhost:5173')
+    (process.env.CORS_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173')
       .split(',')
       .map((origin) => origin.trim())
       .filter(Boolean),
@@ -24,7 +24,7 @@ async function bootstrap() {
       callback(new Error('Origin is not allowed by CORS'));
     },
     allowedHeaders: ['Authorization', 'Content-Type', 'X-Guest-User-Id'],
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
   app.useGlobalPipes(
     new ValidationPipe({

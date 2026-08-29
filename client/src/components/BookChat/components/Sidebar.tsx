@@ -1,291 +1,272 @@
-import { useChatStore } from '@/store/useChatStore';
-import { CHARACTER_IDS, getCharacter, SIDE_ABILITIES, QUICK_PROMPTS, type CharacterType } from '@/data/characters';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { PanelLeftClose, History, Moon, Sun, Trash2 } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { motion } from 'framer-motion';
-import { useState, useEffect } from 'react';
-import { MemoryPanel } from './MemoryPanel';
-import { AccountSection } from '@/components/auth/AccountSection';
+import { AccountSection } from "@/components/auth/AccountSection";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useBooksStore } from "@/store/useBooksStore";
+import { useChatStore } from "@/store/useChatStore";
+import {
+  ArrowLeft,
+  BookOpen,
+  History,
+  PanelLeftClose,
+  Plus,
+  Trash2,
+} from "lucide-react";
+import { useState } from "react";
+import { AssistantSettings } from "./AssistantSettings";
 
 export const Sidebar = ({ onClose }: { onClose: () => void }) => {
   const {
-    currentCharacter,
-    switchCharacter,
-    setDraftInput,
+    currentBook,
+    sections,
+    readingProgress,
+    workspaceError,
+    updateProgress,
+    backToLibrary,
+  } = useBooksStore();
+  const {
     sessions,
-    fetchSessions,
+    isSessionsLoading,
+    sessionId,
+    startNewSession,
     loadSession,
     deleteSession,
-    sessionId,
-    clearMessages,
   } = useChatStore();
-  const [isDark, setIsDark] = useState(() => {
-    const saved = localStorage.getItem('booksoul_theme');
-    if (saved) return saved === 'dark';
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
-  });
-  const [pendingChar, setPendingChar] = useState<CharacterType | null>(null);
   const [pendingDeleteSession, setPendingDeleteSession] = useState<{
     sessionId: string;
     title: string;
   } | null>(null);
 
-  useEffect(() => {
-    fetchSessions();
-  }, [fetchSessions]);
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', isDark);
-  }, [isDark]);
-
-  const toggleTheme = () => {
-    const next = !isDark;
-    setIsDark(next);
-    localStorage.setItem('booksoul_theme', next ? 'dark' : 'light');
-  };
-
-  const pending = pendingChar ? getCharacter(pendingChar) : null;
+  const mode = readingProgress?.mode ?? "NOT_STARTED";
+  const currentSectionOrder = readingProgress?.currentSectionOrder ?? 1;
 
   return (
-    <div className="flex flex-col h-full w-full bg-secondary border-r border-border">
-      <div className="p-4 border-b border-border/40">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h2 className="font-bold text-base text-foreground tracking-tight">BookSoul</h2>
-            <p className="text-[11px] text-muted-foreground mt-0.5">天龙八部</p>
-          </div>
-          <motion.button
+    <div className="flex h-full w-full flex-col border-r border-border bg-secondary">
+      <div className="border-b border-border/70 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <button
             type="button"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.94 }}
+            onClick={backToLibrary}
+            className="tap-spring inline-flex items-center gap-2 rounded-lg px-1 py-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            返回书架
+          </button>
+          <button
+            type="button"
             onClick={onClose}
-            className="p-2 text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 rounded-xl transition-all duration-200"
+            className="tap-spring rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
             aria-label="关闭侧栏"
           >
-            <PanelLeftClose className="w-4 h-4" />
-          </motion.button>
+            <PanelLeftClose className="h-4 w-4" />
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => clearMessages()}
-          className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-left text-sm font-semibold hover:bg-secondary/80 transition-colors"
-        >
-          ＋ 新对话
-        </button>
+        <div className="mt-4 flex items-start gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
+            <BookOpen className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="line-clamp-2 text-sm font-bold leading-snug tracking-tight">
+              {currentBook?.title ?? "当前书籍"}
+            </h2>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {currentBook?.sectionCount ?? sections.length} 节
+            </p>
+          </div>
+        </div>
       </div>
 
-      <ScrollArea className="flex-1 py-4 scrollbar-thin">
-        <div className="px-4 mb-6">
-          <h3 className="text-[11px] font-bold text-muted-foreground tracking-wider mb-3 px-1">
-            角色
-          </h3>
-          <div className="space-y-1.5">
-            {CHARACTER_IDS.map((id, index) => {
-              const char = getCharacter(id);
-              const isActive = currentCharacter === id;
+      <ScrollArea className="flex-1 scrollbar-thin">
+        <div className="space-y-6 p-4">
+          {workspaceError && (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/8 px-3 py-2 text-xs leading-relaxed text-destructive">
+              {workspaceError}
+            </div>
+          )}
 
-              return (
-                <motion.button
-                  key={id}
-                  type="button"
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.04 }}
-                  whileHover={{ x: 2 }}
-                  whileTap={{ scale: 0.985 }}
-                  onClick={() => {
-                    if (isActive) return;
-                    setPendingChar(id);
-                  }}
-                  className={`
-                    w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 text-left
-                    ${isActive
-                      ? 'border border-primary bg-card shadow-sm'
-                      : 'hover:bg-muted/55 border border-transparent'
+          <section>
+            <h3 className="mb-3 text-xs font-semibold text-foreground">
+              阅读进度
+            </h3>
+            <div className="space-y-2.5 rounded-xl border border-border bg-card p-3">
+              <label className="grid gap-1.5 text-[11px] font-medium text-muted-foreground">
+                阅读状态
+                <select
+                  value={mode}
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    if (next === "NOT_STARTED") {
+                      void updateProgress("NOT_STARTED");
+                    } else if (next === "FINISHED") {
+                      void updateProgress("FINISHED");
+                    } else {
+                      void updateProgress("IN_PROGRESS", currentSectionOrder);
                     }
-                  `}
+                  }}
+                  className="h-9 rounded-lg border border-input bg-background px-2 text-xs text-foreground outline-none focus:border-primary"
                 >
-                  <span
-                    className="seal-mark w-9 h-9 rounded-full flex items-center justify-center text-sm flex-shrink-0"
-                    style={{ color: `rgb(var(${char.accentCssVar}))` }}
+                  <option value="NOT_STARTED">尚未开始</option>
+                  <option value="IN_PROGRESS">阅读中</option>
+                  <option value="FINISHED">已读完</option>
+                </select>
+              </label>
+              {mode === "IN_PROGRESS" && (
+                <label className="grid gap-1.5 text-[11px] font-medium text-muted-foreground">
+                  当前读到
+                  <select
+                    value={currentSectionOrder}
+                    onChange={(event) =>
+                      void updateProgress(
+                        "IN_PROGRESS",
+                        Number(event.target.value),
+                      )
+                    }
+                    className="h-9 rounded-lg border border-input bg-background px-2 text-xs text-foreground outline-none focus:border-primary"
                   >
-                    {char.sealChar}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className={`text-sm font-semibold truncate ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
-                      {char.name}
-                    </div>
-                    <div className="text-[11px] text-muted-foreground/60 truncate mt-0.5">
-                      {char.shortTitle}
-                    </div>
-                  </div>
-                  {isActive && (
-                    <motion.div
-                      layoutId="activeCharacter"
-                      className="w-2 h-2 rounded-full bg-primary flex-shrink-0"
-                    />
-                  )}
-                </motion.button>
-              );
-            })}
-          </div>
-        </div>
+                    {sections.map((section) => (
+                      <option key={section.id} value={section.order}>
+                        {section.order}. {section.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                默认只检索第 {readingProgress?.spoilerCeiling ?? 1}{" "}
+                节及以前内容。
+              </p>
+            </div>
+          </section>
 
-        <div className="px-4 mb-6">
-          <h3 className="text-[11px] font-bold text-muted-foreground tracking-wider mb-3 px-1 flex items-center gap-2">
-            <History className="w-3 h-3" />
-            会话
-          </h3>
-          <div className="space-y-1.5 max-h-[200px] overflow-y-auto pr-1 scrollbar-thin">
-            {!sessions || sessions.length === 0 ? (
-              <div className="text-xs text-muted-foreground/50 text-center py-4">暂无会话</div>
-            ) : (
-              sessions.map((session, index) => {
-                const isActive = session.sessionId === sessionId;
+          <section>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="text-xs font-semibold text-foreground">目录</h3>
+              <span className="text-[10px] text-muted-foreground">
+                {sections.length} 节
+              </span>
+            </div>
+            <div className="max-h-48 space-y-1 overflow-y-auto pr-1 scrollbar-thin">
+              {sections.map((section) => {
+                const isCurrent =
+                  mode === "IN_PROGRESS" &&
+                  section.order === currentSectionOrder;
                 return (
-                  <motion.div
-                    key={session.sessionId}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.02 }}
-                    whileTap={{ scale: 0.99 }}
-                    onClick={() => {
-                      if (!isActive) loadSession(session.sessionId);
-                    }}
-                    className={`
-                      w-full flex items-center gap-3 p-2.5 rounded-xl transition-all duration-200 text-left group cursor-pointer
-                      ${isActive
-                        ? 'bg-card border border-border text-foreground font-semibold shadow-sm'
-                        : 'hover:bg-muted/55 text-muted-foreground hover:text-foreground border border-transparent'
-                      }
-                    `}
+                  <button
+                    key={section.id}
+                    type="button"
+                    onClick={() =>
+                      void updateProgress("IN_PROGRESS", section.order)
+                    }
+                    className={`w-full rounded-lg px-2.5 py-2 text-left text-xs transition-colors ${
+                      isCurrent
+                        ? "bg-primary/12 font-semibold text-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
                   >
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs truncate">{session.title}</div>
-                      <div className="text-[10px] opacity-60 mt-0.5">
-                        {new Date(session.updatedAt).toLocaleString('zh-CN', {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPendingDeleteSession({
-                          sessionId: session.sessionId,
-                          title: session.title,
-                        });
-                      }}
-                      className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded-xl transition-all"
-                      title="删除会话"
-                      aria-label={`删除会话：${session.title}`}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </motion.div>
+                    <span className="mr-2 tabular-nums text-muted-foreground/70">
+                      {section.order}
+                    </span>
+                    {section.title}
+                  </button>
                 );
-              })
-            )}
-          </div>
-        </div>
+              })}
+            </div>
+          </section>
 
-        <div className="px-4 mb-6">
-          <h3 className="text-[11px] font-bold text-muted-foreground tracking-wider mb-3 px-1">
-            随身本事
-          </h3>
-          <div className="space-y-2">
-            {SIDE_ABILITIES.map((cap, index) => (
-              <motion.div
-                key={cap.name}
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.08 + index * 0.04 }}
-                className="p-3.5 rounded-xl border border-border/50 bg-card/60"
-              >
-                <div className="text-sm font-medium text-foreground">{cap.name}</div>
-                <div className="text-[11px] text-muted-foreground mt-0.5">{cap.desc}</div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-
-        <div className="px-4">
-          <h3 className="text-[11px] font-bold text-muted-foreground tracking-wider mb-3 px-1">
-            快捷指令
-          </h3>
-          <div className="space-y-1.5">
-            {QUICK_PROMPTS.map((text) => (
-              <motion.button
-                key={text}
+          <section>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="flex items-center gap-2 text-xs font-semibold text-foreground">
+                <History className="h-3.5 w-3.5" />
+                会话
+              </h3>
+              <button
                 type="button"
-                whileHover={{ x: 2 }}
-                whileTap={{ scale: 0.985 }}
-                className="w-full flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-muted/55 transition-all duration-200 text-left group border border-transparent hover:border-border/40"
-                onClick={() => setDraftInput(text)}
+                onClick={() => void startNewSession()}
+                className="tap-spring inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-primary hover:bg-primary/10"
               >
-                <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-                  {text}
-                </span>
-              </motion.button>
-            ))}
-          </div>
+                <Plus className="h-3.5 w-3.5" />
+                新建
+              </button>
+            </div>
+            <div className="space-y-1">
+              {isSessionsLoading ? (
+                <div className="h-16 animate-pulse rounded-xl bg-card" />
+              ) : sessions.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+                  提出第一个问题后，会话会保存在这里。
+                </p>
+              ) : (
+                sessions.map((session) => {
+                  const isActive = session.sessionId === sessionId;
+                  return (
+                    <div
+                      key={session.sessionId}
+                      className={`group flex items-center gap-2 rounded-lg border px-2.5 py-2 ${
+                        isActive
+                          ? "border-border bg-card text-foreground"
+                          : "border-transparent text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => void loadSession(session.sessionId)}
+                        className="min-w-0 flex-1 text-left"
+                      >
+                        <span className="block truncate text-xs font-medium">
+                          {session.title}
+                        </span>
+                        <span className="mt-0.5 block text-[10px] opacity-65">
+                          {new Date(session.updatedAt).toLocaleDateString(
+                            "zh-CN",
+                            {
+                              month: "short",
+                              day: "numeric",
+                            },
+                          )}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPendingDeleteSession({
+                            sessionId: session.sessionId,
+                            title: session.title,
+                          })
+                        }
+                        className="rounded-md p-1.5 text-muted-foreground opacity-0 hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 focus:opacity-100"
+                        aria-label={`删除会话：${session.title}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </section>
+
+          <AssistantSettings />
         </div>
       </ScrollArea>
 
-      <MemoryPanel />
-
-      <div className="p-4 border-t border-border/40">
+      <div className="border-t border-border/70 p-4">
         <div className="mb-3">
           <AccountSection />
         </div>
-        <motion.button
-          type="button"
-          whileTap={{ scale: 0.98 }}
-          onClick={toggleTheme}
-          className="w-full flex items-center justify-between p-2.5 hover:bg-muted/55 rounded-xl transition-all duration-200 group"
-        >
-          <div className="flex items-center gap-2.5 text-sm text-muted-foreground group-hover:text-foreground">
-            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            <span>{isDark ? '浅色' : '暗色'}</span>
-          </div>
-          <div
-            className={`
-              w-10 h-6 rounded-full p-0.5 transition-colors duration-200
-              ${isDark ? 'bg-primary' : 'bg-muted'}
-            `}
-          >
-            <motion.div
-              animate={{ x: isDark ? 16 : 0 }}
-              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-              className="w-5 h-5 rounded-full bg-white shadow-sm"
-            />
-          </div>
-        </motion.button>
+        <div className="flex justify-end">
+          <ThemeToggle />
+        </div>
       </div>
 
       <ConfirmDialog
-        open={!!pendingChar}
-        title={`改为与${pending?.name ?? ''}对话？`}
-        description="将开启新的对话。当前内容仍可在侧栏「会话」中找回。"
-        confirmLabel="开始新对话"
-        cancelLabel="再想想"
-        onCancel={() => setPendingChar(null)}
-        onConfirm={() => {
-          if (!pendingChar) return;
-          switchCharacter(pendingChar);
-          setPendingChar(null);
-        }}
-      />
-      <ConfirmDialog
         open={!!pendingDeleteSession}
         title="删除这段会话？"
-        description={pendingDeleteSession ? `「${pendingDeleteSession.title}」将被永久删除。` : undefined}
-        confirmLabel="删除"
+        description={
+          pendingDeleteSession
+            ? `「${pendingDeleteSession.title}」会被永久删除。`
+            : undefined
+        }
+        confirmLabel="删除会话"
         tone="danger"
         onCancel={() => setPendingDeleteSession(null)}
         onConfirm={() => {

@@ -10,6 +10,7 @@ describe('AppController (e2e)', () => {
 
   beforeAll(async () => {
     process.env.JWT_ACCESS_SECRET = 'booksoul-e2e-only-access-secret';
+    process.env.BOOK_INGESTION_WORKER_ENABLED = 'false';
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
