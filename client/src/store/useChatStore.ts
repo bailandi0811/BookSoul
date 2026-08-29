@@ -1,6 +1,7 @@
-import { create } from 'zustand';
-import { CHARACTER_IDS, type CharacterType } from '@/data/characters';
-import { apiFetch } from '@/lib/api';
+import { create } from "zustand";
+import { CHARACTER_IDS, type CharacterType } from "@/data/characters";
+import { apiFetch } from "@/lib/api";
+import { useMemoryStore } from "@/store/useMemoryStore";
 
 export type { CharacterType };
 
@@ -17,7 +18,7 @@ export interface HistorySession {
 }
 
 export interface Message {
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   references?: Reference[];
   isStreaming?: boolean;
@@ -29,10 +30,11 @@ export interface Message {
   characterId?: CharacterType;
 }
 
-export type ChatView = 'entrance' | 'dialogue';
+export type ChatView = "entrance" | "dialogue";
 
-const HAS_CHOSEN_KEY = 'booksoul_has_chosen';
-const CHARACTER_KEY = 'booksoul_character';
+const HAS_CHOSEN_KEY = "booksoul_has_chosen";
+const CHARACTER_KEY = "booksoul_character";
+const CHAT_INACTIVITY_TIMEOUT_MS = 30_000;
 let latestSessionLoadRequest = 0;
 
 function isCharacterType(value: string | null): value is CharacterType {
@@ -41,7 +43,7 @@ function isCharacterType(value: string | null): value is CharacterType {
 
 function readHasChosen(): boolean {
   try {
-    return localStorage.getItem(HAS_CHOSEN_KEY) === '1';
+    return localStorage.getItem(HAS_CHOSEN_KEY) === "1";
   } catch {
     return false;
   }
@@ -54,12 +56,12 @@ function readStoredCharacter(): CharacterType {
   } catch {
     /* ignore */
   }
-  return 'assistant';
+  return "assistant";
 }
 
 function persistChosenCharacter(character: CharacterType) {
   try {
-    localStorage.setItem(HAS_CHOSEN_KEY, '1');
+    localStorage.setItem(HAS_CHOSEN_KEY, "1");
     localStorage.setItem(CHARACTER_KEY, character);
   } catch {
     /* ignore */
@@ -92,21 +94,25 @@ interface ChatState {
   setDraftInput: (value: string) => void;
   clearStopNotice: () => void;
   enterDialogue: (character: CharacterType) => void;
-  switchCharacter: (character: CharacterType, opts?: { confirm?: boolean }) => void;
+  switchCharacter: (
+    character: CharacterType,
+    opts?: { confirm?: boolean },
+  ) => void;
   openEntrance: () => void;
   fetchSessions: () => Promise<void>;
   loadSession: (sessionId: string) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
 }
 
-const initialHasChosen = typeof localStorage !== 'undefined' ? readHasChosen() : false;
+const initialHasChosen =
+  typeof localStorage !== "undefined" ? readHasChosen() : false;
 const initialCharacter =
-  typeof localStorage !== 'undefined' ? readStoredCharacter() : 'assistant';
+  typeof localStorage !== "undefined" ? readStoredCharacter() : "assistant";
 
 export const useChatStore = create<ChatState>((set, get) => ({
-  view: initialHasChosen ? 'dialogue' : 'entrance',
+  view: initialHasChosen ? "dialogue" : "entrance",
   hasChosenCharacter: initialHasChosen,
-  draftInput: '',
+  draftInput: "",
   lastStopNotice: null,
   messages: [],
   isLoading: false,
@@ -148,7 +154,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const newMessages = [...state.messages];
       if (newMessages.length > 0) {
         const lastMsg = newMessages[newMessages.length - 1];
-        if (lastMsg.role === 'assistant') {
+        if (lastMsg.role === "assistant") {
           lastMsg.content = newContent;
           lastMsg.isStreaming = true;
         }
@@ -162,7 +168,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const newMessages = [...state.messages];
       if (newMessages.length > 0) {
         const lastMsg = newMessages[newMessages.length - 1];
-        if (lastMsg.role === 'assistant') {
+        if (lastMsg.role === "assistant") {
           lastMsg.isStreaming = false;
           lastMsg.isThinking = false;
         }
@@ -180,14 +186,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const newMessages = [...state.messages];
       if (newMessages.length > 0) {
         const lastMsg = newMessages[newMessages.length - 1];
-        if (lastMsg.role === 'assistant') {
+        if (lastMsg.role === "assistant") {
           lastMsg.isThinking = isThinking;
           if (text) {
             lastMsg.thinkingText = text;
             if (!lastMsg.thinkingSteps) {
               lastMsg.thinkingSteps = [];
             }
-            if (lastMsg.thinkingSteps[lastMsg.thinkingSteps.length - 1] !== text) {
+            if (
+              lastMsg.thinkingSteps[lastMsg.thinkingSteps.length - 1] !== text
+            ) {
               lastMsg.thinkingSteps.push(text);
             }
           }
@@ -207,7 +215,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (!abortController) return;
     abortController.abort();
     get().finishStreaming(activeRequestId ?? undefined);
-    set({ lastStopNotice: '对话已止', isLoading: false });
+    set({ lastStopNotice: "对话已止", isLoading: false });
   },
 
   clearMessages: () => {
@@ -230,7 +238,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   enterDialogue: (character) => {
     persistChosenCharacter(character);
     set({
-      view: 'dialogue',
+      view: "dialogue",
       currentCharacter: character,
       hasChosenCharacter: true,
     });
@@ -239,8 +247,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   switchCharacter: (character, opts) => {
     if (opts?.confirm) {
       const ok =
-        typeof window !== 'undefined' &&
-        window.confirm('更换角色将开启新的对话，是否继续？');
+        typeof window !== "undefined" &&
+        window.confirm("更换角色将开启新的对话，是否继续？");
       if (!ok) return;
     }
     get().stopGenerating();
@@ -250,7 +258,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       currentCharacter: character,
       messages: [],
       sessionId: `session_${Date.now()}`,
-      view: 'dialogue',
+      view: "dialogue",
       hasChosenCharacter: true,
       isLoading: false,
       abortController: null,
@@ -258,12 +266,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
-  openEntrance: () => set({ view: 'entrance' }),
+  openEntrance: () => set({ view: "entrance" }),
 
   fetchSessions: async () => {
     set({ isSessionsLoading: true });
     try {
-      const response = await apiFetch('/api/chat/history');
+      const response = await apiFetch("/api/chat/history");
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
@@ -271,7 +279,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
       }
     } catch (error) {
-      console.error('Failed to fetch sessions:', error);
+      console.error("Failed to fetch sessions:", error);
     } finally {
       set({ isSessionsLoading: false });
     }
@@ -280,7 +288,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   deleteSession: async (sessionId: string) => {
     try {
       const response = await apiFetch(`/api/chat/history/${sessionId}`, {
-        method: 'DELETE',
+        method: "DELETE",
       });
       if (response.ok) {
         const result = await response.json();
@@ -351,35 +359,45 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     const newAbortController = new AbortController();
     const requestId =
-      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
         ? crypto.randomUUID()
         : `${Date.now()}_${Math.random()}`;
     set({ abortController: newAbortController, activeRequestId: requestId });
 
-    addMessage({ role: 'user', content });
+    addMessage({ role: "user", content });
     addMessage({
-      role: 'assistant',
-      content: '',
+      role: "assistant",
+      content: "",
       isStreaming: true,
       isThinking: false,
-      thinkingText: '',
+      thinkingText: "",
       thinkingSteps: [],
     });
     setLoading(true);
 
-    let assistantMessage = '';
-    let bufferedContent = '';
+    let assistantMessage = "";
+    let bufferedContent = "";
     let flushTimer: ReturnType<typeof setTimeout> | null = null;
     let hasRenderedFirstToken = false;
     let lastThinkingAt = 0;
-    let lastThinkingText = '';
+    let lastThinkingText = "";
+    let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
+    let inactivityTimedOut = false;
     const THINKING_THROTTLE_MS = 350;
     const CONTENT_FLUSH_MS = 45;
+
+    const armInactivityTimeout = () => {
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(() => {
+        inactivityTimedOut = true;
+        newAbortController.abort();
+      }, CHAT_INACTIVITY_TIMEOUT_MS);
+    };
 
     const flushBufferedContent = () => {
       if (!bufferedContent) return;
       assistantMessage += bufferedContent;
-      bufferedContent = '';
+      bufferedContent = "";
       updateStreamingContent(assistantMessage, requestId);
     };
 
@@ -392,9 +410,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     };
 
     try {
-      const response = await apiFetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      armInactivityTimeout();
+      const response = await apiFetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: content,
           character: currentCharacter,
@@ -404,36 +423,40 @@ export const useChatStore = create<ChatState>((set, get) => ({
       });
 
       if (!response.ok) {
-        throw new Error('Network response was not ok');
+        throw new Error("Network response was not ok");
       }
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
-      let buffer = '';
+      let buffer = "";
 
       if (reader) {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
+          armInactivityTimeout();
 
           buffer += decoder.decode(value, { stream: true });
           let eventEndIndex;
 
-          while ((eventEndIndex = buffer.indexOf('\n\n')) >= 0) {
+          while ((eventEndIndex = buffer.indexOf("\n\n")) >= 0) {
             const eventStr = buffer.slice(0, eventEndIndex);
             buffer = buffer.slice(eventEndIndex + 2);
 
-            const lines = eventStr.split('\n');
+            const lines = eventStr.split("\n");
             for (const line of lines) {
-              if (line.startsWith('data: ')) {
+              if (line.startsWith("data: ")) {
                 const dataStr = line.slice(6).trim();
-                if (dataStr === '[DONE]') continue;
+                if (dataStr === "[DONE]") continue;
 
                 try {
                   const data = JSON.parse(dataStr);
 
                   if (data.error) {
-                    updateStreamingContent(`抱歉，发生错误：${data.error}`, requestId);
+                    updateStreamingContent(
+                      `抱歉，发生错误：${data.error}`,
+                      requestId,
+                    );
                     return;
                   }
 
@@ -456,7 +479,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
                       if (state.activeRequestId !== requestId) return state;
                       const newMessages = [...state.messages];
                       if (newMessages.length > 0) {
-                        newMessages[newMessages.length - 1].references = data.references;
+                        newMessages[newMessages.length - 1].references =
+                          data.references;
                       }
                       return { messages: newMessages };
                     });
@@ -475,10 +499,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
                   }
 
                   if (data.metrics) {
-                    console.debug('SSE metrics:', data.metrics);
+                    console.debug("SSE metrics:", data.metrics);
+                  }
+
+                  if (data.memoryUpdate) {
+                    useMemoryStore
+                      .getState()
+                      .handleMemoryUpdate(data.memoryUpdate);
                   }
                 } catch (e) {
-                  console.error('Parse error:', e, dataStr);
+                  console.error("Parse error:", e, dataStr);
                 }
               }
             }
@@ -487,16 +517,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
         flushBufferedContent();
       }
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        console.log('Request was aborted');
+      if (error instanceof Error && error.name === "AbortError") {
+        if (inactivityTimedOut) {
+          updateStreamingContent(
+            "AI 服务长时间没有响应，请检查模型 Key、服务额度、网络或向量数据库连接后重试。",
+            requestId,
+          );
+        } else {
+          console.log("Request was aborted");
+        }
       } else {
-        console.error('Failed to send message:', error);
-        updateStreamingContent('抱歉，发生了错误，请稍后再试。', requestId);
+        console.error("Failed to send message:", error);
+        updateStreamingContent("抱歉，发生了错误，请稍后再试。", requestId);
       }
     } finally {
       if (flushTimer) {
         clearTimeout(flushTimer);
         flushTimer = null;
+      }
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+        inactivityTimer = null;
       }
       if (get().activeRequestId === requestId) {
         flushBufferedContent();

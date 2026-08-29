@@ -15,6 +15,7 @@ export interface MemoryEntry {
   metadata: {
     editable: boolean;
     verified: boolean;
+    source?: 'automatic' | 'manual';
     sourceMessage?: string;
     extractReason?: string;
   };
@@ -46,15 +47,19 @@ interface MemoryState {
 
   // Actions
   setExpanded: (expanded: boolean) => void;
-  fetchProfile: (userId: string, sessionId: string) => Promise<void>;
-  fetchMemories: (userId: string, sessionId: string) => Promise<void>;
-  searchMemories: (userId: string, query: string, topK?: number) => Promise<MemoryEntry[]>;
+  fetchProfile: (sessionId: string) => Promise<void>;
+  fetchMemories: (sessionId: string) => Promise<void>;
+  searchMemories: (query: string, topK?: number) => Promise<MemoryEntry[]>;
   createMemory: (sessionId: string, content: string, category?: MemoryEntry['category']) => Promise<void>;
   updateMemory: (memoryId: string, updates: { content?: string; importance?: number; verified?: boolean }) => Promise<void>;
   deleteMemory: (memoryId: string) => Promise<void>;
   setSelectedMemory: (memory: MemoryEntry | null) => void;
   setEditing: (editing: boolean) => void;
-  handleMemoryUpdate: (data: { memoryCount: number; hasNewMemories: boolean }) => void;
+  handleMemoryUpdate: (data: {
+    memoryCount: number;
+    hasNewMemories: boolean;
+    updatedCount?: number;
+  }) => void;
 }
 
 let latestProfileRequest = 0;
@@ -72,7 +77,7 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
 
   setExpanded: (expanded) => set({ isExpanded: expanded }),
 
-  fetchProfile: async (userId, sessionId) => {
+  fetchProfile: async (sessionId) => {
     const requestId = ++latestProfileRequest;
     set((state) => ({
       profile: null,
@@ -81,7 +86,9 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
       isLoading: true,
     }));
     try {
-      const response = await apiFetch(`/api/memory/profile/${userId}/${sessionId}`);
+      const response = await apiFetch(
+        `/api/memory/profile?sessionId=${encodeURIComponent(sessionId)}`,
+      );
       if (response.ok) {
         const profile = await response.json();
         if (requestId === latestProfileRequest) set({ profile });
@@ -98,7 +105,7 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
     }
   },
 
-  fetchMemories: async (userId, sessionId) => {
+  fetchMemories: async (sessionId) => {
     const requestId = ++latestMemoryRequest;
     set((state) => ({
       memories: [],
@@ -107,7 +114,9 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
       isLoading: true,
     }));
     try {
-      const response = await apiFetch(`/api/memory/${userId}/${sessionId}`);
+      const response = await apiFetch(
+        `/api/memory?sessionId=${encodeURIComponent(sessionId)}`,
+      );
       if (response.ok) {
         const memories = await response.json();
         if (requestId === latestMemoryRequest) set({ memories });
@@ -124,9 +133,11 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
     }
   },
 
-  searchMemories: async (userId, query, topK = 5) => {
+  searchMemories: async (query, topK = 5) => {
     try {
-      const response = await apiFetch(`/api/memory/search/${userId}?q=${encodeURIComponent(query)}&topK=${topK}`);
+      const response = await apiFetch(
+        `/api/memory/search?q=${encodeURIComponent(query)}&topK=${topK}`,
+      );
       if (response.ok) {
         return await response.json();
       }
@@ -198,11 +209,11 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
   setEditing: (editing) => set({ isEditing: editing }),
 
   handleMemoryUpdate: (data) => {
-    if (data.hasNewMemories) {
+    if (data.hasNewMemories || (data.updatedCount ?? 0) > 0) {
       // Refresh memories when new one is added
       const { profile } = get();
       if (profile) {
-        get().fetchMemories(profile.userId, profile.sessionId);
+        get().fetchMemories(profile.sessionId);
       }
     }
   },

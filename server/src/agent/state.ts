@@ -25,20 +25,20 @@ export interface RetrievedDocument {
 // ========== Intent Classification Types ==========
 
 export type IntentType =
-  | 'simple_greeting'      // 寒暄：你好、嗨、hi等
-  | 'simple_fact'           // 简单事实：可直接从小说文本推断
-  | 'general_knowledge'    // 通用知识：LLM自身知识能回答
-  | 'needs_rag'             // 需要RAG：涉及具体小说内容
-  | 'complex_rag'           // 复杂RAG：多跳推理、比较等
-  | 'unknown';              // 未知：需要进一步分析
+  | 'simple_greeting' // 寒暄：你好、嗨、hi等
+  | 'simple_fact' // 简单事实：可直接从小说文本推断
+  | 'general_knowledge' // 通用知识：LLM自身知识能回答
+  | 'needs_rag' // 需要RAG：涉及具体小说内容
+  | 'complex_rag' // 复杂RAG：多跳推理、比较等
+  | 'unknown'; // 未知：需要进一步分析
 
 export interface IntentClassification {
   intent_type: IntentType;
-  confidence: number;           // 0.0 - 1.0
-  reasoning: string;             // 分类理由
-  rag_likelihood: number;       // 需要RAG的概率 0.0 - 1.0
+  confidence: number; // 0.0 - 1.0
+  reasoning: string; // 分类理由
+  rag_likelihood: number; // 需要RAG的概率 0.0 - 1.0
   suggested_action: 'direct_generate' | 'rag_flow' | 'hybrid';
-  keywords_matched: string[];    // 匹配的关键词
+  keywords_matched: string[]; // 匹配的关键词
   novel_entities_detected: string[]; // 检测到的小说实体
 }
 
@@ -48,6 +48,8 @@ export interface AgentState {
   // 输入
   query: string;
   persona: string;
+  conversation_context: string;
+  memory_context: string;
 
   // 意图分析结果 (NEW)
   intent_classification: IntentClassification | null;
@@ -63,7 +65,7 @@ export interface AgentState {
   // 生成结果
   final_response: string;
   references: RetrievalDoc[];
-  has_used_rag: boolean;         // 是否使用了RAG (NEW)
+  has_used_rag: boolean; // 是否使用了RAG (NEW)
 
   // 工具调用历史
   tool_calls: Array<{
@@ -77,14 +79,14 @@ export interface AgentState {
 
   // 控制流 (EXTENDED)
   next_action:
-    | 'classify'           // 新增：意图分类
-    | 'direct_generate'    // 新增：直接生成
-    | 'rewrite'            // 重写查询
-    | 'retrieve'           // 检索
-    | 'critique'           // 评估
-    | 'generate'            // 生成
-    | 'hybrid_generate'    // 新增：混合生成
-    | 'done';              // 完成
+    | 'classify' // 新增：意图分类
+    | 'direct_generate' // 新增：直接生成
+    | 'rewrite' // 重写查询
+    | 'retrieve' // 检索
+    | 'critique' // 评估
+    | 'generate' // 生成
+    | 'hybrid_generate' // 新增：混合生成
+    | 'done'; // 完成
 }
 
 // ========== Node Names ==========
@@ -114,6 +116,8 @@ export const ROUTING_THRESHOLDS = {
 // ========== Initial State ==========
 
 export const INITIAL_STATE: Partial<AgentState> = {
+  conversation_context: '',
+  memory_context: '',
   intent_classification: null,
   rewritten_queries: [],
   current_query_index: 0,

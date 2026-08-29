@@ -101,3 +101,16 @@ export class SearchMemoryQueryDto {
   @Max(20)
   topK: number = 5;
 }
+
+export class SessionScopeQueryDto {
+  @IsString()
+  @Matches(/^[A-Za-z0-9_-]+$/)
+  @MaxLength(128)
+  sessionId!: string;
+}
+
+export class MemoryListQueryDto extends SessionScopeQueryDto {
+  @IsOptional()
+  @IsEnum(MemoryLevel)
+  level?: MemoryLevel;
+}

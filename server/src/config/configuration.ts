@@ -12,6 +12,7 @@ export default () => ({
     token: process.env.MILVUS_TOKEN || 'root:Milvus',
     collectionName: 'ebook',
     vectorDim: 1024,
+    requestTimeoutMs: Number(process.env.MILVUS_REQUEST_TIMEOUT_MS || 8_000),
   },
   openai: {
     apiKey: process.env.OPENAI_API_KEY,
@@ -19,6 +20,7 @@ export default () => ({
     embeddingModel:
       process.env.EMBEDDING_MODEL_NAME || 'text-embedding-3-small',
     chatModel: process.env.MODEL_NAME || 'gpt-3.5-turbo',
+    requestTimeoutMs: Number(process.env.OPENAI_REQUEST_TIMEOUT_MS || 20_000),
   },
   mcp: {
     amapApiKey: process.env.AMAP_API_KEY,

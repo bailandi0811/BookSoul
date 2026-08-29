@@ -1,88 +1,97 @@
-import { Injectable, Logger } from '@nestjs/common';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import { ConflictException, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { randomUUID } from 'crypto';
+import { requireSafePathSegment } from '../../auth/auth-context';
+import { PrismaService } from '../../prisma/prisma.service';
 import { MemoryEntry, MemoryLevel } from '../interfaces/memory.types';
-import { requireSafePathSegment, resolveWithinRoot } from '../../auth/auth-context';
 
 @Injectable()
 export class MemoryEntryRepository {
-  private readonly logger = new Logger(MemoryEntryRepository.name);
-  private readonly baseDir = 'memories/long_term';
+  constructor(private readonly prisma: PrismaService) {}
 
   async getById(memoryId: string, userId: string): Promise<MemoryEntry | null> {
-    try {
-      const filePath = this.getFilePath(userId, memoryId);
-      const data = await fs.readFile(filePath, 'utf-8');
-      return JSON.parse(data) as MemoryEntry;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        return null;
-      }
-      this.logger.error('Failed to load memory entry');
-      throw error;
-    }
+    this.validateIdentity(userId, memoryId);
+    const record = await this.prisma.memoryRecord.findFirst({
+      where: { id: memoryId, ownerId: userId },
+    });
+    return record ? this.toEntry(record) : null;
   }
 
-  async getByUserId(userId: string, sessionId?: string): Promise<MemoryEntry[]> {
-    try {
-      const dir = this.getUserDirectory(userId);
-      await fs.mkdir(dir, { recursive: true });
-      const files = await fs.readdir(dir);
-      const entries: MemoryEntry[] = [];
+  async getByUserId(
+    userId: string,
+    sessionId?: string,
+  ): Promise<MemoryEntry[]> {
+    requireSafePathSegment(userId, '用户标识');
+    if (sessionId) requireSafePathSegment(sessionId, '会话标识');
 
-      for (const file of files) {
-        if (!file.endsWith('.json')) continue;
-        try {
-          const data = await fs.readFile(path.join(dir, file), 'utf-8');
-          const entry = JSON.parse(data) as MemoryEntry;
-          if (entry.userId !== userId) continue;
-          if (sessionId && entry.sessionId !== sessionId) continue;
-          entries.push(entry);
-        } catch (e) {
-          this.logger.warn(`Failed to parse memory file ${file}: ${e}`);
-        }
-      }
-
-      return entries.sort((a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-    } catch {
-      this.logger.error('Failed to load memory entries');
-      return [];
-    }
+    const records = await this.prisma.memoryRecord.findMany({
+      where: {
+        ownerId: userId,
+        ...(sessionId ? { sessionId } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return records.map((record) => this.toEntry(record));
   }
 
-  async getByLevel(userId: string, level: MemoryLevel, sessionId?: string): Promise<MemoryEntry[]> {
-    const all = await this.getByUserId(userId, sessionId);
-    return all.filter(e => e.level === level);
+  async getByLevel(
+    userId: string,
+    level: MemoryLevel,
+    sessionId?: string,
+  ): Promise<MemoryEntry[]> {
+    requireSafePathSegment(userId, '用户标识');
+    if (sessionId) requireSafePathSegment(sessionId, '会话标识');
+
+    const records = await this.prisma.memoryRecord.findMany({
+      where: {
+        ownerId: userId,
+        level,
+        ...(sessionId ? { sessionId } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return records.map((record) => this.toEntry(record));
   }
 
   async save(entry: MemoryEntry): Promise<void> {
-    try {
-      const dir = this.getUserDirectory(entry.userId);
-      await fs.mkdir(dir, { recursive: true });
-      const filePath = this.getFilePath(entry.userId, entry.id);
-      const temporaryPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-      await fs.writeFile(temporaryPath, JSON.stringify(entry, null, 2));
-      await fs.rename(temporaryPath, filePath);
-    } catch (error) {
-      this.logger.error('Failed to save memory entry');
-      throw error;
+    this.validateIdentity(entry.userId, entry.id);
+    requireSafePathSegment(entry.sessionId, '会话标识');
+
+    const existing = await this.prisma.memoryRecord.findUnique({
+      where: { id: entry.id },
+      select: { ownerId: true },
+    });
+    if (existing && existing.ownerId !== entry.userId) {
+      throw new ConflictException('记忆标识已归属其他用户');
     }
+
+    const data = this.toPersistence(entry);
+    await this.prisma.memoryRecord.upsert({
+      where: { id: entry.id },
+      create: data,
+      update: {
+        level: data.level,
+        content: data.content,
+        importance: data.importance,
+        category: data.category,
+        metadata: data.metadata,
+        updatedAt: data.updatedAt,
+      },
+    });
   }
 
   async delete(memoryId: string, userId: string): Promise<void> {
-    try {
-      const filePath = this.getFilePath(userId, memoryId);
-      await fs.unlink(filePath);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        throw error;
-      }
-    }
+    this.validateIdentity(userId, memoryId);
+    await this.prisma.memoryRecord.deleteMany({
+      where: { id: memoryId, ownerId: userId },
+    });
   }
 
-  async update(memoryId: string, userId: string, updates: Partial<MemoryEntry>): Promise<MemoryEntry | null> {
+  async update(
+    memoryId: string,
+    userId: string,
+    updates: Partial<MemoryEntry>,
+  ): Promise<MemoryEntry | null> {
     const existing = await this.getById(memoryId, userId);
     if (!existing) return null;
 
@@ -95,25 +104,61 @@ export class MemoryEntryRepository {
       createdAt: existing.createdAt,
       updatedAt: new Date().toISOString(),
     };
-
     await this.save(updated);
     return updated;
   }
 
   generateId(): string {
-    return `mem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `mem_${randomUUID()}`;
   }
 
-  private getFilePath(userId: string, memoryId: string): string {
-    requireSafePathSegment(memoryId, '记忆标识');
-    return resolveWithinRoot(
-      this.getUserDirectory(userId),
-      `${memoryId}.json`,
-    );
-  }
-
-  private getUserDirectory(userId: string): string {
+  private validateIdentity(userId: string, memoryId: string): void {
     requireSafePathSegment(userId, '用户标识');
-    return resolveWithinRoot(path.join(process.cwd(), this.baseDir), userId);
+    requireSafePathSegment(memoryId, '记忆标识');
+  }
+
+  private toPersistence(
+    entry: MemoryEntry,
+  ): Prisma.MemoryRecordUncheckedCreateInput {
+    return {
+      id: entry.id,
+      ownerId: entry.userId,
+      sessionId: entry.sessionId,
+      level: entry.level,
+      content: entry.content,
+      importance: entry.importance,
+      category: entry.category,
+      metadata: JSON.parse(
+        JSON.stringify(entry.metadata),
+      ) as Prisma.InputJsonValue,
+      createdAt: new Date(entry.createdAt),
+      updatedAt: new Date(entry.updatedAt),
+    };
+  }
+
+  private toEntry(record: {
+    id: string;
+    ownerId: string;
+    sessionId: string;
+    level: string;
+    content: string;
+    importance: number;
+    category: string;
+    metadata: Prisma.JsonValue;
+    createdAt: Date;
+    updatedAt: Date;
+  }): MemoryEntry {
+    return {
+      id: record.id,
+      userId: record.ownerId,
+      sessionId: record.sessionId,
+      level: record.level as MemoryEntry['level'],
+      content: record.content,
+      importance: record.importance,
+      category: record.category as MemoryEntry['category'],
+      metadata: record.metadata as unknown as MemoryEntry['metadata'],
+      createdAt: record.createdAt.toISOString(),
+      updatedAt: record.updatedAt.toISOString(),
+    };
   }
 }

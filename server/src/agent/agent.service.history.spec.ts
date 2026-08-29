@@ -1,80 +1,99 @@
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
-import { ForbiddenException } from '@nestjs/common';
 import { AgentService } from './agent.service';
 
 describe('AgentService history ownership', () => {
-  let root: string;
-  let cwdSpy: jest.SpyInstance;
+  const records = new Map<string, any>();
   let service: AgentService;
 
+  const key = (ownerId: string, sessionId: string) => `${ownerId}:${sessionId}`;
+
   beforeEach(() => {
-    root = fs.mkdtempSync(path.join(os.tmpdir(), 'booksoul-history-'));
-    fs.mkdirSync(path.join(root, 'chat_histories'));
-    cwdSpy = jest.spyOn(process, 'cwd').mockReturnValue(root);
-    service = Object.create(AgentService.prototype) as AgentService;
-  });
-
-  afterEach(() => {
-    cwdSpy.mockRestore();
-    fs.rmSync(root, { recursive: true, force: true });
-  });
-
-  const writeHistory = (
-    sessionId: string,
-    userId: string | undefined,
-    content = '你好',
-  ) => {
-    const session: Record<string, unknown> = {
-      messages: [{ type: 'human', data: { content } }],
+    records.clear();
+    const chatSessionRecord = {
+      findUnique: jest.fn(async ({ where }: any) => {
+        const scope = where.ownerId_sessionId;
+        return records.get(key(scope.ownerId, scope.sessionId)) ?? null;
+      }),
+      findMany: jest.fn(async ({ where }: any) =>
+        [...records.values()]
+          .filter((record) => record.ownerId === where.ownerId)
+          .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()),
+      ),
+      upsert: jest.fn(async ({ where, create, update }: any) => {
+        const scope = where.ownerId_sessionId;
+        const recordKey = key(scope.ownerId, scope.sessionId);
+        const existing = records.get(recordKey);
+        records.set(
+          recordKey,
+          existing
+            ? { ...existing, ...update, updatedAt: new Date() }
+            : {
+                ...create,
+                createdAt: new Date('2026-01-01T00:00:00.000Z'),
+                updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+              },
+        );
+      }),
+      deleteMany: jest.fn(async ({ where }: any) => {
+        records.delete(key(where.ownerId, where.sessionId));
+      }),
     };
-    if (userId) session.userId = userId;
-    fs.writeFileSync(
-      path.join(root, 'chat_histories', `session_${sessionId}.json`),
-      JSON.stringify({ '': { [sessionId]: session } }),
-    );
+    service = Object.create(AgentService.prototype) as AgentService;
+    Object.defineProperties(service, {
+      prisma: { value: { chatSessionRecord } },
+      historyLocks: { value: new Map() },
+      logger: {
+        value: { error: jest.fn(), warn: jest.fn(), log: jest.fn() },
+      },
+    });
+  });
+
+  const writeHistory = (sessionId: string, userId: string, content: string) => {
+    records.set(key(userId, sessionId), {
+      ownerId: userId,
+      sessionId,
+      messages: [{ type: 'human', data: { content } }],
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-01-02T00:00:00.000Z'),
+    });
   };
 
-  it('lists only histories owned by the current identity', async () => {
-    writeHistory('owned', 'user-a');
-    writeHistory('other', 'user-b');
-    writeHistory('legacy', undefined);
+  it('lists only histories selected by the JWT owner id', async () => {
+    writeHistory('owned', 'user-a', '你好');
+    writeHistory('other', 'user-b', '秘密');
 
     await expect(service.getHistoryList('user-a')).resolves.toEqual([
       expect.objectContaining({ sessionId: 'owned', title: '你好' }),
     ]);
   });
 
-  it('rejects another owner or unowned legacy history', async () => {
-    writeHistory('other', 'user-b');
-    writeHistory('legacy', undefined);
+  it('allows the same session id in two accounts without collision', async () => {
+    writeHistory('same-session', 'user-a', 'A 的问题');
+    writeHistory('same-session', 'user-b', 'B 的问题');
 
     await expect(
-      service.getSessionHistory('other', 'user-a'),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+      service.getSessionHistory('same-session', 'user-a'),
+    ).resolves.toEqual([{ role: 'user', content: 'A 的问题' }]);
     await expect(
-      service.getSessionHistory('legacy', 'user-a'),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+      service.getSessionHistory('same-session', 'user-b'),
+    ).resolves.toEqual([{ role: 'user', content: 'B 的问题' }]);
   });
 
-  it('does not delete another identity history', async () => {
-    writeHistory('other', 'user-b');
+  it('does not reveal another owner session through a direct lookup', async () => {
+    writeHistory('other', 'user-b', '秘密');
 
-    await expect(
-      service.deleteSession('other', 'user-a'),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(
-      fs.existsSync(path.join(root, 'chat_histories', 'session_other.json')),
-    ).toBe(true);
+    await expect(service.getSessionHistory('other', 'user-a')).resolves.toEqual(
+      [],
+    );
   });
 
-  it('prevents writing to another identity session', async () => {
-    writeHistory('other', 'user-b');
+  it('deletes only the composite owner/session resource', async () => {
+    writeHistory('same-session', 'user-a', 'A');
+    writeHistory('same-session', 'user-b', 'B');
 
-    await expect(
-      service.assertSessionWritable('other', 'user-a'),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    await service.deleteSession('same-session', 'user-a');
+
+    expect(records.has(key('user-a', 'same-session'))).toBe(false);
+    expect(records.has(key('user-b', 'same-session'))).toBe(true);
   });
 
   it('rejects path traversal session identifiers', async () => {
@@ -84,7 +103,6 @@ describe('AgentService history ownership', () => {
   });
 
   it('serializes concurrent writes without losing either message pair', async () => {
-    Object.defineProperty(service, 'historyLocks', { value: new Map() });
     const persistHistory = (
       service as unknown as {
         persistHistory: (
@@ -101,13 +119,6 @@ describe('AgentService history ownership', () => {
       persistHistory('owned', 'user-a', '问题二', '回答二'),
     ]);
 
-    const stored = JSON.parse(
-      fs.readFileSync(
-        path.join(root, 'chat_histories', 'session_owned.json'),
-        'utf-8',
-      ),
-    );
-    expect(stored[''].owned.messages).toHaveLength(4);
-    expect(stored[''].owned.userId).toBe('user-a');
+    expect(records.get(key('user-a', 'owned')).messages).toHaveLength(4);
   });
 });

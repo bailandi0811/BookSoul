@@ -40,6 +40,27 @@ describe('MemoryController identity isolation', () => {
     );
   });
 
+  it('canonical URLs do not accept a client-supplied user id', async () => {
+    await controller.getCurrentMemories(userAuth, {
+      sessionId: 'session-1',
+    });
+    await controller.searchCurrentMemories(userAuth, {
+      q: '乔峰',
+      topK: 4,
+    });
+
+    expect(memoryService.getMemories).toHaveBeenCalledWith(
+      'user-a',
+      'session-1',
+      undefined,
+    );
+    expect(memoryService.searchMemories).toHaveBeenCalledWith(
+      '乔峰',
+      'user-a',
+      4,
+    );
+  });
+
   it('rejects another user id in legacy paths', async () => {
     await expect(
       controller.getMemories('user-b', 'session-1', userAuth),
@@ -66,11 +87,7 @@ describe('MemoryController identity isolation', () => {
   });
 
   it('keeps trusted user_id filtering for semantic search', async () => {
-    await controller.searchMemories(
-      'user-a',
-      userAuth,
-      { q: '乔峰', topK: 3 },
-    );
+    await controller.searchMemories('user-a', userAuth, { q: '乔峰', topK: 3 });
 
     expect(memoryService.searchMemories).toHaveBeenCalledWith(
       '乔峰',

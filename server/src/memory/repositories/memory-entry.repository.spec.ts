@@ -1,23 +1,48 @@
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
-import { MemoryCategory, MemoryEntry, MemoryLevel } from '../interfaces/memory.types';
+import { PrismaService } from '../../prisma/prisma.service';
+import {
+  MemoryCategory,
+  MemoryEntry,
+  MemoryLevel,
+} from '../interfaces/memory.types';
 import { MemoryEntryRepository } from './memory-entry.repository';
 
 describe('MemoryEntryRepository', () => {
-  let root: string;
-  let cwdSpy: jest.SpyInstance;
+  const records = new Map<string, any>();
   let repository: MemoryEntryRepository;
 
   beforeEach(() => {
-    root = fs.mkdtempSync(path.join(os.tmpdir(), 'booksoul-memory-'));
-    cwdSpy = jest.spyOn(process, 'cwd').mockReturnValue(root);
-    repository = new MemoryEntryRepository();
-  });
-
-  afterEach(() => {
-    cwdSpy.mockRestore();
-    fs.rmSync(root, { recursive: true, force: true });
+    records.clear();
+    const memoryRecord = {
+      findUnique: jest.fn(async ({ where }: any) => {
+        const record = records.get(where.id) ?? null;
+        return where && record ? { ...record } : record;
+      }),
+      findFirst: jest.fn(async ({ where }: any) => {
+        const record = records.get(where.id);
+        return record?.ownerId === where.ownerId ? { ...record } : null;
+      }),
+      findMany: jest.fn(async ({ where }: any) =>
+        [...records.values()]
+          .filter(
+            (record) =>
+              record.ownerId === where.ownerId &&
+              (!where.sessionId || record.sessionId === where.sessionId) &&
+              (!where.level || record.level === where.level),
+          )
+          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
+      ),
+      upsert: jest.fn(async ({ create, update }: any) => {
+        const previous = records.get(create.id);
+        records.set(create.id, previous ? { ...previous, ...update } : create);
+      }),
+      deleteMany: jest.fn(async ({ where }: any) => {
+        const record = records.get(where.id);
+        if (record?.ownerId === where.ownerId) records.delete(where.id);
+      }),
+    };
+    repository = new MemoryEntryRepository({
+      memoryRecord,
+    } as unknown as PrismaService);
   });
 
   const entry = (id: string, sessionId: string): MemoryEntry => ({
@@ -33,13 +58,16 @@ describe('MemoryEntryRepository', () => {
     metadata: { editable: true, verified: false },
   });
 
-  it('filters by the stored session id instead of the filename', async () => {
+  it('filters every lookup by the trusted owner and session', async () => {
     await repository.save(entry('mem_one', 'session-a'));
     await repository.save(entry('mem_two', 'session-b'));
 
-    await expect(repository.getByUserId('user-a', 'session-a')).resolves.toEqual([
+    await expect(
+      repository.getByUserId('user-a', 'session-a'),
+    ).resolves.toEqual([
       expect.objectContaining({ id: 'mem_one', sessionId: 'session-a' }),
     ]);
+    await expect(repository.getById('mem_one', 'user-b')).resolves.toBeNull();
   });
 
   it('keeps immutable ownership fields during updates', async () => {
