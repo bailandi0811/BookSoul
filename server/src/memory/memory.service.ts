@@ -186,6 +186,25 @@ ${messages.map((m) => `- ${m}`).join('\n')}
     sessionId: string,
     message: string,
   ): Promise<MemoryUpdateEvent> {
+    return this.processAndStoreScopedMemory(userId, sessionId, message, null);
+  }
+
+  async processAndStoreBookMemory(
+    userId: string,
+    sessionId: string,
+    bookId: string,
+    message: string,
+  ): Promise<MemoryUpdateEvent> {
+    requireSafePathSegment(bookId, '书籍标识');
+    return this.processAndStoreScopedMemory(userId, sessionId, message, bookId);
+  }
+
+  private async processAndStoreScopedMemory(
+    userId: string,
+    sessionId: string,
+    message: string,
+    currentBookId: string | null,
+  ): Promise<MemoryUpdateEvent> {
     requireSafePathSegment(userId, '用户标识');
     requireSafePathSegment(sessionId, '会话标识');
     const importanceScore = await this.scoreImportance(message);
@@ -204,9 +223,18 @@ ${messages.map((m) => `- ${m}`).join('\n')}
 
     const content = (importanceScore.extractContent || message).trim();
     const normalizedContent = this.normalizeMemoryContent(content);
-    const existingMemories = await this.memoryEntryRepo.getByUserId(userId);
+    const bookId = this.resolveMemoryBookId(
+      message,
+      category,
+      explicitConfirmation,
+      currentBookId,
+    );
+    const existingMemories = bookId
+      ? await this.memoryEntryRepo.getForBookContext(userId, bookId)
+      : await this.memoryEntryRepo.getByUserId(userId);
     const duplicate = existingMemories.find(
       (entry) =>
+        (entry.bookId ?? null) === bookId &&
         entry.category === category &&
         this.normalizeMemoryContent(entry.content) === normalizedContent,
     );
@@ -227,7 +255,7 @@ ${messages.map((m) => `- ${m}`).join('\n')}
           ],
         },
       });
-      if (updated?.level === MemoryLevel.LONG_TERM) {
+      if (updated?.level === MemoryLevel.LONG_TERM && !updated.bookId) {
         await this.storeToMilvus(updated);
       }
       return {
@@ -243,6 +271,7 @@ ${messages.map((m) => `- ${m}`).join('\n')}
       id: this.memoryEntryRepo.generateId(),
       userId,
       sessionId,
+      bookId,
       level: MemoryLevel.LONG_TERM,
       content,
       importance: importanceScore.score,
@@ -269,6 +298,21 @@ ${messages.map((m) => `- ${m}`).join('\n')}
       proposedCount: explicitConfirmation ? 0 : 1,
       confirmedCount: explicitConfirmation ? 1 : 0,
     };
+  }
+
+  private resolveMemoryBookId(
+    message: string,
+    category: MemoryCategory,
+    explicitConfirmation: boolean,
+    currentBookId: string | null,
+  ): string | null {
+    if (!currentBookId || !explicitConfirmation) return null;
+    if (category === MemoryCategory.OTHER) return currentBookId;
+    return /这本书|本书|这部小说|这篇小说|剧情|角色|人物|伏笔|读到|看到第|我怀疑|我认为/.test(
+      message,
+    )
+      ? currentBookId
+      : null;
   }
 
   private determineCategory(message: string): MemoryCategory {
@@ -368,7 +412,7 @@ ${messages.map((m) => `- ${m}`).join('\n')}
             },
           }),
     });
-    if (updated?.level === MemoryLevel.LONG_TERM) {
+    if (updated?.level === MemoryLevel.LONG_TERM && !updated.bookId) {
       await this.storeToMilvus(updated);
     }
     return updated;
@@ -524,6 +568,51 @@ ${messages.map((m) => `- ${m}`).join('\n')}
     };
   }
 
+  async buildBookAgentContext(
+    userId: string,
+    sessionId: string,
+    bookId: string,
+    query: string,
+    topK = 5,
+  ): Promise<AgentMemoryContext> {
+    requireSafePathSegment(userId, '用户标识');
+    requireSafePathSegment(sessionId, '会话标识');
+    requireSafePathSegment(bookId, '书籍标识');
+
+    const safeTopK = Math.max(1, Math.min(20, topK));
+    const scoped = await this.memoryEntryRepo.getForBookContext(userId, bookId);
+    const stable = scoped.filter(
+      (entry) =>
+        entry.userId === userId &&
+        (entry.bookId == null || entry.bookId === bookId) &&
+        entry.metadata.verified &&
+        (entry.level !== MemoryLevel.EPISODIC || entry.sessionId === sessionId),
+    );
+    const ranked = this.rankTextMemories(stable, query);
+    const recalled = [...ranked, ...stable]
+      .filter(
+        (entry, index, entries) =>
+          entries.findIndex((candidate) => candidate.id === entry.id) === index,
+      )
+      .sort(
+        (a, b) =>
+          Number(b.bookId === bookId) - Number(a.bookId === bookId) ||
+          b.importance - a.importance ||
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      )
+      .slice(0, safeTopK);
+
+    return {
+      text: recalled
+        .map(
+          (entry, index) =>
+            `${index + 1}. [${entry.bookId ? '当前书籍' : '全局偏好'}] ${entry.content.slice(0, 500)}`,
+        )
+        .join('\n'),
+      recalledMemoryIds: recalled.map((entry) => entry.id),
+    };
+  }
+
   private mergeProfiles(
     userId: string,
     sessionId: string,
@@ -670,7 +759,7 @@ ${messages.map((m) => `- ${m}`).join('\n')}
 
   private async persistMemory(memory: MemoryEntry): Promise<void> {
     await this.memoryEntryRepo.save(memory);
-    if (memory.level === MemoryLevel.LONG_TERM) {
+    if (memory.level === MemoryLevel.LONG_TERM && !memory.bookId) {
       await this.storeToMilvus(memory);
     }
   }

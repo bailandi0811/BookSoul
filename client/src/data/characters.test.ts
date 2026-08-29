@@ -1,12 +1,17 @@
-import { describe, it, expect } from 'vitest';
-import { getCharacter, CHARACTER_IDS } from './characters';
+import { describe, it, expect } from "vitest";
+import { getCharacter, CHARACTER_IDS } from "./characters";
 
-describe('characters', () => {
-  it('exposes four character ids matching backend CharacterType', () => {
-    expect(CHARACTER_IDS).toEqual(['assistant', 'qiaofeng', 'duanyu', 'wangyuyan']);
+describe("characters", () => {
+  it("exposes four character ids matching backend CharacterType", () => {
+    expect(CHARACTER_IDS).toEqual([
+      "assistant",
+      "qiaofeng",
+      "duanyu",
+      "wangyuyan",
+    ]);
   });
 
-  it('every character has required immersion fields', () => {
+  it("every character has required immersion fields", () => {
     for (const id of CHARACTER_IDS) {
       const c = getCharacter(id);
       expect(c.name.length).toBeGreaterThan(0);
@@ -21,7 +26,7 @@ describe('characters', () => {
     }
   });
 
-  it('keeps email demo out of empty-state suggestions', () => {
+  it("keeps email demo out of empty-state suggestions", () => {
     for (const id of CHARACTER_IDS) {
       for (const s of getCharacter(id).suggestions) {
         expect(s).not.toMatch(/@/);

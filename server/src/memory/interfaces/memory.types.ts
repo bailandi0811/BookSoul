@@ -42,6 +42,7 @@ export interface MemoryEntry {
   id: string;
   userId: string;
   sessionId: string;
+  bookId?: string | null;
   level: MemoryLevel;
   content: string;
   importance: number;

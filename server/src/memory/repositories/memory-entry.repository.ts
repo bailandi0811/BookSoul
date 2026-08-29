@@ -53,6 +53,23 @@ export class MemoryEntryRepository {
     return records.map((record) => this.toEntry(record));
   }
 
+  async getForBookContext(
+    userId: string,
+    bookId: string,
+  ): Promise<MemoryEntry[]> {
+    requireSafePathSegment(userId, '用户标识');
+    requireSafePathSegment(bookId, '书籍标识');
+
+    const records = await this.prisma.memoryRecord.findMany({
+      where: {
+        ownerId: userId,
+        OR: [{ bookId: null }, { bookId }],
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return records.map((record) => this.toEntry(record));
+  }
+
   async save(entry: MemoryEntry): Promise<void> {
     this.validateIdentity(entry.userId, entry.id);
     requireSafePathSegment(entry.sessionId, '会话标识');
@@ -124,6 +141,7 @@ export class MemoryEntryRepository {
       id: entry.id,
       ownerId: entry.userId,
       sessionId: entry.sessionId,
+      bookId: entry.bookId ?? null,
       level: entry.level,
       content: entry.content,
       importance: entry.importance,
@@ -140,6 +158,7 @@ export class MemoryEntryRepository {
     id: string;
     ownerId: string;
     sessionId: string;
+    bookId: string | null;
     level: string;
     content: string;
     importance: number;
@@ -152,6 +171,7 @@ export class MemoryEntryRepository {
       id: record.id,
       userId: record.ownerId,
       sessionId: record.sessionId,
+      bookId: record.bookId,
       level: record.level as MemoryEntry['level'],
       content: record.content,
       importance: record.importance,

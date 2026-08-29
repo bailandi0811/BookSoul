@@ -1,5 +1,5 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 export interface AuthUser {
   id: string;
@@ -12,7 +12,7 @@ export interface AuthTokens {
   user: AuthUser;
 }
 
-export type ClaimState = 'idle' | 'claiming' | 'partial' | 'failed';
+export type ClaimState = "idle" | "claiming" | "partial" | "failed";
 
 interface AuthState {
   user: AuthUser | null;
@@ -31,11 +31,11 @@ interface AuthState {
 
 function createGuestUserId(): string {
   const uuid =
-    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
       ? crypto.randomUUID()
-      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (symbol) => {
+      : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (symbol) => {
           const random = Math.floor(Math.random() * 16);
-          const value = symbol === 'x' ? random : (random & 0x3) | 0x8;
+          const value = symbol === "x" ? random : (random & 0x3) | 0x8;
           return value.toString(16);
         });
   return `guest_${uuid}`;
@@ -43,7 +43,7 @@ function createGuestUserId(): string {
 
 export function normalizeGuestUserId(value: unknown): string {
   if (
-    typeof value === 'string' &&
+    typeof value === "string" &&
     /^guest_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
       value,
     )
@@ -59,7 +59,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       accessToken: null,
       guestUserId: createGuestUserId(),
-      claimState: 'idle',
+      claimState: "idle",
       claimMessage: null,
       isAuthenticated: false,
       signIn: ({ accessToken, user }) =>
@@ -67,7 +67,7 @@ export const useAuthStore = create<AuthState>()(
           accessToken,
           user,
           isAuthenticated: true,
-          claimState: 'idle',
+          claimState: "idle",
           claimMessage: null,
         }),
       restoreSession: ({ accessToken, user }) =>
@@ -90,7 +90,7 @@ export const useAuthStore = create<AuthState>()(
       completeClaim: () =>
         set({
           guestUserId: createGuestUserId(),
-          claimState: 'idle',
+          claimState: "idle",
           claimMessage: null,
         }),
       clearAuthentication: () =>
@@ -98,18 +98,16 @@ export const useAuthStore = create<AuthState>()(
           user: null,
           accessToken: null,
           isAuthenticated: false,
-          claimState: 'idle',
+          claimState: "idle",
           claimMessage: null,
         }),
     }),
     {
-      name: 'booksoul-auth',
+      name: "booksoul-auth",
       version: 2,
       merge: (persisted, current) => {
         const saved = (persisted ?? {}) as Partial<AuthState>;
-        const validUserState = Boolean(
-          saved.user && saved.accessToken,
-        );
+        const validUserState = Boolean(saved.user && saved.accessToken);
         return {
           ...current,
           ...saved,

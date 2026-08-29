@@ -1,4 +1,11 @@
-import { IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class ChatDto {
   @IsString()
@@ -6,13 +13,10 @@ export class ChatDto {
   @MaxLength(10_000)
   message!: string;
 
-  @IsOptional()
-  @IsIn(['assistant', 'qiaofeng', 'duanyu', 'wangyuyan'])
-  character?: string;
+  @IsUUID()
+  sessionId!: string;
 
   @IsOptional()
-  @IsString()
-  @Matches(/^[A-Za-z0-9_-]+$/)
-  @MaxLength(128)
-  sessionId?: string;
+  @IsBoolean()
+  spoilerOverride?: boolean;
 }

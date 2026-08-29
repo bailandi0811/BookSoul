@@ -10,7 +10,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"Noto Sans SC"', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        sans: ['"Noto Sans SC"', '"Microsoft YaHei"', '"PingFang SC"', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'sans-serif'],
       },
       colors: {
         background: 'rgb(var(--background) / <alpha-value>)',

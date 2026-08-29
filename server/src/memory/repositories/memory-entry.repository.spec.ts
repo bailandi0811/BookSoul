@@ -27,7 +27,13 @@ describe('MemoryEntryRepository', () => {
             (record) =>
               record.ownerId === where.ownerId &&
               (!where.sessionId || record.sessionId === where.sessionId) &&
-              (!where.level || record.level === where.level),
+              (!where.level || record.level === where.level) &&
+              (!where.OR ||
+                where.OR.some((condition: { bookId: string | null }) =>
+                  condition.bookId === null
+                    ? record.bookId === null
+                    : record.bookId === condition.bookId,
+                )),
           )
           .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
       ),
@@ -88,5 +94,21 @@ describe('MemoryEntryRepository', () => {
       createdAt: '2026-01-01T00:00:00.000Z',
       content: 'updated',
     });
+  });
+
+  it('returns only global and current-book records for book context', async () => {
+    await repository.save({ ...entry('global', 'session-a'), bookId: null });
+    await repository.save({
+      ...entry('current', 'session-a'),
+      bookId: 'book-a',
+    });
+    await repository.save({ ...entry('other', 'session-a'), bookId: 'book-b' });
+
+    const result = await repository.getForBookContext('user-a', 'book-a');
+
+    expect(result.map((memory) => memory.id).sort()).toEqual([
+      'current',
+      'global',
+    ]);
   });
 });

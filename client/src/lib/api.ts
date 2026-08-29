@@ -1,4 +1,4 @@
-import { useAuthStore, type AuthTokens } from '@/store/useAuthStore';
+import { useAuthStore, type AuthTokens } from "@/store/useAuthStore";
 
 interface ApiOptions extends RequestInit {
   skipAuth?: boolean;
@@ -6,8 +6,8 @@ interface ApiOptions extends RequestInit {
 }
 
 type RefreshResult =
-  | { status: 'success'; data: AuthTokens }
-  | { status: 'unauthorized' | 'unavailable' };
+  | { status: "success"; data: AuthTokens }
+  | { status: "unauthorized" | "unavailable" };
 
 let refreshPromise: Promise<RefreshResult> | null = null;
 
@@ -15,35 +15,35 @@ function withIdentityHeaders(options: ApiOptions): Headers {
   const headers = new Headers(options.headers);
   const auth = useAuthStore.getState();
   if (!options.skipAuth && auth.accessToken) {
-    headers.set('Authorization', `Bearer ${auth.accessToken}`);
+    headers.set("Authorization", `Bearer ${auth.accessToken}`);
   }
   return headers;
 }
 
 function invalidateAuthentication(): void {
   useAuthStore.getState().clearAuthentication();
-  window.dispatchEvent(new Event('booksoul:auth-invalidated'));
+  window.dispatchEvent(new Event("booksoul:auth-invalidated"));
 }
 
 async function requestTokenRefresh(): Promise<RefreshResult> {
   if (refreshPromise) return refreshPromise;
   refreshPromise = (async () => {
     try {
-      const response = await fetch('/api/auth/refresh', {
-        method: 'POST',
-        credentials: 'include',
+      const response = await fetch("/api/auth/refresh", {
+        method: "POST",
+        credentials: "include",
       });
       if (response.status === 401 || response.status === 403) {
-        return { status: 'unauthorized' } as const;
+        return { status: "unauthorized" } as const;
       }
-      if (!response.ok) return { status: 'unavailable' } as const;
+      if (!response.ok) return { status: "unavailable" } as const;
       const payload = (await response.json()) as {
         success: true;
         data: AuthTokens;
       };
-      return { status: 'success', data: payload.data } as const;
+      return { status: "success", data: payload.data } as const;
     } catch {
-      return { status: 'unavailable' } as const;
+      return { status: "unavailable" } as const;
     }
   })();
 
@@ -57,11 +57,11 @@ async function requestTokenRefresh(): Promise<RefreshResult> {
 async function refreshAuthentication(): Promise<boolean> {
   if (!useAuthStore.getState().user) return false;
   const result = await requestTokenRefresh();
-  if (result.status === 'success') {
+  if (result.status === "success") {
     useAuthStore.getState().restoreSession(result.data);
     return true;
   }
-  if (result.status === 'unauthorized') invalidateAuthentication();
+  if (result.status === "unauthorized") invalidateAuthentication();
   return false;
 }
 
@@ -72,7 +72,7 @@ export async function apiFetch(
   const { skipAuth, skipRefresh, ...requestOptions } = options;
   const response = await fetch(input, {
     ...requestOptions,
-    credentials: 'include',
+    credentials: "include",
     headers: withIdentityHeaders(options),
   });
   if (response.status !== 401 || skipRefresh || skipAuth) {
@@ -83,7 +83,7 @@ export async function apiFetch(
   if (!refreshed) return response;
   return fetch(input, {
     ...requestOptions,
-    credentials: 'include',
+    credentials: "include",
     headers: withIdentityHeaders(options),
   });
 }
@@ -94,9 +94,9 @@ export async function readApiError(response: Response): Promise<string> {
       message?: string | string[];
       error?: string;
     };
-    if (Array.isArray(payload.message)) return payload.message.join('，');
-    return payload.message ?? payload.error ?? '请求失败，请稍后重试';
+    if (Array.isArray(payload.message)) return payload.message.join("，");
+    return payload.message ?? payload.error ?? "请求失败，请稍后重试";
   } catch {
-    return '网络请求失败，请稍后重试';
+    return "网络请求失败，请稍后重试";
   }
 }

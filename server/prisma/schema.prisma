@@ -8,26 +8,29 @@ datasource db {
 }
 
 model User {
-  id           String         @id @default(uuid())
-  email        String         @unique
-  name         String
-  passwordHash String
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  refreshTokens RefreshToken[]
+  id              String            @id @default(uuid())
+  email           String            @unique
+  name            String
+  passwordHash    String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  refreshTokens   RefreshToken[]
+  books           Book[]
+  bookAssistants  BookAssistant[]
+  readingProgress ReadingProgress[]
 }
 
 model RefreshToken {
-  id           String    @id @default(uuid())
+  id           String         @id @default(uuid())
   userId       String
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash    String    @unique
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash    String         @unique
   expiresAt    DateTime
   revokedAt    DateTime?
   replacedById String?
   replacedBy   RefreshToken?  @relation("TokenReplacement", fields: [replacedById], references: [id], onDelete: SetNull)
   replaces     RefreshToken[] @relation("TokenReplacement")
-  createdAt    DateTime  @default(now())
+  createdAt    DateTime       @default(now())
   userAgent    String?
   ip           String?
 
@@ -35,14 +38,18 @@ model RefreshToken {
 }
 
 model ChatSessionRecord {
-  ownerId   String
-  sessionId String
-  messages  Json
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  ownerId         String
+  sessionId       String
+  bookAssistantId String?
+  bookAssistant   BookAssistant? @relation(fields: [bookAssistantId], references: [id], onDelete: Cascade)
+  title           String?
+  messages        Json
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   @@id([ownerId, sessionId])
   @@index([ownerId, updatedAt])
+  @@index([bookAssistantId, updatedAt])
 }
 
 model UserProfileRecord {
@@ -63,6 +70,8 @@ model MemoryRecord {
   id         String   @id
   ownerId    String
   sessionId  String
+  bookId     String?
+  book       Book?    @relation(fields: [bookId], references: [id], onDelete: Cascade)
   level      String
   content    String
   importance Float
@@ -73,4 +82,165 @@ model MemoryRecord {
 
   @@index([ownerId, sessionId])
   @@index([ownerId, level])
+  @@index([ownerId, bookId])
+}
+
+enum BookVisibility {
+  PRIVATE
+  SYSTEM
+}
+
+enum BookStatus {
+  QUEUED
+  PARSING
+  CHUNKING
+  EMBEDDING
+  READY
+  FAILED
+  DELETING
+}
+
+enum AssistantResponseDepth {
+  BRIEF
+  BALANCED
+  DEEP
+}
+
+enum AssistantTone {
+  NATURAL
+  WARM
+  ANALYTICAL
+}
+
+enum ReadingMode {
+  NOT_STARTED
+  IN_PROGRESS
+  FINISHED
+}
+
+enum IngestionJobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+model Book {
+  id               String            @id @default(uuid())
+  ownerId          String?
+  owner            User?             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  visibility       BookVisibility    @default(PRIVATE)
+  title            String
+  author           String?
+  originalFileName String
+  storageKey       String
+  mimeType         String
+  fileSizeBytes    BigInt
+  contentHash      String
+  language         String?
+  coverStorageKey  String?
+  status           BookStatus        @default(QUEUED)
+  statusProgress   Int               @default(0)
+  failureCode      String?
+  failureMessage   String?
+  sectionCount     Int               @default(0)
+  chunkCount       Int               @default(0)
+  parserVersion    String
+  embeddingVersion String
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  readyAt          DateTime?
+  sections         BookSection[]
+  chunks           BookChunk[]
+  assistants       BookAssistant[]
+  readingProgress  ReadingProgress[]
+  ingestionJob     IngestionJob?
+  memories         MemoryRecord[]
+
+  @@unique([ownerId, contentHash])
+  @@index([ownerId, updatedAt])
+  @@index([status, updatedAt])
+}
+
+model BookSection {
+  id        String      @id @default(uuid())
+  bookId    String
+  book      Book        @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  order     Int
+  title     String
+  sourceRef String?
+  content   String
+  charCount Int
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  chunks    BookChunk[]
+
+  @@unique([bookId, order])
+  @@index([bookId])
+}
+
+model BookChunk {
+  id               String      @id @default(uuid())
+  bookId           String
+  book             Book        @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  sectionId        String
+  section          BookSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  sectionOrder     Int
+  chunkIndex       Int
+  content          String
+  startOffset      Int?
+  endOffset        Int?
+  embeddingVersion String
+  createdAt        DateTime    @default(now())
+
+  @@unique([sectionId, chunkIndex, embeddingVersion])
+  @@index([bookId, embeddingVersion])
+  @@index([bookId, sectionOrder])
+}
+
+model BookAssistant {
+  id                String                 @id @default(uuid())
+  ownerId           String
+  owner             User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  bookId            String
+  book              Book                   @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  name              String
+  responseDepth     AssistantResponseDepth @default(BALANCED)
+  tone              AssistantTone          @default(NATURAL)
+  customInstruction String?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  chatSessions      ChatSessionRecord[]
+
+  @@unique([ownerId, bookId])
+  @@index([bookId])
+}
+
+model ReadingProgress {
+  ownerId             String
+  owner               User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  bookId              String
+  book                Book        @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  mode                ReadingMode @default(NOT_STARTED)
+  currentSectionOrder Int?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  @@id([ownerId, bookId])
+  @@index([bookId])
+}
+
+model IngestionJob {
+  id          String             @id @default(uuid())
+  bookId      String             @unique
+  book        Book               @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  status      IngestionJobStatus @default(QUEUED)
+  attempt     Int                @default(0)
+  lockedAt    DateTime?
+  heartbeatAt DateTime?
+  lastError   String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([status, updatedAt])
 }

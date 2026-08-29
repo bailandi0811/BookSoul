@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
-/* CSS Variables for theming — Claude-like warm ivory */
+/* Warm ivory theme tokens */
 :root {
   --background: 250 249 245;
   --foreground: 20 20 19;
@@ -24,14 +24,10 @@
   --ring: 217 119 87;
   --radius: 18px;
 
-  --font-display: 'Noto Sans SC', system-ui, sans-serif;
-  --font-body: 'Noto Sans SC', system-ui, sans-serif;
-
-  /* 角色微差：同暖色系，避免彩虹 */
-  --char-assistant: 180 130 110;
-  --char-qiaofeng: 217 119 87;
-  --char-duanyu: 160 120 100;
-  --char-wangyuyan: 190 140 115;
+  --font-display: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", system-ui,
+    sans-serif;
+  --font-body: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", system-ui,
+    sans-serif;
 }
 
 .dark {
@@ -74,6 +70,20 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
   /* Selection */
   ::selection {
     background-color: rgb(var(--primary) / 0.2);
@@ -82,7 +92,9 @@
   /* Focus styles */
   :focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px rgb(var(--background)), 0 0 0 4px rgb(var(--ring) / 0.5);
+    box-shadow:
+      0 0 0 2px rgb(var(--background)),
+      0 0 0 4px rgb(var(--ring) / 0.5);
   }
 }
 
@@ -94,24 +106,6 @@
 
   .paper-bg {
     background-color: rgb(var(--background));
-  }
-
-  .avatar-mark {
-    font-family: var(--font-body);
-    font-weight: 700;
-    border-radius: 9999px;
-    background: rgb(var(--secondary));
-    border: 1px solid rgb(var(--border));
-    color: inherit;
-  }
-
-  .seal-mark {
-    /* alias → avatar-mark during migration */
-    font-family: var(--font-body);
-    font-weight: 700;
-    border-radius: 9999px;
-    background: rgb(var(--secondary));
-    border: 1px solid rgb(var(--border));
   }
 
   .soft-surface {
@@ -127,7 +121,11 @@
   }
 
   .tap-spring {
-    transition: transform 0.18s cubic-bezier(0.34, 1.4, 0.64, 1), background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    transition:
+      transform 0.18s cubic-bezier(0.34, 1.4, 0.64, 1),
+      background-color 0.2s ease,
+      border-color 0.2s ease,
+      box-shadow 0.2s ease;
   }
 
   .tap-spring:active {
@@ -135,7 +133,11 @@
   }
 
   .hover-lift {
-    transition: transform 0.22s cubic-bezier(0.34, 1.2, 0.64, 1), box-shadow 0.22s ease, border-color 0.2s ease, background-color 0.2s ease;
+    transition:
+      transform 0.22s cubic-bezier(0.34, 1.2, 0.64, 1),
+      box-shadow 0.22s ease,
+      border-color 0.2s ease,
+      background-color 0.2s ease;
   }
 
   .hover-lift:hover {
@@ -203,7 +205,11 @@
     background-clip: text;
     -webkit-background-clip: text;
     color: transparent;
-    background-image: linear-gradient(135deg, rgb(var(--primary)), rgb(var(--accent)));
+    background-image: linear-gradient(
+      135deg,
+      rgb(var(--primary)),
+      rgb(var(--accent))
+    );
   }
 
   /* Shimmer loading effect */
@@ -219,8 +225,12 @@
   }
 
   @keyframes shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
   }
 
   /* Typing indicator dots */
@@ -228,12 +238,20 @@
     animation: typing-bounce 1.4s ease-in-out infinite;
   }
 
-  .typing-dot:nth-child(1) { animation-delay: 0ms; }
-  .typing-dot:nth-child(2) { animation-delay: 160ms; }
-  .typing-dot:nth-child(3) { animation-delay: 320ms; }
+  .typing-dot:nth-child(1) {
+    animation-delay: 0ms;
+  }
+  .typing-dot:nth-child(2) {
+    animation-delay: 160ms;
+  }
+  .typing-dot:nth-child(3) {
+    animation-delay: 320ms;
+  }
 
   @keyframes typing-bounce {
-    0%, 60%, 100% {
+    0%,
+    60%,
+    100% {
       transform: translateY(0);
       opacity: 0.4;
     }
@@ -284,7 +302,7 @@
     transform: scale(0.96);
   }
 
-  /* Avatar — solid primary, no purple glow */
+  /* Solid primary avatar */
   .avatar-gradient {
     background: rgb(var(--primary));
   }
@@ -308,7 +326,8 @@
   font-weight: 600;
 }
 
-.prose-ai ul, .prose-ai ol {
+.prose-ai ul,
+.prose-ai ol {
   margin-top: 0.75rem;
   margin-bottom: 0.75rem;
   list-style-position: inside;
@@ -363,17 +382,25 @@
   text-decoration: underline;
 }
 
-.prose-ai h1, .prose-ai h2, .prose-ai h3 {
+.prose-ai h1,
+.prose-ai h2,
+.prose-ai h3 {
   font-weight: 600;
   margin-top: 1rem;
   margin-bottom: 0.5rem;
 }
 
-.prose-ai h1 { font-size: 1.25rem; }
-.prose-ai h2 { font-size: 1.125rem; }
-.prose-ai h3 { font-size: 1rem; }
+.prose-ai h1 {
+  font-size: 1.25rem;
+}
+.prose-ai h2 {
+  font-size: 1.125rem;
+}
+.prose-ai h3 {
+  font-size: 1rem;
+}
 
-/* Input area focus — soft primary ring, no strong glow */
+/* Input area focus with a soft primary ring */
 .input-glow:focus-within {
   box-shadow: 0 0 0 2px rgb(var(--primary) / 0.08);
 }

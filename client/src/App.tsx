@@ -1,28 +1,27 @@
-import { useChatStore } from '@/store/useChatStore';
-import { useMemoryStore } from '@/store/useMemoryStore';
-import { lazy, Suspense, useEffect, useState } from 'react';
-import { restoreAuthentication } from '@/lib/auth-api';
-import { useAuthStore } from '@/store/useAuthStore';
-import { AuthPage } from '@/components/auth/AuthPage';
-import { resolveAppScreen } from '@/lib/app-flow';
+import { useMemoryStore } from "@/store/useMemoryStore";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { restoreAuthentication } from "@/lib/auth-api";
+import { useAuthStore } from "@/store/useAuthStore";
+import { AuthPage } from "@/components/auth/AuthPage";
+import { resolveAppScreen } from "@/lib/app-flow";
+import { useBooksStore } from "@/store/useBooksStore";
 
-const BookChat = lazy(() => import('@/components/BookChat'));
+const BookChat = lazy(() => import("@/components/BookChat"));
 const Entrance = lazy(() =>
-  import('@/components/Entrance').then((module) => ({
+  import("@/components/Entrance").then((module) => ({
     default: module.Entrance,
   })),
 );
 
 function App() {
-  const view = useChatStore((s) => s.view);
+  const view = useBooksStore((s) => s.view);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const [authReady, setAuthReady] = useState(false);
   const screen = resolveAppScreen({ authReady, isAuthenticated, view });
 
   useEffect(() => {
     const clearPrivateCaches = () => {
-      useChatStore.getState().clearMessages();
-      useChatStore.setState({ sessions: [], view: 'entrance' });
+      useBooksStore.getState().clearPrivateState();
       useMemoryStore.setState({
         profile: null,
         memories: [],
@@ -30,9 +29,12 @@ function App() {
         isExpanded: false,
       });
     };
-    window.addEventListener('booksoul:auth-invalidated', clearPrivateCaches);
+    window.addEventListener("booksoul:auth-invalidated", clearPrivateCaches);
     return () =>
-      window.removeEventListener('booksoul:auth-invalidated', clearPrivateCaches);
+      window.removeEventListener(
+        "booksoul:auth-invalidated",
+        clearPrivateCaches,
+      );
   }, []);
 
   useEffect(() => {
@@ -45,7 +47,7 @@ function App() {
     };
   }, []);
 
-  if (screen === 'loading') {
+  if (screen === "loading") {
     return (
       <div className="grid min-h-[100dvh] place-items-center bg-background text-sm text-muted-foreground">
         正在恢复会话…
@@ -53,10 +55,10 @@ function App() {
     );
   }
 
-  if (screen === 'auth') {
+  if (screen === "auth") {
     return (
       <AuthPage
-        onAuthenticated={() => useChatStore.getState().openEntrance()}
+        onAuthenticated={() => useBooksStore.getState().backToLibrary()}
       />
     );
   }
@@ -70,7 +72,7 @@ function App() {
           </div>
         }
       >
-        {screen === 'entrance' ? <Entrance /> : <BookChat />}
+        {screen === "library" ? <Entrance /> : <BookChat />}
       </Suspense>
     </div>
   );

@@ -1,48 +1,60 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
-import { useChatStore } from '@/store/useChatStore';
-import { getCharacter } from '@/data/characters';
-import { PanelLeftOpen, Plus } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { motion, AnimatePresence } from 'framer-motion';
-import { MessageBubble } from './components/MessageBubble';
-import { InputArea } from './components/InputArea';
-import { Sidebar } from './components/Sidebar';
-import { CharacterSwitchPanel } from './components/CharacterSwitchPanel';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useChatStore } from "@/store/useChatStore";
+import { useBooksStore } from "@/store/useBooksStore";
+import { BookOpen, PanelLeftOpen, Plus } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { motion, AnimatePresence } from "framer-motion";
+import { MessageBubble } from "./components/MessageBubble";
+import { InputArea } from "./components/InputArea";
+import { Sidebar } from "./components/Sidebar";
 
-const SIDEBAR_WIDTH_KEY = 'booksoul_sidebar_width';
-const SIDEBAR_MIN = 200;
-const SIDEBAR_MAX = 480;
+const SIDEBAR_WIDTH_KEY = "booksoul_sidebar_width";
+const SIDEBAR_MIN = 244;
+const SIDEBAR_MAX = 420;
 
-/** 默认 2:8 → 侧栏约占视口 20% */
 function defaultSidebarWidth() {
-  if (typeof window === 'undefined') return 280;
-  return Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, Math.round(window.innerWidth * 0.2)));
+  if (typeof window === "undefined") return 300;
+  return Math.min(
+    SIDEBAR_MAX,
+    Math.max(SIDEBAR_MIN, Math.round(window.innerWidth * 0.24)),
+  );
 }
 
 function readSidebarWidth() {
-  if (typeof localStorage === 'undefined') return defaultSidebarWidth();
+  if (typeof localStorage === "undefined") return defaultSidebarWidth();
   const raw = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY));
   if (!Number.isFinite(raw)) return defaultSidebarWidth();
   return Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, raw));
 }
 
-export default function BookChat() {
-  const messages = useChatStore((s) => s.messages);
-  const isLoading = useChatStore((s) => s.isLoading);
-  const clearMessages = useChatStore((s) => s.clearMessages);
-  const sendMessage = useChatStore((s) => s.sendMessage);
-  const currentCharacter = useChatStore((s) => s.currentCharacter);
-  const character = getCharacter(currentCharacter);
+const SUGGESTIONS = [
+  "帮我梳理目前出现的主要人物和关系",
+  "总结我已读范围内的重要情节",
+  "有哪些容易忽略的细节或伏笔？",
+];
 
-  const scrollRef = useRef<HTMLDivElement>(null);
+export default function BookChat() {
+  const messages = useChatStore((state) => state.messages);
+  const isLoading = useChatStore((state) => state.isLoading);
+  const sendMessage = useChatStore((state) => state.sendMessage);
+  const startNewSession = useChatStore((state) => state.startNewSession);
+  const currentBook = useBooksStore((state) => state.currentBook);
+  const assistant = useBooksStore((state) => state.assistant);
+  const readingProgress = useBooksStore((state) => state.readingProgress);
+  const isWorkspaceLoading = useBooksStore((state) => state.isWorkspaceLoading);
+  const workspaceError = useBooksStore((state) => state.workspaceError);
+  const backToLibrary = useBooksStore((state) => state.backToLibrary);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isDesktop, setIsDesktop] = useState(() =>
-    typeof window === 'undefined' ? true : window.matchMedia('(min-width: 768px)').matches,
+    typeof window === "undefined"
+      ? true
+      : window.matchMedia("(min-width: 768px)").matches,
   );
   const [isSidebarOpen, setIsSidebarOpen] = useState(() =>
-    typeof window === 'undefined' ? true : window.matchMedia('(min-width: 768px)').matches,
+    typeof window === "undefined"
+      ? true
+      : window.matchMedia("(min-width: 768px)").matches,
   );
-  const [switchOpen, setSwitchOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(readSidebarWidth);
   const [isResizing, setIsResizing] = useState(false);
   const sidebarWidthRef = useRef(sidebarWidth);
@@ -52,77 +64,116 @@ export default function BookChat() {
   }, [sidebarWidth]);
 
   useEffect(() => {
-    const media = window.matchMedia('(min-width: 768px)');
+    const media = window.matchMedia("(min-width: 768px)");
     const update = () => setIsDesktop(media.matches);
-    media.addEventListener('change', update);
-    return () => media.removeEventListener('change', update);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
   }, []);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
 
   useEffect(() => {
-    scrollToBottom();
+    const reduceMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    messagesEndRef.current?.scrollIntoView({
+      behavior: reduceMotion ? "auto" : "smooth",
+    });
   }, [messages, isLoading]);
 
-  const onResizePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    const handle = e.currentTarget;
-    handle.setPointerCapture(e.pointerId);
-    setIsResizing(true);
+  const onResizePointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      const handle = event.currentTarget;
+      handle.setPointerCapture(event.pointerId);
+      setIsResizing(true);
+      const onMove = (moveEvent: PointerEvent) => {
+        const next = Math.min(
+          SIDEBAR_MAX,
+          Math.max(SIDEBAR_MIN, moveEvent.clientX),
+        );
+        sidebarWidthRef.current = next;
+        setSidebarWidth(next);
+      };
+      const onUp = (upEvent: PointerEvent) => {
+        try {
+          handle.releasePointerCapture(upEvent.pointerId);
+        } catch {
+          // Pointer capture may already be released.
+        }
+        setIsResizing(false);
+        localStorage.setItem(
+          SIDEBAR_WIDTH_KEY,
+          String(sidebarWidthRef.current),
+        );
+        handle.removeEventListener("pointermove", onMove);
+        handle.removeEventListener("pointerup", onUp);
+        handle.removeEventListener("pointercancel", onUp);
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      };
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+      handle.addEventListener("pointermove", onMove);
+      handle.addEventListener("pointerup", onUp);
+      handle.addEventListener("pointercancel", onUp);
+    },
+    [],
+  );
 
-    const onMove = (ev: PointerEvent) => {
-      const next = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, ev.clientX));
-      sidebarWidthRef.current = next;
-      setSidebarWidth(next);
-    };
+  if (!currentBook) return null;
 
-    const onUp = (ev: PointerEvent) => {
-      try {
-        handle.releasePointerCapture(ev.pointerId);
-      } catch {
-        /* already released */
-      }
-      setIsResizing(false);
-      localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidthRef.current));
-      handle.removeEventListener('pointermove', onMove);
-      handle.removeEventListener('pointerup', onUp);
-      handle.removeEventListener('pointercancel', onUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-    handle.addEventListener('pointermove', onMove);
-    handle.addEventListener('pointerup', onUp);
-    handle.addEventListener('pointercancel', onUp);
-  }, []);
+  if (workspaceError && !assistant && !isWorkspaceLoading) {
+    return (
+      <div className="grid min-h-[100dvh] place-items-center bg-background px-6 text-center">
+        <div className="max-w-md">
+          <BookOpen className="mx-auto h-8 w-8 text-destructive" />
+          <h1 className="mt-4 text-xl font-semibold">工作区没有加载完成</h1>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            {workspaceError}
+          </p>
+          <button
+            type="button"
+            onClick={backToLibrary}
+            className="tap-spring mt-6 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground"
+          >
+            返回书架
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex h-[100dvh] min-h-[100dvh] bg-background paper-bg text-foreground overflow-hidden">
+    <div className="flex h-[100dvh] min-h-[100dvh] overflow-hidden bg-background text-foreground">
       <AnimatePresence initial={false}>
         {isSidebarOpen && !isDesktop && (
           <motion.button
+            key="sidebar-backdrop"
             type="button"
             aria-label="关闭侧栏"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setIsSidebarOpen(false)}
-            className="fixed inset-0 z-20 bg-foreground/25 backdrop-blur-[2px] md:hidden"
+            className="fixed inset-0 z-20 bg-foreground/25 md:hidden"
           />
         )}
         {isSidebarOpen && (
           <motion.div
-            initial={isDesktop ? { width: 0, opacity: 0 } : { x: '-100%', opacity: 0 }}
-            animate={isDesktop ? { width: sidebarWidth, opacity: 1 } : { x: 0, opacity: 1 }}
-            exit={isDesktop ? { width: 0, opacity: 0 } : { x: '-100%', opacity: 0 }}
-            transition={isResizing ? { duration: 0 } : { duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-            className="fixed inset-y-0 left-0 w-[min(88vw,360px)] md:relative md:w-auto h-full border-r border-border/60 bg-[#f0eee6] dark:bg-secondary z-30 flex-shrink-0 overflow-hidden"
+            key="sidebar-panel"
+            initial={isDesktop ? { width: 0, opacity: 0 } : { x: "-100%" }}
+            animate={isDesktop ? { width: sidebarWidth, opacity: 1 } : { x: 0 }}
+            exit={isDesktop ? { width: 0, opacity: 0 } : { x: "-100%" }}
+            transition={
+              isResizing
+                ? { duration: 0 }
+                : { duration: 0.2, ease: [0.4, 0, 0.2, 1] }
+            }
+            className="fixed inset-y-0 left-0 z-30 h-full w-[min(88vw,360px)] shrink-0 overflow-hidden md:relative md:w-auto"
           >
-            <div className="h-full w-[min(88vw,360px)] md:w-auto overflow-hidden" style={isDesktop ? { width: sidebarWidth } : undefined}>
+            <div
+              className="h-full w-[min(88vw,360px)] overflow-hidden md:w-auto"
+              style={isDesktop ? { width: sidebarWidth } : undefined}
+            >
               <Sidebar onClose={() => setIsSidebarOpen(false)} />
             </div>
             <div
@@ -135,183 +186,118 @@ export default function BookChat() {
               onPointerDown={onResizePointerDown}
               tabIndex={0}
               onKeyDown={(event) => {
-                if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+                if (event.key !== "ArrowLeft" && event.key !== "ArrowRight")
+                  return;
                 event.preventDefault();
-                const delta = event.key === 'ArrowLeft' ? -16 : 16;
-                const next = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, sidebarWidth + delta));
+                const delta = event.key === "ArrowLeft" ? -16 : 16;
+                const next = Math.min(
+                  SIDEBAR_MAX,
+                  Math.max(SIDEBAR_MIN, sidebarWidth + delta),
+                );
                 setSidebarWidth(next);
                 localStorage.setItem(SIDEBAR_WIDTH_KEY, String(next));
               }}
-              className={`
-                hidden md:block absolute top-0 right-0 z-40 h-full w-1.5 -mr-0.5
-                cursor-col-resize touch-none
-                hover:bg-primary/25 active:bg-primary/40
-                ${isResizing ? 'bg-primary/40' : 'bg-transparent'}
-              `}
+              className={`absolute right-0 top-0 hidden h-full w-1.5 cursor-col-resize touch-none md:block ${
+                isResizing ? "bg-primary/35" : "hover:bg-primary/20"
+              }`}
             />
           </motion.div>
         )}
       </AnimatePresence>
 
-      <div className="flex flex-col flex-1 relative h-full min-w-0">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-80"
-          style={{
-            background:
-              'radial-gradient(ellipse 80% 45% at 50% -10%, rgb(var(--primary) / 0.07), transparent 55%)',
-          }}
-        />
-        <header className="relative flex items-center justify-center px-4 lg:px-6 z-20">
-          {!isSidebarOpen && (
-            <motion.button
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.94 }}
-              onClick={() => setIsSidebarOpen(true)}
-              className="absolute left-3 lg:left-4 p-2 text-muted-foreground hover:text-foreground hover:bg-secondary/80 rounded-xl transition-all duration-200"
-              aria-label="打开侧边栏"
-            >
-              <PanelLeftOpen className="w-5 h-5" />
-            </motion.button>
-          )}
-
-          <div className="flex items-center gap-2.5 min-w-0 px-12 py-3">
-            <span
-              className="w-7 h-7 rounded-full bg-secondary border border-border flex items-center justify-center text-[11px] font-semibold flex-shrink-0"
-              style={{ color: `rgb(var(${character.accentCssVar}))` }}
-            >
-              {character.sealChar}
-            </span>
-            <div className="min-w-0 text-center sm:text-left">
-              <div className="flex items-baseline justify-center sm:justify-start gap-2 min-w-0">
-                <h1 className="font-semibold text-[15px] text-foreground truncate tracking-tight">
-                  {character.name}
-                </h1>
-                <span className="text-[12px] text-muted-foreground truncate hidden sm:inline">
-                  {character.shortTitle}
-                </span>
-              </div>
+      <div className="relative flex h-full min-w-0 flex-1 flex-col">
+        <header className="relative z-10 flex min-h-16 items-center justify-between border-b border-border/70 bg-background/95 px-3 sm:px-5">
+          <div className="flex min-w-0 items-center gap-3">
+            {!isSidebarOpen && (
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen(true)}
+                className="tap-spring rounded-xl p-2 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                aria-label="打开侧栏"
+              >
+                <PanelLeftOpen className="h-5 w-5" />
+              </button>
+            )}
+            <div className="min-w-0">
+              <h1 className="truncate text-sm font-semibold tracking-tight">
+                {assistant?.name ?? `《${currentBook.title}》阅读助手`}
+              </h1>
+              <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                {readingProgress?.mode === "FINISHED"
+                  ? "已读完整本书"
+                  : readingProgress?.mode === "IN_PROGRESS"
+                    ? `回答范围到第 ${readingProgress.spoilerCeiling} 节`
+                    : "回答范围为第一节"}
+              </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setSwitchOpen(true)}
-              className="text-xs font-medium text-primary/90 hover:text-primary transition-colors flex-shrink-0 px-2 py-1 rounded-lg hover:bg-primary/5"
-              title="更换角色"
-            >
-              换角
-            </button>
           </div>
-
-          <motion.button
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.96 }}
-            onClick={() => clearMessages()}
-            className="absolute right-3 lg:right-4 p-2 text-muted-foreground hover:text-foreground hover:bg-secondary/80 rounded-xl transition-all duration-200"
-            title="新建对话"
-            aria-label="新建对话"
+          <button
+            type="button"
+            onClick={() => void startNewSession(currentBook.id)}
+            className="tap-spring inline-flex items-center gap-2 whitespace-nowrap rounded-xl border border-border bg-card px-3 py-2 text-xs font-semibold hover:bg-secondary"
           >
-            <Plus className="w-4 h-4" />
-          </motion.button>
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">新对话</span>
+          </button>
         </header>
 
-        <CharacterSwitchPanel open={switchOpen} onClose={() => setSwitchOpen(false)} />
-
-        <div className="relative z-10 flex-1 overflow-hidden">
-          <ScrollArea className="h-full chat-scrollbar" ref={scrollRef}>
-            <div className="max-w-[42rem] mx-auto w-full px-4 sm:px-6 py-6">
-              {messages.length === 0 && !isLoading ? (
-                <motion.div
-                  initial={{ opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4 }}
-                  className="relative flex flex-col items-center justify-center min-h-[calc(100vh-11rem)] px-2"
-                >
-                  <div
-                    aria-hidden
-                    className="pointer-events-none absolute inset-x-0 top-1/4 -translate-y-1/2 h-64 max-w-lg mx-auto rounded-full opacity-70"
-                    style={{
-                      background:
-                        'radial-gradient(ellipse at center, rgb(var(--primary) / 0.10), transparent 68%)',
-                    }}
-                  />
-
-                  <div className="relative text-center mb-9 max-w-lg">
-                    <motion.div
-                      initial={{ scale: 0.9, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                      className="relative inline-flex mb-5"
-                    >
-                      <span
-                        className="relative z-10 inline-flex w-16 h-16 items-center justify-center text-2xl font-bold rounded-full bg-card border border-border shadow-[0_8px_28px_-12px_rgb(var(--primary)/0.45)]"
-                        style={{ color: `rgb(var(${character.accentCssVar}))` }}
-                      >
-                        {character.sealChar}
-                      </span>
-                      <span
-                        aria-hidden
-                        className="absolute inset-0 rounded-full bg-primary/15 blur-md scale-110"
-                      />
-                    </motion.div>
-                    <p className="text-xs font-semibold tracking-wide text-primary mb-2">
-                      {character.name}
-                      <span className="text-muted-foreground font-medium"> · {character.shortTitle}</span>
-                    </p>
-                    <h2 className="text-xl sm:text-2xl font-semibold text-foreground leading-snug tracking-tight">
-                      {character.greeting}
-                    </h2>
-                    <p className="mt-3 text-sm text-muted-foreground">点选下方问题，或直接输入开始对话</p>
-                  </div>
-
-                  <div className="relative w-full max-w-md space-y-2.5">
-                    {character.suggestions.map((text, i) => (
-                      <motion.button
-                        key={text}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.12 + i * 0.05, type: 'spring', stiffness: 320, damping: 24 }}
-                        whileHover={{ scale: 1.02, y: -2 }}
-                        whileTap={{ scale: 0.985 }}
-                        disabled={isLoading}
-                        onClick={() => {
-                          if (!isLoading) sendMessage(text);
-                        }}
-                        className="
-                          w-full text-left px-4 py-3.5 rounded-2xl origin-center
-                          text-sm font-medium text-foreground/90 leading-relaxed
-                          bg-primary/[0.07] border border-primary/15
-                          shadow-[0_1px_2px_rgb(217_119_87/0.06)]
-                          hover:bg-primary/[0.18] hover:border-primary/40 hover:text-foreground
-                          hover:shadow-[0_10px_28px_-12px_rgb(var(--primary)/0.5)]
-                          transition-colors duration-200
-                        "
-                      >
-                        {text}
-                      </motion.button>
-                    ))}
-                  </div>
-                </motion.div>
-              ) : (
-                <div className="space-y-8 pb-8">
-                  <AnimatePresence initial={false}>
-                    {messages.map((msg, index) => (
-                      <MessageBubble key={index} message={msg} />
-                    ))}
-                  </AnimatePresence>
-                  <div ref={messagesEndRef} />
-                </div>
-              )}
+        <div className="relative flex-1 overflow-hidden">
+          {isWorkspaceLoading ? (
+            <div className="mx-auto max-w-[46rem] space-y-4 px-4 py-8 sm:px-6">
+              <div className="h-24 animate-pulse rounded-2xl bg-secondary" />
+              <div className="h-36 animate-pulse rounded-2xl bg-card" />
             </div>
-          </ScrollArea>
+          ) : (
+            <ScrollArea className="h-full chat-scrollbar">
+              <div className="mx-auto w-full max-w-[46rem] px-4 py-6 sm:px-6">
+                {messages.length === 0 && !isLoading ? (
+                  <div className="flex min-h-[calc(100dvh-12rem)] items-center justify-center py-10">
+                    <div className="w-full max-w-xl">
+                      <span className="grid h-12 w-12 place-items-center rounded-xl bg-primary text-primary-foreground">
+                        <BookOpen className="h-5 w-5" />
+                      </span>
+                      <h2 className="mt-5 text-2xl font-bold tracking-tight">
+                        从已读内容开始聊
+                      </h2>
+                      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                        你可以问人物、情节、设定和伏笔。需要时，回答会附上章节引用。
+                      </p>
+                      <div className="mt-7 grid gap-2 sm:grid-cols-2">
+                        {SUGGESTIONS.map((suggestion, index) => (
+                          <button
+                            key={suggestion}
+                            type="button"
+                            disabled={isLoading}
+                            onClick={() => void sendMessage(suggestion)}
+                            className={`tap-spring rounded-xl border border-border bg-card px-4 py-3 text-left text-sm leading-relaxed hover:border-primary/45 hover:bg-primary/5 ${
+                              index === 0 ? "sm:col-span-2" : ""
+                            }`}
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-8 pb-8">
+                    <AnimatePresence initial={false}>
+                      {messages.map((message, index) => (
+                        <MessageBubble
+                          key={`${message.createdAt ?? index}-${index}`}
+                          message={message}
+                        />
+                      ))}
+                    </AnimatePresence>
+                    <div ref={messagesEndRef} />
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          )}
         </div>
 
-        <div className="relative z-10">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -top-10 inset-x-0 h-10 bg-gradient-to-t from-[rgb(var(--background))] to-transparent"
-          />
+        <div className="relative z-10 bg-gradient-to-t from-background via-background to-background/70 pt-2">
           <InputArea />
         </div>
       </div>
