@@ -17,7 +17,9 @@ const serverRoot = process.cwd();
 async function listDirectories(root: string): Promise<string[]> {
   try {
     const entries = await fs.readdir(root, { withFileTypes: true });
-    return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+    return entries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
     throw error;
@@ -55,7 +57,12 @@ async function migrateChatHistories(): Promise<number> {
       if (!session.userId || !Array.isArray(session.messages)) continue;
       const stats = await fs.stat(path.join(root, file));
       await prisma.chatSessionRecord.upsert({
-        where: { sessionId },
+        where: {
+          ownerId_sessionId: {
+            ownerId: session.userId,
+            sessionId,
+          },
+        },
         create: {
           sessionId,
           ownerId: session.userId,

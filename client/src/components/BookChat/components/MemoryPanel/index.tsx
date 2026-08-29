@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useChatStore } from '@/store/useChatStore';
-import { useAuthStore } from '@/store/useAuthStore';
 import { useMemoryStore, MemoryEntry } from '@/store/useMemoryStore';
 import { Brain, ChevronDown, Heart, Info, Bookmark, Plus, Sparkles, Archive } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -29,16 +28,12 @@ export const MemoryPanel = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<MemoryEntry | null>(null);
 
-  const userId = useAuthStore(
-    (state) => state.user?.id ?? state.guestUserId,
-  );
-
   useEffect(() => {
     if (sessionId) {
-      fetchProfile(userId, sessionId);
-      fetchMemories(userId, sessionId);
+      fetchProfile(sessionId);
+      fetchMemories(sessionId);
     }
-  }, [sessionId, userId, fetchProfile, fetchMemories]);
+  }, [sessionId, fetchProfile, fetchMemories]);
 
   const groupedMemories = {
     preference: memories.filter(m => m.category === 'preference'),
@@ -67,7 +62,7 @@ export const MemoryPanel = () => {
     setIsSaving(true);
     try {
       if (selectedMemory) {
-        await updateMemory(selectedMemory.id, { content });
+        await updateMemory(selectedMemory.id, { content, verified: true });
       } else {
         await createMemory(sessionId, content);
       }
@@ -177,6 +172,9 @@ export const MemoryPanel = () => {
                   memories={groupedMemories.preference}
                   onEdit={beginEdit}
                   onDelete={(memory) => setPendingDelete(memory)}
+                  onConfirm={(memory) =>
+                    void updateMemory(memory.id, { verified: true })
+                  }
                   delay={0.15}
                 />
 
@@ -188,6 +186,9 @@ export const MemoryPanel = () => {
                   memories={groupedMemories.fact}
                   onEdit={beginEdit}
                   onDelete={(memory) => setPendingDelete(memory)}
+                  onConfirm={(memory) =>
+                    void updateMemory(memory.id, { verified: true })
+                  }
                   delay={0.2}
                 />
 
@@ -199,6 +200,9 @@ export const MemoryPanel = () => {
                   memories={groupedMemories.other}
                   onEdit={beginEdit}
                   onDelete={(memory) => setPendingDelete(memory)}
+                  onConfirm={(memory) =>
+                    void updateMemory(memory.id, { verified: true })
+                  }
                   delay={0.25}
                 />
               </div>
@@ -302,10 +306,11 @@ interface MemoryCategoryProps {
   memories: MemoryEntry[];
   onEdit: (memory: MemoryEntry) => void;
   onDelete: (memory: MemoryEntry) => void;
+  onConfirm: (memory: MemoryEntry) => void;
   delay: number;
 }
 
-const MemoryCategory = ({ icon: Icon, label, color, memories, onEdit, onDelete, delay }: MemoryCategoryProps) => {
+const MemoryCategory = ({ icon: Icon, label, color, memories, onEdit, onDelete, onConfirm, delay }: MemoryCategoryProps) => {
   if (memories.length === 0) return null;
 
   const colorMap = {
@@ -354,6 +359,7 @@ const MemoryCategory = ({ icon: Icon, label, color, memories, onEdit, onDelete, 
             color={color}
             onEdit={() => onEdit(memory)}
             onDelete={() => onDelete(memory)}
+            onConfirm={() => onConfirm(memory)}
             delay={delay + index * 0.05}
           />
         ))}
@@ -368,10 +374,11 @@ interface MemoryItemProps {
   color: 'rose' | 'blue' | 'amber';
   onEdit: () => void;
   onDelete: () => void;
+  onConfirm: () => void;
   delay: number;
 }
 
-const MemoryItem = ({ memory, color, onEdit, onDelete, delay }: MemoryItemProps) => {
+const MemoryItem = ({ memory, color, onEdit, onDelete, onConfirm, delay }: MemoryItemProps) => {
   const colorMap = {
     rose: { border: 'border-rose-500/10', hover: 'hover:border-rose-500/30', accent: 'bg-rose-500' },
     blue: { border: 'border-blue-500/10', hover: 'hover:border-blue-500/30', accent: 'bg-blue-500' },
@@ -412,6 +419,11 @@ const MemoryItem = ({ memory, color, onEdit, onDelete, delay }: MemoryItemProps)
             <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-medium", level.bg)}>
               {level.text}
             </span>
+            {!memory.metadata.verified && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700">
+                待确认
+              </span>
+            )}
             <span className="text-[10px] text-muted-foreground/40">
               {new Date(memory.createdAt).toLocaleDateString()}
             </span>
@@ -425,6 +437,16 @@ const MemoryItem = ({ memory, color, onEdit, onDelete, delay }: MemoryItemProps)
 
         {/* Action buttons - show on hover */}
         <div className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-all duration-200 flex items-center gap-1 -mt-1">
+          {!memory.metadata.verified && (
+            <button
+              onClick={onConfirm}
+              className="rounded-md px-2 py-1 text-[10px] font-medium text-emerald-700 hover:bg-emerald-500/10 transition-colors"
+              title="确认后 Agent 才会使用这条记忆"
+              aria-label="确认记忆"
+            >
+              确认
+            </button>
+          )}
           <button
             onClick={onEdit}
             className="p-1.5 rounded-md hover:bg-muted transition-colors"

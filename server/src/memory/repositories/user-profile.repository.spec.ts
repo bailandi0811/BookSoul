@@ -1,22 +1,46 @@
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
+import { PrismaService } from '../../prisma/prisma.service';
 import { UserProfileRepository } from './user-profile.repository';
 
 describe('UserProfileRepository', () => {
-  let root: string;
-  let cwdSpy: jest.SpyInstance;
+  const records = new Map<string, any>();
   let repository: UserProfileRepository;
 
   beforeEach(() => {
-    root = fs.mkdtempSync(path.join(os.tmpdir(), 'booksoul-profile-'));
-    cwdSpy = jest.spyOn(process, 'cwd').mockReturnValue(root);
-    repository = new UserProfileRepository();
-  });
-
-  afterEach(() => {
-    cwdSpy.mockRestore();
-    fs.rmSync(root, { recursive: true, force: true });
+    records.clear();
+    const key = (ownerId: string, sessionId: string) =>
+      `${ownerId}:${sessionId}`;
+    const userProfileRecord = {
+      findUnique: jest.fn(
+        async ({ where }: any) =>
+          records.get(
+            key(
+              where.ownerId_sessionId.ownerId,
+              where.ownerId_sessionId.sessionId,
+            ),
+          ) ?? null,
+      ),
+      findMany: jest.fn(async ({ where }: any) =>
+        [...records.values()].filter(
+          (record) => record.ownerId === where.ownerId,
+        ),
+      ),
+      upsert: jest.fn(async ({ where, create, update }: any) => {
+        const recordKey = key(
+          where.ownerId_sessionId.ownerId,
+          where.ownerId_sessionId.sessionId,
+        );
+        records.set(
+          recordKey,
+          records.has(recordKey)
+            ? { ...records.get(recordKey), ...update }
+            : { id: 'profile-id', ...create },
+        );
+      }),
+      deleteMany: jest.fn(),
+    };
+    repository = new UserProfileRepository({
+      userProfileRecord,
+    } as unknown as PrismaService);
   });
 
   it('never lets profile updates replace trusted identity fields', async () => {
@@ -37,5 +61,14 @@ describe('UserProfileRepository', () => {
       userId: 'user-a',
       sessionId: 'session-a',
     });
+  });
+
+  it('only lists profiles belonging to the requested owner', async () => {
+    await repository.save(repository.createDefault('user-a', 'session-a'));
+    await repository.save(repository.createDefault('user-b', 'session-b'));
+
+    await expect(repository.getByUserId('user-a')).resolves.toEqual([
+      expect.objectContaining({ userId: 'user-a' }),
+    ]);
   });
 });

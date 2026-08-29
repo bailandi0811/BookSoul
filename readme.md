@@ -55,6 +55,14 @@ npm run prisma:migrate:deploy
 npm run start:dev
 ```
 
+从旧版 JSON 文件存储升级时，在数据库迁移后额外执行一次：
+
+```powershell
+npm run migrate:file-data
+```
+
+该脚本只复制数据并可安全重跑，不会删除原文件。会话、私人记忆与共享小说库的隔离设计见 [docs/memory-isolation.md](docs/memory-isolation.md)。
+
 看到以下地址即可：
 
 ```text

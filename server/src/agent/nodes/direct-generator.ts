@@ -1,5 +1,6 @@
 import { ChatOpenAI } from '@langchain/openai';
 import type { AgentState } from '../state';
+import { formatScopedUserContext } from '../context';
 
 const DIRECT_GENERATE_PROMPT = `你是一个热情的AI助手，专注于《天龙八部》小说。
 
@@ -13,6 +14,9 @@ const DIRECT_GENERATE_PROMPT = `你是一个热情的AI助手，专注于《天�
 
 【你的角色】
 {role_prompt}
+
+【用户专属上下文】
+{user_context}
 
 【回答要求】
 1. 根据问题类型调整回答策略
@@ -28,7 +32,9 @@ export const createDirectGeneratorNode = (
   model: ChatOpenAI,
   getPersonaPrompt: (name: string) => string,
 ) => {
-  return async (state: AgentState): Promise<Partial<AgentState> & { stream?: any }> => {
+  return async (
+    state: AgentState,
+  ): Promise<Partial<AgentState> & { stream?: any }> => {
     const personaPrompt = getPersonaPrompt(state.persona);
     const classification = state.intent_classification;
 
@@ -40,22 +46,40 @@ export const createDirectGeneratorNode = (
       const isPing = /在吗|有人吗|在不在/.test(q);
 
       const greetings: Record<string, string[]> = {
-        assistant: ['你好！有什么关于《天龙八部》的问题可以问我。', '您好！我是BookSoul助手，随时为您效劳。'],
-        qiaofeng: ['兄弟好啊！有什么想问的尽管说。', '哈哈，兄台来找俺乔峰，有何贵干？'],
+        assistant: [
+          '你好！有什么关于《天龙八部》的问题可以问我。',
+          '您好！我是BookSoul助手，随时为您效劳。',
+        ],
+        qiaofeng: [
+          '兄弟好啊！有什么想问的尽管说。',
+          '哈哈，兄台来找俺乔峰，有何贵干？',
+        ],
         duanyu: ['兄台好，小生这厢有礼了。', '这位姑娘/公子，小生段誉有礼了。'],
         wangyuyan: ['公子万安，请问有何指教？', '公子安好，敢问有何疑惑？'],
       };
       const thanksReplies: Record<string, string[]> = {
         assistant: ['不客气！有需要随时叫我。', '应该的，随时为你服务。'],
-        qiaofeng: ['兄弟客气了！有事尽管开口。', '哈哈，不必言谢，江湖儿女讲个痛快。'],
-        duanyu: ['兄台言重了，小生不过略尽绵薄之力。', '不敢当，不敢当，能帮到你便好。'],
-        wangyuyan: ['公子客气了，能为你解惑是我的荣幸。', '不必言谢，若有疑问可再问我。'],
+        qiaofeng: [
+          '兄弟客气了！有事尽管开口。',
+          '哈哈，不必言谢，江湖儿女讲个痛快。',
+        ],
+        duanyu: [
+          '兄台言重了，小生不过略尽绵薄之力。',
+          '不敢当，不敢当，能帮到你便好。',
+        ],
+        wangyuyan: [
+          '公子客气了，能为你解惑是我的荣幸。',
+          '不必言谢，若有疑问可再问我。',
+        ],
       };
       const farewellReplies: Record<string, string[]> = {
         assistant: ['好的，回头见！', '没问题，随时欢迎你再来。'],
         qiaofeng: ['兄弟慢走，咱们后会有期！', '好，改日再叙！'],
         duanyu: ['兄台慢行，后会有期。', '那小生便先告辞，愿君安好。'],
-        wangyuyan: ['公子慢走，若有疑问随时再来。', '后会有期，愿公子诸事顺遂。'],
+        wangyuyan: [
+          '公子慢走，若有疑问随时再来。',
+          '后会有期，愿公子诸事顺遂。',
+        ],
       };
       const pingReplies: Record<string, string[]> = {
         assistant: ['在的，你说。', '我在，想聊什么？'],
@@ -69,7 +93,8 @@ export const createDirectGeneratorNode = (
         return options[Math.floor(Math.random() * options.length)];
       }
       if (isFarewell) {
-        const options = farewellReplies[state.persona] || farewellReplies.assistant;
+        const options =
+          farewellReplies[state.persona] || farewellReplies.assistant;
         return options[Math.floor(Math.random() * options.length)];
       }
       if (isPing) {
@@ -82,12 +107,20 @@ export const createDirectGeneratorNode = (
     };
 
     // 意图驱动的回复策略
-    const responsePrompt = DIRECT_GENERATE_PROMPT
-      .replace('{query}', state.query)
+    const responsePrompt = DIRECT_GENERATE_PROMPT.replace(
+      '{query}',
+      state.query,
+    )
       .replace('{intent_type}', classification?.intent_type || 'unknown')
-      .replace('{confidence}', classification ? `${(classification.confidence * 100).toFixed(0)}%` : 'N/A')
+      .replace(
+        '{confidence}',
+        classification
+          ? `${(classification.confidence * 100).toFixed(0)}%`
+          : 'N/A',
+      )
       .replace('{reasoning}', classification?.reasoning || '无')
-      .replace('{role_prompt}', personaPrompt);
+      .replace('{role_prompt}', personaPrompt)
+      .replace('{user_context}', formatScopedUserContext(state));
 
     // 对于简单寒暄，使用更自然的回复
     if (classification?.intent_type === 'simple_greeting') {
@@ -99,23 +132,14 @@ export const createDirectGeneratorNode = (
       };
     }
 
-    try {
-      const stream = await model.stream(responsePrompt);
+    const stream = await model.stream(responsePrompt);
 
-      return {
-        stream, // Return the stream directly
-        final_response: '', // Will be accumulated by the caller
-        references: [],
-        has_used_rag: false,
-        next_action: 'done',
-      };
-    } catch (error: any) {
-      return {
-        final_response: `生成回答时出错: ${error.message}`,
-        references: [],
-        has_used_rag: false,
-        next_action: 'done',
-      };
-    }
+    return {
+      stream, // Return the stream directly
+      final_response: '', // Will be accumulated by the caller
+      references: [],
+      has_used_rag: false,
+      next_action: 'done',
+    };
   };
 };

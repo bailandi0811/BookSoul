@@ -51,12 +51,28 @@ export const createQueryRewriterNode = (model: ChatOpenAI) => {
   return async (state: AgentState): Promise<Partial<AgentState>> => {
     const intent = state.intent_classification;
 
-    let prompt = ENHANCED_QUERY_REWRITE_PROMPT
-      .replace('{query}', state.query)
+    // Most entity questions are already good retrieval queries. Calling an
+    // LLM here adds latency and used to make the whole chat hang when the
+    // provider was unavailable. Reserve semantic rewriting for truly complex
+    // or retry queries.
+    if (intent?.intent_type !== 'complex_rag' && !state.critique) {
+      return {
+        rewritten_queries: [state.query],
+        current_query_index: 0,
+        retrieved_documents: [],
+        critique: null,
+        next_action: 'retrieve' as const,
+      };
+    }
+
+    let prompt = ENHANCED_QUERY_REWRITE_PROMPT.replace('{query}', state.query)
       .replace('{intent_type}', intent?.intent_type || 'unknown')
       .replace('{rag_likelihood}', intent?.rag_likelihood?.toString() || '0.5')
       .replace('{confidence}', intent?.confidence?.toString() || '0.5')
-      .replace('{novel_entities}', intent?.novel_entities_detected?.join(', ') || '无');
+      .replace(
+        '{novel_entities}',
+        intent?.novel_entities_detected?.join(', ') || '无',
+      );
 
     if (state.critique && !state.critique.is_adequate) {
       prompt += `\n\n【注意】之前的检索结果被评估为不足！
@@ -67,10 +83,26 @@ export const createQueryRewriterNode = (model: ChatOpenAI) => {
 请根据上述评估，尝试一种完全不同的查询改写策略，以检索到更准确的信息。`;
     }
 
-    const queryAnalysis = await model.invoke([
-      { role: 'system', content: prompt },
-      { role: 'user', content: state.query },
-    ]);
+    let queryAnalysis;
+    try {
+      queryAnalysis = await model.invoke(
+        [
+          { role: 'system', content: prompt },
+          { role: 'user', content: state.query },
+        ],
+        { signal: AbortSignal.timeout(15_000) },
+      );
+    } catch {
+      return {
+        rewritten_queries: [
+          state.critique?.suggested_rewrite?.trim() || state.query,
+        ],
+        current_query_index: 0,
+        retrieved_documents: [],
+        critique: null,
+        next_action: 'retrieve' as const,
+      };
+    }
 
     let analysis: QueryAnalysis;
     try {
@@ -86,9 +118,10 @@ export const createQueryRewriterNode = (model: ChatOpenAI) => {
       };
     }
 
-    const queries = analysis.sub_questions.length > 0
-      ? analysis.sub_questions
-      : [analysis.rewritten_query || state.query];
+    const queries =
+      analysis.sub_questions.length > 0
+        ? analysis.sub_questions
+        : [analysis.rewritten_query || state.query];
 
     return {
       rewritten_queries: queries,

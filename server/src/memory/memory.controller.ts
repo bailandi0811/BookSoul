@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, ForbiddenException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  ForbiddenException,
+} from '@nestjs/common';
 import { MemoryService } from './memory.service';
 import { MemoryLevel } from './interfaces/memory.types';
 import { CurrentAuth } from '../auth/decorators/auth-context.decorator';
@@ -6,7 +17,9 @@ import type { AuthContext } from '../auth/auth-context';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import {
   CreateMemoryDto,
+  MemoryListQueryDto,
   SearchMemoryQueryDto,
+  SessionScopeQueryDto,
   UpdateMemoryDto,
   UpdateProfileDto,
 } from './dto/memory.dto';
@@ -17,6 +30,30 @@ export class MemoryController {
   constructor(private readonly memoryService: MemoryService) {}
 
   // ========== User Profile ==========
+
+  @Get('profile')
+  async getCurrentProfile(
+    @Query() query: SessionScopeQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.memoryService.getOrCreateUserProfile(
+      auth.userId,
+      query.sessionId,
+    );
+  }
+
+  @Patch('profile')
+  async updateCurrentProfile(
+    @Query() query: SessionScopeQueryDto,
+    @Body() body: UpdateProfileDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.memoryService.updateUserProfile(
+      auth.userId,
+      query.sessionId,
+      body,
+    );
+  }
 
   @Get('profile/:userId/:sessionId')
   async getProfile(
@@ -40,6 +77,26 @@ export class MemoryController {
   }
 
   // ========== Memory CRUD ==========
+
+  @Get('search')
+  async searchCurrentMemories(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: SearchMemoryQueryDto,
+  ) {
+    return this.memoryService.searchMemories(query.q, auth.userId, query.topK);
+  }
+
+  @Get()
+  async getCurrentMemories(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: MemoryListQueryDto,
+  ) {
+    return this.memoryService.getMemories(
+      auth.userId,
+      query.sessionId,
+      query.level,
+    );
+  }
 
   @Get('search/:userId')
   async searchMemories(

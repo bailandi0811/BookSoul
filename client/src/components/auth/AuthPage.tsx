@@ -8,6 +8,14 @@ interface AuthPageProps {
   onAuthenticated: () => void;
 }
 
+type EditableField = 'name' | 'email' | 'password';
+
+const LOCKED_FIELDS: Record<EditableField, boolean> = {
+  name: false,
+  email: false,
+  password: false,
+};
+
 export function AuthPage({ onAuthenticated }: AuthPageProps) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
@@ -15,7 +23,24 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [editableFields, setEditableFields] = useState(LOCKED_FIELDS);
   const sessionId = useChatStore((state) => state.sessionId);
+
+  const unlockField = (field: EditableField) => {
+    setEditableFields((current) =>
+      current[field] ? current : { ...current, [field]: true },
+    );
+  };
+
+  const changeMode = (nextMode: 'login' | 'register') => {
+    if (nextMode === mode) return;
+    setMode(nextMode);
+    setName('');
+    setEmail('');
+    setPassword('');
+    setEditableFields(LOCKED_FIELDS);
+    setError(null);
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -94,10 +119,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
               <button
                 key={item}
                 type="button"
-                onClick={() => {
-                  setMode(item);
-                  setError(null);
-                }}
+                onClick={() => changeMode(item)}
                 className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                   mode === item
                     ? 'bg-card text-foreground shadow-sm'
@@ -109,15 +131,21 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
             ))}
           </div>
 
-          <form className="space-y-4" onSubmit={submit}>
+          <form className="space-y-4" autoComplete="off" onSubmit={submit}>
             {mode === 'register' && (
               <label className="block space-y-2 text-sm font-medium">
                 <span>名称</span>
                 <input
                   value={name}
                   onChange={(event) => setName(event.target.value)}
+                  onFocus={() => unlockField('name')}
+                  onPointerDown={() => unlockField('name')}
+                  name="booksoul-display-name"
                   maxLength={50}
-                  autoComplete="name"
+                  autoComplete="off"
+                  readOnly={!editableFields.name}
+                  data-1p-ignore
+                  data-lpignore="true"
                   className="w-full rounded-xl border border-input bg-background px-3.5 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary"
                   placeholder="你的称呼"
                 />
@@ -128,9 +156,15 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
               <input
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
+                onFocus={() => unlockField('email')}
+                onPointerDown={() => unlockField('email')}
+                name="booksoul-account-email"
                 type="email"
-                autoComplete="email"
+                autoComplete="off"
                 maxLength={254}
+                readOnly={!editableFields.email}
+                data-1p-ignore
+                data-lpignore="true"
                 className="w-full rounded-xl border border-input bg-background px-3.5 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary"
                 placeholder="reader@example.com"
               />
@@ -140,10 +174,16 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
               <input
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
+                onFocus={() => unlockField('password')}
+                onPointerDown={() => unlockField('password')}
+                name="booksoul-account-secret"
                 type="password"
-                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                autoComplete="new-password"
                 minLength={mode === 'register' ? 8 : 1}
                 maxLength={72}
+                readOnly={!editableFields.password}
+                data-1p-ignore
+                data-lpignore="true"
                 className="w-full rounded-xl border border-input bg-background px-3.5 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary"
                 placeholder={mode === 'register' ? '至少 8 个字符' : '输入密码'}
               />

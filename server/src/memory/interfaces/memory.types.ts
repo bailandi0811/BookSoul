@@ -30,6 +30,10 @@ export interface MemoryMetadata {
   sourceMessage?: string;
   extractReason?: string;
   tags?: string[];
+  source?: 'automatic' | 'manual';
+  occurrences?: number;
+  lastSeenAt?: string;
+  sourceSessionIds?: string[];
   editable: boolean;
   verified: boolean;
 }
@@ -58,4 +62,7 @@ export interface ImportanceScore {
 export interface MemoryUpdateEvent {
   hasNewMemories: boolean;
   memoryCount: number;
+  proposedCount?: number;
+  confirmedCount?: number;
+  updatedCount?: number;
 }
