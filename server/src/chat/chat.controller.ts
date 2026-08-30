@@ -85,6 +85,7 @@ export class ChatController {
       for await (const event of this.chatService.stream(context, body.message, {
         externalResearch: body.externalResearch === true,
         abortSignal: abortController.signal,
+        accountEmail: auth.kind === 'user' ? auth.email : undefined,
       })) {
         if (event.type === 'references') {
           writeEvent({ references: event.data });
@@ -92,6 +93,8 @@ export class ChatController {
           writeEvent({ externalReferences: event.data });
         } else if (event.type === 'content') {
           writeEvent({ content: event.data });
+        } else if (event.type === 'email_draft') {
+          writeEvent({ emailDraft: event.data });
         } else if (event.type === 'memory_update') {
           writeEvent({ memoryUpdate: event.data });
         } else {

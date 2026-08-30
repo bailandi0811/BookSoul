@@ -13,19 +13,17 @@ import {
   type BookChatContext,
   BookSessionsService,
 } from './book-sessions.service';
-import {
-  type ExternalSource,
-  ExternalResearchService,
-} from './external-research.service';
+import { type ExternalSource } from './external-research.service';
 
 export interface ExternalResearchContext {
   requested: boolean;
+  used: boolean;
   sources: ExternalSource[];
   failed: boolean;
 }
 
 export interface BookContextBuildOptions {
-  externalResearch?: boolean;
+  externalResearchContext?: ExternalResearchContext;
   abortSignal?: AbortSignal;
 }
 
@@ -43,6 +41,7 @@ const EMPTY_MEMORY_CONTEXT: AgentMemoryContext = {
 
 const EMPTY_EXTERNAL_RESEARCH: ExternalResearchContext = {
   requested: false,
+  used: false,
   sources: [],
   failed: false,
 };
@@ -56,7 +55,6 @@ export class BookContextService {
     private readonly planner: BookContextPlannerService,
     private readonly retriever: BookChunkRetrieverService,
     private readonly memory: MemoryService,
-    private readonly externalResearchService: ExternalResearchService,
   ) {}
 
   async build(
@@ -80,7 +78,7 @@ export class BookContextService {
     });
     this.throwIfAborted(abortSignal);
 
-    const [retrieved, memoryContext, externalResearch] = await Promise.all([
+    const [retrieved, memoryContext] = await Promise.all([
       plan.bookQueries.length
         ? this.retriever.retrieve(context.boundary, {
             queries: plan.bookQueries,
@@ -98,38 +96,16 @@ export class BookContextService {
             abortSignal,
           )
         : Promise.resolve(EMPTY_MEMORY_CONTEXT),
-      options.externalResearch === true
-        ? this.buildExternalResearch(context.bookTitle, query, abortSignal)
-        : Promise.resolve(EMPTY_EXTERNAL_RESEARCH),
     ]);
     this.throwIfAborted(abortSignal);
+    const externalResearch =
+      options.externalResearchContext ?? EMPTY_EXTERNAL_RESEARCH;
 
     this.logger.debug(
       `Book context assembled planner=${plan.plannerSource}, reason=${plan.reasonCode}, history=${plan.conversationMessages.length}, chunks=${retrieved.length}, memories=${memoryContext.recalledMemoryIds.length}, externalRequested=${externalResearch.requested}, externalSources=${externalResearch.sources.length}, externalFailed=${externalResearch.failed}, chars=${retrieved.reduce((total, item) => total + item.content.length, 0)}, elapsedMs=${Date.now() - startedAt}`,
     );
 
     return { plan, retrieved, memoryContext, externalResearch };
-  }
-
-  private async buildExternalResearch(
-    bookTitle: string,
-    query: string,
-    abortSignal?: AbortSignal,
-  ): Promise<ExternalResearchContext> {
-    try {
-      const sources = await this.externalResearchService.search(
-        `《${bookTitle}》 ${query}`,
-        abortSignal,
-      );
-      this.throwIfAborted(abortSignal);
-      return { requested: true, sources, failed: false };
-    } catch (error) {
-      if (abortSignal?.aborted || this.isAbortError(error)) throw error;
-      this.logger.warn(
-        `External research skipped (type=${this.errorName(error)})`,
-      );
-      return { requested: true, sources: [], failed: true };
-    }
   }
 
   private async buildMemoryContext(
