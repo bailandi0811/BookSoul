@@ -12,9 +12,10 @@ export const createRetrieverNode = (novelSearchTool: Tool, baseTopK = 3) => {
     }
 
     // 动态决定top_k：如果有多个子问题，增加k值
-    const topK = state.rewritten_queries.length > 1
-      ? Math.min(6, baseTopK + state.rewritten_queries.length)
-      : baseTopK;
+    const topK =
+      state.rewritten_queries.length > 1
+        ? Math.min(6, baseTopK + state.rewritten_queries.length)
+        : baseTopK;
 
     try {
       const result = await novelSearchTool.invoke({
@@ -28,14 +29,15 @@ export const createRetrieverNode = (novelSearchTool: Tool, baseTopK = 3) => {
         { query: currentQuery, docs: Array.isArray(docs) ? docs : [] },
       ];
 
-      const hasMore = state.current_query_index < state.rewritten_queries.length - 1;
+      const hasMore =
+        state.current_query_index < state.rewritten_queries.length - 1;
 
       return {
         retrieved_documents: newRetrievedDocs,
         current_query_index: hasMore
           ? state.current_query_index + 1
           : state.current_query_index,
-        next_action: hasMore ? 'retrieve' as const : 'critique' as const,
+        next_action: hasMore ? ('retrieve' as const) : ('critique' as const),
       };
     } catch {
       return {
@@ -44,9 +46,10 @@ export const createRetrieverNode = (novelSearchTool: Tool, baseTopK = 3) => {
           { query: currentQuery, docs: [] },
         ],
         current_query_index: state.current_query_index + 1,
-        next_action: state.current_query_index < state.rewritten_queries.length - 1
-          ? 'retrieve' as const
-          : 'critique' as const,
+        next_action:
+          state.current_query_index < state.rewritten_queries.length - 1
+            ? ('retrieve' as const)
+            : ('critique' as const),
       };
     }
   };

@@ -239,4 +239,65 @@ describe('MemoryService gate, scope, and recall', () => {
     expect(context.text).not.toContain('另一本书');
     expect(context.text).not.toContain('未经确认');
   });
+
+  it('loads only global preferences for preference-only context', async () => {
+    memoryRepo.getForBookContext.mockResolvedValue([
+      baseMemory({ id: 'global-preference', bookId: null }),
+      baseMemory({
+        id: 'global-fact',
+        bookId: null,
+        category: MemoryCategory.FACT,
+        content: '用户事实',
+      }),
+      baseMemory({
+        id: 'book-note',
+        bookId: 'book-a',
+        category: MemoryCategory.OTHER,
+        content: '当前书籍笔记',
+      }),
+    ]);
+
+    const context = await service.buildBookAgentContext(
+      'user-a',
+      'session-a',
+      'book-a',
+      '回答偏好',
+      5,
+      'preferences',
+    );
+
+    expect(context.recalledMemoryIds).toEqual(['global-preference']);
+    expect(context.text).not.toContain('用户事实');
+    expect(context.text).not.toContain('当前书籍笔记');
+  });
+
+  it('prioritizes query-relevant current-book notes before generic importance', async () => {
+    memoryRepo.getForBookContext.mockResolvedValue([
+      baseMemory({
+        id: 'important-but-unrelated',
+        bookId: 'book-a',
+        category: MemoryCategory.OTHER,
+        content: '我关注主角的武功',
+        importance: 0.99,
+      }),
+      baseMemory({
+        id: 'relevant-note',
+        bookId: 'book-a',
+        category: MemoryCategory.OTHER,
+        content: '我怀疑旧友隐藏了身份',
+        importance: 0.5,
+      }),
+    ]);
+
+    const context = await service.buildBookAgentContext(
+      'user-a',
+      'session-a',
+      'book-a',
+      '旧友身份',
+      1,
+      'book_notes',
+    );
+
+    expect(context.recalledMemoryIds).toEqual(['relevant-note']);
+  });
 });

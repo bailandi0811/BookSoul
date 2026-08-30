@@ -15,7 +15,11 @@ export const createHybridRouterNode = () => {
       const maxRetries = state.max_retries;
 
       // 如果检索足够，或达到最大重试次数 → 生成
-      if (is_adequate || confidence >= ROUTING_THRESHOLDS.RAG_MIN || retryCount >= maxRetries) {
+      if (
+        is_adequate ||
+        confidence >= ROUTING_THRESHOLDS.RAG_MIN ||
+        retryCount >= maxRetries
+      ) {
         return { next_action: 'generate' };
       }
 
@@ -29,7 +33,10 @@ export const createHybridRouterNode = () => {
     const intent = state.intent_classification;
     if (intent) {
       // 简单问题置信度很高 → 直接生成
-      if (intent.intent_type === 'simple_greeting' && intent.confidence >= ROUTING_THRESHOLDS.HIGH_CONFIDENCE) {
+      if (
+        intent.intent_type === 'simple_greeting' &&
+        intent.confidence >= ROUTING_THRESHOLDS.HIGH_CONFIDENCE
+      ) {
         return { next_action: 'direct_generate' };
       }
 

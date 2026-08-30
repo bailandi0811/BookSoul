@@ -40,9 +40,15 @@ const CRITIQUE_PROMPT = `你是一个自我反思专家，负责评估检索结�
 - 否则 → is_adequate = false`;
 
 export const createCritiqueAgent = (model: ChatOpenAI) => {
-  return async (query: string, documents: RetrievalDoc[]): Promise<CritiqueResult> => {
+  return async (
+    query: string,
+    documents: RetrievalDoc[],
+  ): Promise<CritiqueResult> => {
     const docsText = documents
-      .map((doc, i) => `[片段${i + 1}]\n书名：${doc.book_name}\n章节：第 ${doc.chapter_num} 章\n内容：${doc.content}`)
+      .map(
+        (doc, i) =>
+          `[片段${i + 1}]\n书名：${doc.book_name}\n章节：第 ${doc.chapter_num} 章\n内容：${doc.content}`,
+      )
       .join('\n\n');
 
     const response = await model.invoke([
@@ -76,7 +82,7 @@ export const createCritiqueNode = (model: ChatOpenAI) => {
   const critiqueAgent = createCritiqueAgent(model);
 
   return async (state: AgentState): Promise<Partial<AgentState>> => {
-    const allDocs = state.retrieved_documents.flatMap(d => d.docs);
+    const allDocs = state.retrieved_documents.flatMap((d) => d.docs);
     const intentType = state.intent_classification?.intent_type;
 
     if (allDocs.length === 0) {
@@ -90,7 +96,10 @@ export const createCritiqueNode = (model: ChatOpenAI) => {
           reasoning: 'No documents retrieved',
         },
         retry_count: nextRetryCount,
-        next_action: nextRetryCount < state.max_retries ? 'rewrite' as const : 'generate' as const,
+        next_action:
+          nextRetryCount < state.max_retries
+            ? ('rewrite' as const)
+            : ('generate' as const),
       };
     }
 

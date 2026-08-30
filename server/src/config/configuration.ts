@@ -55,10 +55,12 @@ export default () => ({
     requestTimeoutMs: Number(process.env.OPENAI_REQUEST_TIMEOUT_MS || 20_000),
   },
   mcp: {
-    amapApiKey: process.env.AMAP_API_KEY,
-    allowedTools: (process.env.MCP_ALLOWED_TOOL_NAMES || '')
+    tavilyUrl: process.env.TAVILY_MCP_URL || 'https://mcp.tavily.com/mcp',
+    tavilyApiKey: process.env.TAVILY_API_KEY?.trim() || undefined,
+    allowedTools: (process.env.MCP_ALLOWED_TOOL_NAMES || 'tavily_search')
       .split(',')
       .map((name) => name.trim())
       .filter(Boolean),
+    toolTimeoutMs: Number(process.env.MCP_TOOL_TIMEOUT_MS || 8_000),
   },
 });

@@ -39,15 +39,22 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
 
   const mode = readingProgress?.mode ?? "NOT_STARTED";
   const currentSectionOrder = readingProgress?.currentSectionOrder ?? 1;
+  const totalSections = currentBook?.sectionCount ?? sections.length;
+  const progressPercent =
+    mode === "FINISHED"
+      ? 100
+      : mode === "IN_PROGRESS" && totalSections > 0
+        ? Math.min(100, Math.round((currentSectionOrder / totalSections) * 100))
+        : 0;
 
   return (
-    <div className="flex h-full w-full flex-col border-r border-border bg-secondary">
-      <div className="border-b border-border/70 p-4">
+    <div className="flex h-full w-full flex-col border-r border-border/80 bg-secondary/80">
+      <div className="border-b border-border/75 p-4">
         <div className="flex items-start justify-between gap-3">
           <button
             type="button"
             onClick={backToLibrary}
-            className="tap-spring inline-flex items-center gap-2 rounded-lg px-1 py-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+            className="tap-spring inline-flex items-center gap-2 rounded-lg px-1 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             返回书架
@@ -55,29 +62,29 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
           <button
             type="button"
             onClick={onClose}
-            className="tap-spring rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="tap-spring rounded-xl p-2 text-muted-foreground hover:bg-card hover:text-foreground"
             aria-label="关闭侧栏"
           >
             <PanelLeftClose className="h-4 w-4" />
           </button>
         </div>
-        <div className="mt-4 flex items-start gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
+        <div className="warm-card mt-4 flex items-center gap-3 rounded-[18px] p-3">
+          <span className="grid h-12 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#a85f4b] to-[#744137] text-[#fff2df] shadow-sm">
             <BookOpen className="h-4 w-4" />
           </span>
           <div className="min-w-0">
-            <h2 className="line-clamp-2 text-sm font-bold leading-snug tracking-tight">
+            <h2 className="font-reading line-clamp-2 text-sm font-semibold leading-snug">
               {currentBook?.title ?? "当前书籍"}
             </h2>
             <p className="mt-1 text-[11px] text-muted-foreground">
-              {currentBook?.sectionCount ?? sections.length} 节
+              {totalSections} 节 · {progressPercent}%
             </p>
           </div>
         </div>
       </div>
 
       <ScrollArea className="flex-1 scrollbar-thin">
-        <div className="space-y-6 p-4">
+        <div className="space-y-5 p-4">
           {workspaceError && (
             <div className="rounded-xl border border-destructive/30 bg-destructive/8 px-3 py-2 text-xs leading-relaxed text-destructive">
               {workspaceError}
@@ -88,7 +95,20 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
             <h3 className="mb-3 text-xs font-semibold text-foreground">
               阅读进度
             </h3>
-            <div className="space-y-2.5 rounded-xl border border-border bg-card p-3">
+            <div className="warm-card space-y-2.5 rounded-[18px] p-3.5">
+              <div
+                role="progressbar"
+                aria-label="阅读进度"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={progressPercent}
+                className="h-1.5 overflow-hidden rounded-full bg-secondary"
+              >
+                <div
+                  className="h-full rounded-full bg-primary transition-[width] duration-300"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
               <label className="grid gap-1.5 text-[11px] font-medium text-muted-foreground">
                 阅读状态
                 <select
@@ -103,7 +123,7 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
                       void updateProgress("IN_PROGRESS", currentSectionOrder);
                     }
                   }}
-                  className="h-9 rounded-lg border border-input bg-background px-2 text-xs text-foreground outline-none focus:border-primary"
+                  className="h-9 rounded-xl border border-input bg-background px-2.5 text-xs text-foreground outline-none focus:border-primary"
                 >
                   <option value="NOT_STARTED">尚未开始</option>
                   <option value="IN_PROGRESS">阅读中</option>
@@ -121,7 +141,7 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
                         Number(event.target.value),
                       )
                     }
-                    className="h-9 rounded-lg border border-input bg-background px-2 text-xs text-foreground outline-none focus:border-primary"
+                    className="h-9 rounded-xl border border-input bg-background px-2.5 text-xs text-foreground outline-none focus:border-primary"
                   >
                     {sections.map((section) => (
                       <option key={section.id} value={section.order}>
@@ -145,7 +165,7 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
                 {sections.length} 节
               </span>
             </div>
-            <div className="max-h-48 space-y-1 overflow-y-auto pr-1 scrollbar-thin">
+            <div className="warm-inset max-h-48 space-y-0.5 overflow-y-auto rounded-[16px] p-1.5 scrollbar-thin">
               {sections.map((section) => {
                 const isCurrent =
                   mode === "IN_PROGRESS" &&
@@ -157,10 +177,10 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
                     onClick={() =>
                       void updateProgress("IN_PROGRESS", section.order)
                     }
-                    className={`w-full rounded-lg px-2.5 py-2 text-left text-xs transition-colors ${
+                    className={`w-full rounded-xl px-2.5 py-2 text-left text-xs transition-colors ${
                       isCurrent
-                        ? "bg-primary/12 font-semibold text-foreground"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        ? "bg-card font-semibold text-foreground shadow-sm"
+                        : "text-muted-foreground hover:bg-card/70 hover:text-foreground"
                     }`}
                   >
                     <span className="mr-2 tabular-nums text-muted-foreground/70">
@@ -190,9 +210,9 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
             </div>
             <div className="space-y-1">
               {isSessionsLoading ? (
-                <div className="h-16 animate-pulse rounded-xl bg-card" />
+                <div className="warm-card h-16 animate-pulse rounded-[16px]" />
               ) : sessions.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+                <p className="rounded-[16px] border border-dashed border-border bg-card/45 px-3 py-4 text-center text-xs text-muted-foreground">
                   提出第一个问题后，会话会保存在这里。
                 </p>
               ) : (
@@ -201,10 +221,10 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
                   return (
                     <div
                       key={session.sessionId}
-                      className={`group flex items-center gap-2 rounded-lg border px-2.5 py-2 ${
+                      className={`group flex items-center gap-2 rounded-[14px] border px-2.5 py-2.5 ${
                         isActive
-                          ? "border-border bg-card text-foreground"
-                          : "border-transparent text-muted-foreground hover:bg-muted"
+                          ? "border-border bg-card text-foreground shadow-sm"
+                          : "border-transparent text-muted-foreground hover:bg-card/65"
                       }`}
                     >
                       <button
@@ -249,7 +269,7 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
         </div>
       </ScrollArea>
 
-      <div className="border-t border-border/70 p-4">
+      <div className="border-t border-border/75 bg-secondary/90 p-4">
         <div className="mb-3">
           <AccountSection />
         </div>

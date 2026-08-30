@@ -37,13 +37,13 @@ function AssistantSettingsForm({
   const [saved, setSaved] = useState(false);
 
   return (
-    <details className="group rounded-xl border border-border/80 bg-card">
-      <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground">
+    <details className="warm-card group rounded-[18px]">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-3.5 py-3 text-sm font-medium text-muted-foreground hover:text-foreground">
         <Settings2 className="h-4 w-4" />
         助手设置
       </summary>
       <form
-        className="space-y-3 border-t border-border/70 p-3"
+        className="space-y-3 border-t border-border/70 p-3.5"
         onSubmit={(event) => {
           event.preventDefault();
           setIsSaving(true);
@@ -66,7 +66,7 @@ function AssistantSettingsForm({
             maxLength={80}
             required
             onChange={(event) => setName(event.target.value)}
-            className="h-9 rounded-lg border border-input bg-background px-3 text-sm font-normal outline-none focus:border-primary"
+            className="h-9 rounded-xl border border-input bg-background px-3 text-sm font-normal outline-none focus:border-primary"
           />
         </label>
 
@@ -80,7 +80,7 @@ function AssistantSettingsForm({
                   event.target.value as "BRIEF" | "BALANCED" | "DEEP",
                 )
               }
-              className="h-9 rounded-lg border border-input bg-background px-2 text-xs font-normal outline-none focus:border-primary"
+              className="h-9 rounded-xl border border-input bg-background px-2 text-xs font-normal outline-none focus:border-primary"
             >
               <option value="BRIEF">简洁</option>
               <option value="BALANCED">适中</option>
@@ -94,7 +94,7 @@ function AssistantSettingsForm({
               onChange={(event) =>
                 setTone(event.target.value as "NATURAL" | "WARM" | "ANALYTICAL")
               }
-              className="h-9 rounded-lg border border-input bg-background px-2 text-xs font-normal outline-none focus:border-primary"
+              className="h-9 rounded-xl border border-input bg-background px-2 text-xs font-normal outline-none focus:border-primary"
             >
               <option value="NATURAL">自然</option>
               <option value="WARM">温和</option>
@@ -111,14 +111,14 @@ function AssistantSettingsForm({
             rows={3}
             placeholder="例如：回答人物关系时先给结论，再列依据"
             onChange={(event) => setCustomInstruction(event.target.value)}
-            className="resize-none rounded-lg border border-input bg-background px-3 py-2 text-xs font-normal leading-relaxed outline-none placeholder:text-muted-foreground/70 focus:border-primary"
+            className="resize-none rounded-xl border border-input bg-background px-3 py-2 text-xs font-normal leading-relaxed outline-none placeholder:text-muted-foreground/70 focus:border-primary"
           />
         </label>
 
         <button
           type="submit"
           disabled={isSaving || !name.trim()}
-          className="tap-spring w-full rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+          className="tap-spring w-full rounded-xl bg-primary px-3 py-2.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
         >
           {isSaving ? "正在保存" : saved ? "已保存" : "保存设置"}
         </button>

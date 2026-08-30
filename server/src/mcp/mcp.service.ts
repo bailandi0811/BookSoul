@@ -1,14 +1,21 @@
 import { Injectable, OnModuleDestroy, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MultiServerMCPClient } from '@langchain/mcp-adapters';
+import {
+  type ClientConfig,
+  MultiServerMCPClient,
+} from '@langchain/mcp-adapters';
+
+export type McpTool = Awaited<
+  ReturnType<MultiServerMCPClient['getTools']>
+>[number];
 
 @Injectable()
 export class McpService implements OnModuleDestroy {
   private mcpClient: MultiServerMCPClient | null = null;
   private readonly logger = new Logger(McpService.name);
-  private cachedTools: any[] | null = null;
+  private cachedTools: McpTool[] | null = null;
   private toolsCachedAt = 0;
-  private toolsLoadPromise: Promise<any[]> | null = null;
+  private toolsLoadPromise: Promise<McpTool[]> | null = null;
   private readonly TOOLS_CACHE_TTL_MS = 5 * 60 * 1000;
 
   constructor(private configService: ConfigService) {}
@@ -18,17 +25,28 @@ export class McpService implements OnModuleDestroy {
       return this.mcpClient;
     }
 
-    const mcpServers: Record<string, { url: string }> = {};
+    const mcpServers: ClientConfig['mcpServers'] = {};
 
-    const amapApiKey = this.configService.get<string>('mcp.amapApiKey');
-    if (amapApiKey) {
-      mcpServers['amap-maps-streamableHTTP'] = {
-        url: `https://mcp.amap.com/mcp?key=${amapApiKey}`,
+    const tavilyApiKey = this.configService.get<string>('mcp.tavilyApiKey');
+    if (tavilyApiKey) {
+      mcpServers.tavily = {
+        transport: 'http',
+        url:
+          this.configService.get<string>('mcp.tavilyUrl') ||
+          'https://mcp.tavily.com/mcp',
+        headers: {
+          Authorization: `Bearer ${tavilyApiKey}`,
+        },
+        defaultToolTimeout:
+          this.configService.get<number>('mcp.toolTimeoutMs') || 8_000,
       };
     }
 
     this.mcpClient = new MultiServerMCPClient({
-      mcpServers: mcpServers,
+      throwOnLoadError: true,
+      useStandardContentBlocks: true,
+      prefixToolNameWithServerName: false,
+      mcpServers,
     });
 
     this.logger.log(
@@ -37,22 +55,29 @@ export class McpService implements OnModuleDestroy {
     return this.mcpClient;
   }
 
-  async getMcpTools(): Promise<any[]> {
+  async getMcpTools(): Promise<McpTool[]> {
     const allowedToolNames = new Set(
       this.configService.get<string[]>('mcp.allowedTools') ?? [],
     );
     if (allowedToolNames.size === 0) {
-      this.logger.debug('MCP tools are disabled because the allowlist is empty');
+      this.logger.debug(
+        'MCP tools are disabled because the allowlist is empty',
+      );
       return [];
     }
 
-    if (!this.configService.get<string>('mcp.amapApiKey')) {
-      this.logger.warn('MCP tool allowlist is set, but no MCP server is configured');
+    if (!this.configService.get<string>('mcp.tavilyApiKey')) {
+      this.logger.warn(
+        'MCP tool allowlist is set, but no MCP server is configured',
+      );
       return [];
     }
 
     const now = Date.now();
-    if (this.cachedTools && now - this.toolsCachedAt < this.TOOLS_CACHE_TTL_MS) {
+    if (
+      this.cachedTools &&
+      now - this.toolsCachedAt < this.TOOLS_CACHE_TTL_MS
+    ) {
       return this.cachedTools;
     }
 
@@ -68,10 +93,13 @@ export class McpService implements OnModuleDestroy {
         );
         this.cachedTools = tools;
         this.toolsCachedAt = Date.now();
-        this.logger.log(`Loaded ${tools.length} tools: ${tools.map((t) => t.name).join(', ')}`);
+        this.logger.log(
+          `Loaded ${tools.length} tools: ${tools.map((t) => t.name).join(', ')}`,
+        );
         return tools;
       } catch (error) {
-        this.logger.error('Failed to load MCP tools:', error);
+        const errorType = error instanceof Error ? error.name : 'UnknownError';
+        this.logger.error(`Failed to load MCP tools (type=${errorType})`);
         return [];
       } finally {
         this.toolsLoadPromise = null;

@@ -17,29 +17,25 @@ export const ReferenceCard = ({ references }: ReferenceCardProps) => {
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
-      className="mt-3"
+      className="w-full"
     >
       <motion.button
         type="button"
         whileHover={{ y: -1 }}
         whileTap={{ scale: 0.98 }}
         onClick={() => setIsExpanded(!isExpanded)}
-        className={`
-          flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium
-          transition-all duration-200 border border-border
-          ${
-            isExpanded
-              ? "bg-secondary text-foreground"
-              : "bg-secondary/80 text-muted-foreground hover:text-foreground"
-          }
-        `}
+        className={`warm-inset flex w-full items-center gap-2 rounded-[14px] px-3.5 py-2.5 text-left text-xs font-medium transition-colors ${
+          isExpanded
+            ? "text-foreground"
+            : "text-muted-foreground hover:text-foreground"
+        }`}
       >
         <BookOpen className="w-3.5 h-3.5" />
         <span>
           引用第 {references[0]?.sectionOrder} 节「{references[0]?.sectionTitle}
           」{references.length > 1 ? `等 ${references.length} 处` : ""}
         </span>
-        <div className="ml-auto">
+        <div className="ml-auto shrink-0">
           {isExpanded ? (
             <ChevronUp className="w-4 h-4" />
           ) : (
@@ -64,15 +60,15 @@ export const ReferenceCard = ({ references }: ReferenceCardProps) => {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.05 }}
-                  className="bg-secondary/80 rounded-xl p-3.5 border border-border"
+                  className="warm-inset rounded-[14px] p-3.5"
                 >
-                  <div className="flex items-center gap-1.5 text-muted-foreground mb-2">
+                  <div className="mb-2 flex items-center gap-1.5 text-muted-foreground">
                     <FileText className="w-3.5 h-3.5" />
                     <span className="text-xs font-medium">
                       第 {ref.sectionOrder} 节 · {ref.sectionTitle}
                     </span>
                   </div>
-                  <p className="text-[13px] text-muted-foreground leading-relaxed line-clamp-3">
+                  <p className="font-reading line-clamp-4 text-[13px] leading-relaxed text-foreground/75">
                     {ref.excerpt}
                   </p>
                 </motion.div>

@@ -18,7 +18,8 @@ export const createNovelSearchTool = (
 
         // 2. Search Milvus with dynamic k
         const searchResult = await milvusService.getClient().search({
-          collection_name: configService.get<string>('milvus.collectionName') || 'ebook',
+          collection_name:
+            configService.get<string>('milvus.collectionName') || 'ebook',
           vector: queryVector,
           limit: top_k,
           metric_type: MetricType.COSINE,
@@ -38,7 +39,11 @@ export const createNovelSearchTool = (
 - top_k: 返回结果数量（默认3，复杂问题可增加到5-10）`,
       schema: z.object({
         query: z.string().describe('搜索查询，描述要查找的小说内容'),
-        top_k: z.number().optional().default(3).describe('返回的最相关片段数量（1-10）'),
+        top_k: z
+          .number()
+          .optional()
+          .default(3)
+          .describe('返回的最相关片段数量（1-10）'),
       }),
     },
   );

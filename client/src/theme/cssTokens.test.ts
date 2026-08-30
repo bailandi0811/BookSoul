@@ -5,14 +5,16 @@ import { resolve } from "node:path";
 
 const css = readFileSync(resolve(__dirname, "../index.css"), "utf8");
 
-describe("claude-style css tokens", () => {
-  it("uses coral primary and ivory background in :root", () => {
-    expect(css).toMatch(/--primary:\s*217\s+119\s+87/);
-    expect(css).toMatch(/--background:\s*250\s+249\s+245/);
-    expect(css).toMatch(/--foreground:\s*20\s+20\s+19/);
+describe("cream reading-room css tokens", () => {
+  it("uses terracotta primary and cream paper colors in :root", () => {
+    expect(css).toMatch(/--primary:\s*168\s+73\s+49/);
+    expect(css).toMatch(/--background:\s*247\s+242\s+233/);
+    expect(css).toMatch(/--foreground:\s*45\s+39\s+34/);
   });
 
-  it("does not keep vermillion primary as default", () => {
-    expect(css).not.toMatch(/--primary:\s*166\s+45\s+45/);
+  it("defines warm surface layers and a reading typeface", () => {
+    expect(css).toMatch(/--surface-soft:\s*249\s+240\s+227/);
+    expect(css).toMatch(/--surface-tint:\s*246\s+226\s+211/);
+    expect(css).toContain("--font-reading:");
   });
 });

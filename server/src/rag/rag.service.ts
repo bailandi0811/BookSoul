@@ -10,23 +10,30 @@ import { Response } from 'express';
 const PERSONAS: Record<string, any> = {
   assistant: {
     role: '专业的《天龙八部》小说助手',
-    style: '用准确、详细的语言回答问题，同时作为一位精通地理的现实向导，积极进行古今对照。',
-    instruction: '回答要准确，符合小说的情节和人物设定。保持沉浸感，将现实地理信息自然融入到武侠叙述中。',
+    style:
+      '用准确、详细的语言回答问题，同时作为一位精通地理的现实向导，积极进行古今对照。',
+    instruction:
+      '回答要准确，符合小说的情节和人物设定。保持沉浸感，将现实地理信息自然融入到武侠叙述中。',
   },
   qiaofeng: {
     role: '丐帮帮主乔峰（萧峰）',
-    style: "豪迈、直爽，称呼用户为'兄弟'或'朋友'。言语间透着英雄气概，喜谈酒量与武功。",
-    instruction: "以乔峰的口吻回答。回答要直接、痛快，不要拖泥带水。遇到地理问题，可以说'当年我在此地...'，并自然地补充现实世界的地理情况。如果不知道，就直说'这地方我不曾去过'。",
+    style:
+      "豪迈、直爽，称呼用户为'兄弟'或'朋友'。言语间透着英雄气概，喜谈酒量与武功。",
+    instruction:
+      "以乔峰的口吻回答。回答要直接、痛快，不要拖泥带水。遇到地理问题，可以说'当年我在此地...'，并自然地补充现实世界的地理情况。如果不知道，就直说'这地方我不曾去过'。",
   },
   duanyu: {
     role: '大理世子段誉',
-    style: "温文尔雅，满口'之乎者也'，称呼用户为'兄台'或'姑娘'。三句话不离'神仙姐姐'。",
-    instruction: '以段誉的口吻回答。性格痴情、善良，讨厌打打杀杀。回答问题时多引经据典，但不要过于啰嗦。对于地理位置，可以感叹其山水之美。',
+    style:
+      "温文尔雅，满口'之乎者也'，称呼用户为'兄台'或'姑娘'。三句话不离'神仙姐姐'。",
+    instruction:
+      '以段誉的口吻回答。性格痴情、善良，讨厌打打杀杀。回答问题时多引经据典，但不要过于啰嗦。对于地理位置，可以感叹其山水之美。',
   },
   wangyuyan: {
     role: '曼陀山庄王语嫣',
     style: "温婉知性，对天下武功了如指掌，称呼用户为'公子'。",
-    instruction: '以王语嫣的口吻回答。分析问题时条理清晰，喜欢点评武学招式。回答要切中要害，展现你的博学。',
+    instruction:
+      '以王语嫣的口吻回答。分析问题时条理清晰，喜欢点评武学招式。回答要切中要害，展现你的博学。',
   },
 };
 
@@ -69,7 +76,8 @@ export class RagService {
     try {
       const queryVector = await this.getEmbedding(question);
       const searchResult = await this.milvusService.getClient().search({
-        collection_name: this.configService.get<string>('milvus.collectionName') || 'ebook',
+        collection_name:
+          this.configService.get<string>('milvus.collectionName') || 'ebook',
         vector: queryVector,
         limit: k,
         metric_type: MetricType.COSINE,
@@ -82,7 +90,12 @@ export class RagService {
     }
   }
 
-  async generateResponseStream(question: string, context: string, res: Response, character = 'assistant') {
+  async generateResponseStream(
+    question: string,
+    context: string,
+    res: Response,
+    character = 'assistant',
+  ) {
     const persona = PERSONAS[character] || PERSONAS.assistant;
 
     const prompt = `
@@ -124,7 +137,7 @@ ${persona.role}的回答:
     try {
       const mcpTools = await this.mcpService.getMcpTools();
       const tools = [...mcpTools];
-      
+
       let stream;
 
       if (tools.length > 0) {
@@ -135,7 +148,9 @@ ${persona.role}的回答:
         const response = await modelWithTools.invoke(messages);
 
         if (response.tool_calls && response.tool_calls.length > 0) {
-          this.logger.log(`Tool calls detected: ${response.tool_calls.map((t: any) => t.name).join(', ')}`);
+          this.logger.log(
+            `Tool calls detected: ${response.tool_calls.map((t: any) => t.name).join(', ')}`,
+          );
           messages.push(response);
 
           for (const toolCall of response.tool_calls) {
@@ -144,7 +159,10 @@ ${persona.role}的回答:
               this.logger.log(`Executing tool ${tool.name}...`);
               try {
                 const toolResult = await tool.invoke(toolCall.args);
-                const contentStr = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
+                const contentStr =
+                  typeof toolResult === 'string'
+                    ? toolResult
+                    : JSON.stringify(toolResult);
 
                 messages.push(
                   new ToolMessage({
@@ -162,7 +180,9 @@ ${persona.role}的回答:
                 );
               }
             } else {
-              this.logger.warn(`Tool ${toolCall.name} not found in available tools.`);
+              this.logger.warn(
+                `Tool ${toolCall.name} not found in available tools.`,
+              );
               messages.push(
                 new ToolMessage({
                   content: `Error: Tool ${toolCall.name} not found`,
@@ -190,7 +210,9 @@ ${persona.role}的回答:
       res.end();
     } catch (error) {
       this.logger.error('Error generating response:', error);
-      res.write(`data: ${JSON.stringify({ error: 'Error generating response' })}\n\n`);
+      res.write(
+        `data: ${JSON.stringify({ error: 'Error generating response' })}\n\n`,
+      );
       res.end();
     }
   }

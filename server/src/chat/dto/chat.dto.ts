@@ -19,4 +19,8 @@ export class ChatDto {
   @IsOptional()
   @IsBoolean()
   spoilerOverride?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  externalResearch?: boolean;
 }
