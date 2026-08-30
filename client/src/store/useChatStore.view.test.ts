@@ -17,6 +17,7 @@ describe("book-scoped chat state", () => {
       messages: [],
       draftInput: "",
       lastStopNotice: null,
+      pendingEmailDraft: null,
       sessionId: null,
       sessions: [],
       isLoading: false,
@@ -123,6 +124,38 @@ describe("book-scoped chat state", () => {
           snippet: "摘要",
         },
       ],
+    );
+  });
+
+  it("opens the confirmation dialog from a model email tool event", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (input === "/api/chat") {
+        return new Response(
+          'data: {"content":"邮件草稿已准备好。"}\n\ndata: {"emailDraft":{"to":"reader@example.com","subject":"阅读笔记","text":"正文"}}\n\ndata: [DONE]\n\n',
+          {
+            status: 200,
+            headers: { "Content-Type": "text/event-stream" },
+          },
+        );
+      }
+      return success([]);
+    });
+    useChatStore.setState({
+      currentBookId: "book-a",
+      sessionId: "server-session",
+    });
+
+    await useChatStore
+      .getState()
+      .sendMessage("把刚才的回答发到我的邮箱");
+
+    expect(useChatStore.getState().pendingEmailDraft).toEqual({
+      to: "reader@example.com",
+      subject: "阅读笔记",
+      text: "正文",
+    });
+    expect(useChatStore.getState().messages.at(-1)?.content).toBe(
+      "邮件草稿已准备好。",
     );
   });
 

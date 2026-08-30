@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { MessageBubble } from "./components/MessageBubble";
 import { InputArea } from "./components/InputArea";
 import { Sidebar } from "./components/Sidebar";
+import { EmailComposerDialog } from "./components/EmailComposerDialog";
 
 const SIDEBAR_WIDTH_KEY = "booksoul_sidebar_width";
 const SIDEBAR_MIN = 280;
@@ -38,6 +39,8 @@ export default function BookChat() {
   const isLoading = useChatStore((state) => state.isLoading);
   const sendMessage = useChatStore((state) => state.sendMessage);
   const startNewSession = useChatStore((state) => state.startNewSession);
+  const pendingEmailDraft = useChatStore((state) => state.pendingEmailDraft);
+  const closeEmailDraft = useChatStore((state) => state.closeEmailDraft);
   const currentBook = useBooksStore((state) => state.currentBook);
   const assistant = useBooksStore((state) => state.assistant);
   const readingProgress = useBooksStore((state) => state.readingProgress);
@@ -317,6 +320,12 @@ export default function BookChat() {
           <InputArea />
         </div>
       </div>
+      {pendingEmailDraft && (
+        <EmailComposerDialog
+          draft={pendingEmailDraft}
+          onClose={closeEmailDraft}
+        />
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { apiFetch, readApiError } from "@/lib/api";
 import { useMemoryStore } from "@/store/useMemoryStore";
+import type { EmailDraft } from "@/lib/email-draft";
 
 export interface Reference {
   bookId: string;
@@ -53,6 +54,7 @@ interface ChatState {
   currentBookId: string | null;
   draftInput: string;
   lastStopNotice: string | null;
+  pendingEmailDraft: EmailDraft | null;
   messages: Message[];
   isLoading: boolean;
   sessionId: string | null;
@@ -65,6 +67,8 @@ interface ChatState {
   finishStreaming: (requestId?: string) => void;
   setThinking: (isThinking: boolean, text?: string, requestId?: string) => void;
   setDraftInput: (value: string) => void;
+  openEmailDraft: (draft: EmailDraft) => void;
+  closeEmailDraft: () => void;
   clearStopNotice: () => void;
   stopGenerating: () => void;
   prepareBook: (bookId: string) => Promise<void>;
@@ -93,6 +97,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   currentBookId: null,
   draftInput: "",
   lastStopNotice: null,
+  pendingEmailDraft: null,
   messages: [],
   isLoading: false,
   sessionId: null,
@@ -161,6 +166,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }),
 
   setDraftInput: (value) => set({ draftInput: value }),
+  openEmailDraft: (draft) =>
+    set({ pendingEmailDraft: draft, lastStopNotice: null }),
+  closeEmailDraft: () => set({ pendingEmailDraft: null }),
   clearStopNotice: () => set({ lastStopNotice: null }),
 
   stopGenerating: () => {
@@ -181,6 +189,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       messages: [],
       draftInput: "",
       lastStopNotice: null,
+      pendingEmailDraft: null,
       isLoading: false,
       abortController: null,
       activeRequestId: null,
@@ -195,6 +204,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       currentBookId: null,
       draftInput: "",
       lastStopNotice: null,
+      pendingEmailDraft: null,
       messages: [],
       isLoading: false,
       sessionId: null,
@@ -239,6 +249,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         sessionId: session.sessionId,
         messages: [],
         lastStopNotice: null,
+        pendingEmailDraft: null,
         sessions: [
           session,
           ...state.sessions.filter(
@@ -284,6 +295,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       sessionId,
       messages: [],
       lastStopNotice: null,
+      pendingEmailDraft: null,
     });
     try {
       const messages = await readData<Message[]>(
@@ -419,6 +431,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 references?: Reference[];
                 externalReferences?: ExternalReference[];
                 content?: string;
+                emailDraft?: EmailDraft;
                 memoryUpdate?: MemoryUpdateData;
               };
               if (data.error) throw new Error(data.error);
@@ -472,6 +485,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
                   bufferedContent += data.content;
                   scheduleContentFlush();
                 }
+              }
+              if (data.emailDraft) {
+                set((state) =>
+                  state.activeRequestId === requestId
+                    ? {
+                        pendingEmailDraft: data.emailDraft,
+                        lastStopNotice: null,
+                      }
+                    : state,
+                );
               }
               if (data.memoryUpdate) {
                 useMemoryStore.getState().handleMemoryUpdate(data.memoryUpdate);

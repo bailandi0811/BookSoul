@@ -10,14 +10,12 @@ import {
   type BookChatContext,
   BookSessionsService,
 } from './book-sessions.service';
-import { ExternalResearchService } from './external-research.service';
 
 describe('BookContextService', () => {
   let sessions: { getRecentMessages: jest.Mock };
   let planner: { plan: jest.Mock };
   let retriever: { retrieve: jest.Mock };
   let memory: { buildBookAgentContext: jest.Mock };
-  let externalResearch: { search: jest.Mock };
   let service: BookContextService;
 
   beforeEach(() => {
@@ -30,13 +28,11 @@ describe('BookContextService', () => {
         recalledMemoryIds: [],
       }),
     };
-    externalResearch = { search: jest.fn().mockResolvedValue([]) };
     service = new BookContextService(
       sessions as unknown as BookSessionsService,
       planner as unknown as BookContextPlannerService,
       retriever as unknown as BookChunkRetrieverService,
       memory as unknown as MemoryService,
-      externalResearch as unknown as ExternalResearchService,
     );
   });
 
@@ -60,7 +56,6 @@ describe('BookContextService', () => {
       maxPerSection: 4,
     });
     expect(memory.buildBookAgentContext).not.toHaveBeenCalled();
-    expect(externalResearch.search).not.toHaveBeenCalled();
   });
 
   it('loads only the memory scope selected by the plan', async () => {
@@ -105,6 +100,7 @@ describe('BookContextService', () => {
     expect(result.memoryContext).toEqual({ text: '', recalledMemoryIds: [] });
     expect(result.externalResearch).toEqual({
       requested: false,
+      used: false,
       sources: [],
       failed: false,
     });
@@ -122,42 +118,28 @@ describe('BookContextService', () => {
     expect(retriever.retrieve).toHaveBeenCalledTimes(1);
   });
 
-  it('calls external research only when the user explicitly enables it', async () => {
-    externalResearch.search.mockResolvedValue([
-      {
-        title: '典故来源',
-        url: 'https://example.com/source',
-        snippet: '这是一段现实背景资料。',
-      },
-    ]);
-
+  it('carries only the precomputed agent tool context into the bundle', async () => {
     const result = await service.build(context(), '查一下这个典故', {
-      externalResearch: true,
-    });
-
-    expect(externalResearch.search).toHaveBeenCalledWith(
-      '《长夜行》 查一下这个典故',
-      undefined,
-    );
-    expect(result.externalResearch).toEqual({
-      requested: true,
-      sources: [expect.objectContaining({ url: 'https://example.com/source' })],
-      failed: false,
-    });
-  });
-
-  it('keeps scoped book retrieval usable when external research fails', async () => {
-    externalResearch.search.mockRejectedValue(new Error('provider failed'));
-
-    const result = await service.build(context(), '查一下现实背景', {
-      externalResearch: true,
+      externalResearchContext: {
+        requested: true,
+        used: true,
+        sources: [
+          {
+            title: '典故来源',
+            url: 'https://example.com/source',
+            snippet: '这是一段现实背景资料。',
+          },
+        ],
+        failed: false,
+      },
     });
 
     expect(retriever.retrieve).toHaveBeenCalledTimes(1);
     expect(result.externalResearch).toEqual({
       requested: true,
-      sources: [],
-      failed: true,
+      used: true,
+      sources: [expect.objectContaining({ url: 'https://example.com/source' })],
+      failed: false,
     });
   });
 

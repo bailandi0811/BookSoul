@@ -54,13 +54,15 @@ npm run test:db
 
 填写 `TAVILY_API_KEY` 即会启用 Tavily 远程 MCP。`TAVILY_MCP_URL`、`MCP_ALLOWED_TOOL_NAMES` 和 `MCP_TOOL_TIMEOUT_MS` 已有默认值；当前只允许只读的 `tavily_search`，不开放 extract、crawl、map 或写工具。Key 只能通过密钥管理或 `.env` 注入，不要放入 URL、日志或仓库。
 
-联网检索必须由用户在当次请求显式设置 `externalResearch: true`。外部服务只接收当前问题和必要书名，不接收小说正文、会话历史、用户记忆、owner 或 book id。返回内容按不可信资料清洗与限长，并与书内章节引用分开返回。
+联网检索必须由用户在当次请求显式设置 `externalResearch: true`。该字段只授予本轮权限：模型先在只含当前问题与必要书名的隔离上下文中自行决定是否调用一次 `tavily_search`，服务端再验证工具名与参数并执行 MCP。小说正文、会话历史、用户记忆、owner 和 book id 不进入工具决策或搜索请求。返回内容按不可信资料清洗与限长，通过 `ToolMessage` 交回模型，并与书内章节引用分开返回。
 
 ### 可选邮件发送
 
 如需在聊天回答上使用“发送到邮箱”，配置 `SMTP_USER`、`SMTP_PASS` 和 `SMTP_FROM`；非 QQ 邮箱还需设置 `SMTP_HOST`、`SMTP_PORT` 与 `SMTP_SECURE`。密码应使用邮件服务商的 SMTP 授权码，不要提交到仓库。
 
-`POST /api/tools/email` 只接受 JWT 登录用户，要求请求体携带 `confirmed: true`，并限制为每来源每分钟 5 次。客户端会先展示可编辑草稿，只在用户点击“确认并发送”后调用该接口；模型和小说正文不能自行触发邮件。
+聊天模型仅在当前用户消息明确要求发送邮件时获得 `prepare_email` 工具。模型负责生成结构化的收件人、主题和纯文本正文，工具只通过 SSE 返回可编辑草稿；小说正文、外部资料、记忆和历史消息不能授予工具权限，显式收件人在进入检索前会被脱敏。
+
+`POST /api/tools/email` 只接受 JWT 登录用户，要求请求体携带 `confirmed: true`，并限制为每来源每分钟 5 次。无论草稿来自回复邮件按钮还是模型工具，只有用户点击“确认并发送”后才调用该接口；模型不能直接执行 SMTP 投递。
 
 ## 迁移
 
