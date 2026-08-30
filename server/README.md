@@ -18,6 +18,7 @@ npm run check
 
 - 登录和注册返回 `{ accessToken, user }`，同时设置 `booksoul_refresh` HttpOnly Cookie。
 - `POST /api/auth/refresh` 与 `POST /api/auth/logout` 从 Cookie 读取刷新令牌。
+- Access Token 默认 15 分钟；过期后客户端用 Refresh Token 静默轮换，不应要求重新登录。Refresh Token 默认滚动有效 7 天，连续 7 天未使用或令牌被吊销后才需要重新登录。
 - 私人书籍接口使用 `Authorization: Bearer <access-token>`。
 - owner 始终来自服务端认证上下文；聊天请求只接受 `sessionId`、`message` 与单次 `spoilerOverride`。
 - session 在服务端反查 assistant、book、owner、embedding version 与 spoiler ceiling。

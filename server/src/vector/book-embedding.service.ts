@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { OpenAIEmbeddings } from '@langchain/openai';
 import { IngestionError } from '../ingestion/errors/ingestion-error';
 
+const DASHSCOPE_EMBEDDING_BATCH_LIMIT = 10;
+
 @Injectable()
 export class BookEmbeddingService {
   private readonly logger = new Logger(BookEmbeddingService.name);
@@ -12,8 +14,13 @@ export class BookEmbeddingService {
   private readonly retryBaseMs: number;
 
   constructor(configService: ConfigService) {
-    const batchSize =
+    const configuredBatchSize =
       configService.get<number>('books.embeddingBatchSize') || 32;
+    const baseUrl = configService.get<string>('openai.baseUrl');
+    const requestBatchSize = this.resolveRequestBatchSize(
+      configuredBatchSize,
+      baseUrl,
+    );
     this.vectorDim = configService.get<number>('milvus.vectorDim') || 1_024;
     this.maxAttempts =
       configService.get<number>('books.embeddingMaxAttempts') || 3;
@@ -25,11 +32,11 @@ export class BookEmbeddingService {
         configService.get<string>('openai.embeddingModel') ||
         'text-embedding-3-small',
       dimensions: this.vectorDim,
-      batchSize,
+      batchSize: requestBatchSize,
       timeout: configService.get<number>('openai.requestTimeoutMs') || 20_000,
       maxRetries: 0,
       configuration: {
-        baseURL: configService.get<string>('openai.baseUrl'),
+        baseURL: baseUrl,
       },
     });
   }
@@ -50,17 +57,81 @@ export class BookEmbeddingService {
         return vectors;
       } catch (error) {
         lastError = error;
-        if (attempt >= this.maxAttempts) break;
-        this.logger.warn(`Embedding batch attempt ${attempt} failed; retrying`);
+        const summary = this.safeErrorSummary(error);
+        if (attempt >= this.maxAttempts || !this.isRetryable(error)) {
+          this.logger.error(`Embedding batch failed (${summary})`);
+          break;
+        }
+        this.logger.warn(
+          `Embedding batch attempt ${attempt}/${this.maxAttempts} failed (${summary}); retrying`,
+        );
         await this.delay(this.retryBaseMs * 2 ** (attempt - 1));
       }
     }
 
     throw new IngestionError(
       'EMBEDDING_UNAVAILABLE',
-      '暂时无法生成小说索引，请稍后重试',
+      this.safeFailureMessage(lastError),
       { cause: lastError },
     );
+  }
+
+  private resolveRequestBatchSize(
+    configuredBatchSize: number,
+    baseUrl: string | undefined,
+  ): number {
+    if (!baseUrl) return configuredBatchSize;
+    try {
+      const hostname = new URL(baseUrl).hostname.toLowerCase();
+      const isDashScope =
+        hostname === 'dashscope.aliyuncs.com' ||
+        hostname.endsWith('.maas.aliyuncs.com');
+      return isDashScope
+        ? Math.min(configuredBatchSize, DASHSCOPE_EMBEDDING_BATCH_LIMIT)
+        : configuredBatchSize;
+    } catch {
+      return configuredBatchSize;
+    }
+  }
+
+  private isRetryable(error: unknown): boolean {
+    const status = this.errorStatus(error);
+    if (status !== null) {
+      return status === 408 || status === 409 || status === 429 || status >= 500;
+    }
+    return this.errorName(error) !== 'AbortError';
+  }
+
+  private safeFailureMessage(error: unknown): string {
+    const status = this.errorStatus(error);
+    if (status === 400 || status === 404) {
+      return '向量模型配置不兼容，请检查模型名称、维度和批次设置';
+    }
+    if (status === 401 || status === 403) {
+      return '向量服务认证失败，请检查模型服务配置';
+    }
+    if (status === 429) {
+      return '向量服务请求过多，请稍后重试';
+    }
+    return '暂时无法生成小说索引，请稍后重试';
+  }
+
+  private safeErrorSummary(error: unknown): string {
+    const status = this.errorStatus(error);
+    const name = this.errorName(error);
+    return status === null ? `type=${name}` : `status=${status}, type=${name}`;
+  }
+
+  private errorStatus(error: unknown): number | null {
+    if (!error || typeof error !== 'object' || !('status' in error)) {
+      return null;
+    }
+    return typeof error.status === 'number' ? error.status : null;
+  }
+
+  private errorName(error: unknown): string {
+    if (error instanceof Error && error.name) return error.name;
+    return 'UnknownError';
   }
 
   private validateVectors(vectors: number[][], expectedCount: number): void {

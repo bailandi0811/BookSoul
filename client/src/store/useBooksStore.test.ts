@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { BookAssistant, BookView, ReadingProgress } from "@/lib/books-api";
+import type {
+  BookAssistant,
+  BookUploadProgress,
+  BookView,
+  ReadingProgress,
+} from "@/lib/books-api";
 
 const apiMocks = vi.hoisted(() => ({
   listBooks: vi.fn(),
@@ -94,6 +99,48 @@ describe("private bookshelf state", () => {
     ).resolves.toBe(true);
 
     expect(useBooksStore.getState().books[0]).toEqual(queued);
+  });
+
+  it("exposes byte progress while a file is uploading", async () => {
+    const queued = { ...readyBook, id: "book-new", status: "QUEUED" as const };
+    let finishUpload: ((book: BookView) => void) | undefined;
+    apiMocks.uploadBook.mockImplementation(
+      (
+        _file: File,
+        onProgress?: (progress: BookUploadProgress) => void,
+      ) => {
+        onProgress?.({
+          loadedBytes: 512,
+          totalBytes: 1024,
+          percent: 50,
+        });
+        return new Promise<BookView>((resolve) => {
+          finishUpload = resolve;
+        });
+      },
+    );
+
+    const upload = useBooksStore
+      .getState()
+      .uploadBook(new File(["novel"], "novel.txt", { type: "text/plain" }));
+
+    expect(useBooksStore.getState()).toMatchObject({
+      isUploading: true,
+      uploadFileName: "novel.txt",
+      uploadProgress: {
+        loadedBytes: 512,
+        totalBytes: 1024,
+        percent: 50,
+      },
+    });
+
+    finishUpload?.(queued);
+    await expect(upload).resolves.toBe(true);
+    expect(useBooksStore.getState()).toMatchObject({
+      isUploading: false,
+      uploadFileName: null,
+      uploadProgress: null,
+    });
   });
 
   it("opens a ready book and prepares only that book session scope", async () => {

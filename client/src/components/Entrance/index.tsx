@@ -17,7 +17,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 
 const PROCESSING_STATUSES: BookStatus[] = [
@@ -38,6 +38,7 @@ const STATUS_LABELS: Record<BookStatus, string> = {
 };
 
 function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 KB";
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
@@ -55,6 +56,8 @@ export function Entrance() {
     books,
     isLoading,
     isUploading,
+    uploadFileName,
+    uploadProgress,
     mutatingBookIds,
     error,
     fetchBooks,
@@ -67,6 +70,7 @@ export function Entrance() {
   const [isDragging, setIsDragging] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<BookView | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
     void fetchBooks();
@@ -83,7 +87,7 @@ export function Entrance() {
   }, [fetchBooks, hasProcessingBooks]);
 
   const submitFile = async (file: File | undefined) => {
-    if (!file) return;
+    if (!file || isUploading) return;
     setFileError(null);
     const validationError = validateBookUpload(file);
     if (validationError) {
@@ -93,6 +97,8 @@ export function Entrance() {
     await uploadBook(file);
     if (inputRef.current) inputRef.current.value = "";
   };
+
+  const uploadPercent = uploadProgress?.percent ?? 0;
 
   return (
     <main className="min-h-[100dvh] bg-background text-foreground">
@@ -133,9 +139,12 @@ export function Entrance() {
           </div>
 
           <motion.label
-            whileTap={{ scale: 0.995 }}
+            whileTap={isUploading ? undefined : { scale: 0.995 }}
+            aria-busy={isUploading}
+            aria-disabled={isUploading}
             onDragEnter={(event) => {
               event.preventDefault();
+              if (isUploading) return;
               setIsDragging(true);
             }}
             onDragOver={(event) => event.preventDefault()}
@@ -143,12 +152,15 @@ export function Entrance() {
             onDrop={(event) => {
               event.preventDefault();
               setIsDragging(false);
+              if (isUploading) return;
               void submitFile(event.dataTransfer.files[0]);
             }}
-            className={`flex min-h-64 cursor-pointer flex-col justify-between rounded-2xl border p-6 transition-colors sm:p-7 ${
-              isDragging
+            className={`flex min-h-64 flex-col justify-between rounded-2xl border p-6 transition-colors sm:p-7 ${
+              isUploading
+                ? "cursor-wait border-primary/45 bg-primary/5"
+                : isDragging
                 ? "border-primary bg-primary/10"
-                : "border-border bg-card hover:border-primary/45"
+                : "cursor-pointer border-border bg-card hover:border-primary/45"
             }`}
           >
             <input
@@ -159,26 +171,102 @@ export function Entrance() {
               disabled={isUploading}
               onChange={(event) => void submitFile(event.target.files?.[0])}
             />
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary text-primary">
+            <motion.div
+              animate={
+                isUploading && !reduceMotion
+                  ? { y: [0, -4, 0], opacity: [0.72, 1, 0.72] }
+                  : { y: 0, opacity: 1 }
+              }
+              transition={
+                isUploading && !reduceMotion
+                  ? { duration: 1.4, repeat: Infinity, ease: "easeInOut" }
+                  : undefined
+              }
+              className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary text-primary"
+            >
               <Upload className="h-5 w-5" />
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold tracking-tight">
-                {isUploading ? "正在上传小说" : "添加一本小说"}
-              </h2>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                点击选择或拖入文件。支持 EPUB、TXT，单个文件不超过
-                {` ${MAX_BOOK_UPLOAD_MEGABYTES} MB`}。
-              </p>
-              <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-primary">
-                {isUploading ? (
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                ) : (
-                  <FileText className="h-4 w-4" />
-                )}
-                {isUploading ? "请稍候" : "选择文件"}
-              </span>
-            </div>
+            </motion.div>
+            <AnimatePresence mode="wait" initial={false}>
+              {isUploading ? (
+                <motion.div
+                  key="uploading"
+                  initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reduceMotion ? undefined : { opacity: 0, y: -8 }}
+                >
+                  <h2 className="text-xl font-semibold tracking-tight">
+                    正在上传小说
+                  </h2>
+                  <p
+                    className="mt-2 truncate text-sm font-medium text-foreground"
+                    title={uploadFileName ?? undefined}
+                  >
+                    {uploadFileName}
+                  </p>
+                  <div className="mt-5">
+                    <div className="flex items-center justify-between gap-4 text-xs">
+                      <span className="text-muted-foreground" aria-live="polite">
+                        {uploadPercent >= 100
+                          ? "上传完成，正在创建处理任务"
+                          : "文件正在安全传入私人书架"}
+                      </span>
+                      <span className="font-semibold tabular-nums text-foreground">
+                        {uploadPercent}%
+                      </span>
+                    </div>
+                    <div
+                      role="progressbar"
+                      aria-label="小说上传进度"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={uploadPercent}
+                      className="relative mt-2 h-2 overflow-hidden rounded-full bg-secondary"
+                    >
+                      <motion.div
+                        className="absolute inset-0 origin-left rounded-full bg-primary"
+                        initial={false}
+                        animate={{ scaleX: uploadPercent / 100 }}
+                        transition={{ duration: 0.25, ease: "easeOut" }}
+                      />
+                      {uploadPercent < 100 && !reduceMotion && (
+                        <motion.div
+                          className="absolute inset-y-0 left-0 w-1/4 bg-primary-foreground/35"
+                          animate={{ x: ["-100%", "400%"] }}
+                          transition={{
+                            duration: 1.25,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                          }}
+                        />
+                      )}
+                    </div>
+                    <p className="mt-2 text-xs tabular-nums text-muted-foreground">
+                      {formatBytes(uploadProgress?.loadedBytes ?? 0)} /{" "}
+                      {formatBytes(uploadProgress?.totalBytes ?? 0)}
+                    </p>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="idle"
+                  initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reduceMotion ? undefined : { opacity: 0, y: -8 }}
+                >
+                  <h2 className="text-xl font-semibold tracking-tight">
+                    添加一本小说
+                  </h2>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    点击选择或拖入文件。支持 EPUB、TXT，单个文件不超过
+                    {` ${MAX_BOOK_UPLOAD_MEGABYTES} MB`}。
+                  </p>
+                  <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-primary">
+                    <FileText className="h-4 w-4" />
+                    选择文件
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.label>
         </section>
 
@@ -287,9 +375,11 @@ export function Entrance() {
                         </div>
                         {isProcessing && (
                           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary">
-                            <div
-                              className="h-full rounded-full bg-primary transition-[width] duration-500"
-                              style={{ width: `${book.statusProgress}%` }}
+                            <motion.div
+                              className="h-full origin-left rounded-full bg-primary"
+                              initial={false}
+                              animate={{ scaleX: book.statusProgress / 100 }}
+                              transition={{ duration: 0.5, ease: "easeOut" }}
                             />
                           </div>
                         )}
