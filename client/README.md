@@ -20,4 +20,4 @@ npm run build
 - 桌面可调侧栏、移动端抽屉、暗色主题和系统减少动态效果支持；
 - 加载、空、失败与重试状态。
 
-刷新令牌不进入 Zustand、Local Storage 或前端响应类型。所有 API 请求使用 `credentials: include` 携带 HttpOnly Cookie；聊天 body 不发送角色、owner 或 book id。
+刷新令牌不进入 Zustand、Local Storage 或前端响应类型。所有 API 请求使用 `credentials: include` 携带 HttpOnly Cookie；Access Token 过期时统一静默刷新，同一页面和支持 Web Locks 的同源标签页会串行轮换，避免把并发续期误判为令牌重放。聊天 body 不发送角色、owner 或 book id。

@@ -1,4 +1,11 @@
-import { apiFetch, readApiError } from "@/lib/api";
+import {
+  apiFetch,
+  apiUpload,
+  readApiError,
+  type ApiUploadProgress,
+} from "@/lib/api";
+
+export type BookUploadProgress = ApiUploadProgress;
 
 export type BookStatus =
   | "QUEUED"
@@ -82,11 +89,14 @@ export async function getBook(bookId: string): Promise<BookView> {
   return readData<BookView>(await apiFetch(`/api/books/${bookId}`));
 }
 
-export async function uploadBook(file: File): Promise<BookView> {
+export async function uploadBook(
+  file: File,
+  onProgress?: (progress: BookUploadProgress) => void,
+): Promise<BookView> {
   const body = new FormData();
   body.append("file", file);
   return readData<BookView>(
-    await apiFetch("/api/books", { method: "POST", body }),
+    await apiUpload("/api/books", body, onProgress),
   );
 }
 

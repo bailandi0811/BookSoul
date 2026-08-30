@@ -1,4 +1,4 @@
-import { apiFetch, readApiError } from "./api";
+import { apiFetch, readApiError, refreshAuthentication } from "./api";
 import { useAuthStore, type AuthTokens } from "@/store/useAuthStore";
 
 type AuthMode = "login" | "register";
@@ -43,19 +43,9 @@ export async function restoreAuthentication(): Promise<AuthRestoreStatus> {
       return response.status === 401 ? "guest" : "unavailable";
     }
 
-    const response = await apiFetch("/api/auth/refresh", {
-      method: "POST",
-      skipAuth: true,
-      skipRefresh: true,
-    });
-    if (response.status === 401) return "guest";
-    if (!response.ok) return "unavailable";
-    const result = (await response.json()) as {
-      success: true;
-      data: AuthTokens;
-    };
-    useAuthStore.getState().restoreSession(result.data);
-    return "authenticated";
+    const refreshStatus = await refreshAuthentication();
+    if (refreshStatus === "authenticated") return "authenticated";
+    return refreshStatus === "unauthorized" ? "guest" : "unavailable";
   } catch {
     return "unavailable";
   }

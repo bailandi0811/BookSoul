@@ -11,6 +11,7 @@ import {
   uploadBook as uploadBookRequest,
   type BookAssistant,
   type BookSection,
+  type BookUploadProgress,
   type BookView,
   type ReadingMode,
   type ReadingProgress,
@@ -24,6 +25,8 @@ interface BooksState {
   books: BookView[];
   isLoading: boolean;
   isUploading: boolean;
+  uploadFileName: string | null;
+  uploadProgress: BookUploadProgress | null;
   mutatingBookIds: string[];
   error: string | null;
   currentBook: BookView | null;
@@ -62,6 +65,8 @@ export const useBooksStore = create<BooksState>((set, get) => ({
   books: [],
   isLoading: false,
   isUploading: false,
+  uploadFileName: null,
+  uploadProgress: null,
   mutatingBookIds: [],
   error: null,
   currentBook: null,
@@ -84,16 +89,31 @@ export const useBooksStore = create<BooksState>((set, get) => ({
   },
 
   uploadBook: async (file) => {
-    set({ isUploading: true, error: null });
+    set({
+      isUploading: true,
+      uploadFileName: file.name,
+      uploadProgress: {
+        loadedBytes: 0,
+        totalBytes: file.size,
+        percent: 0,
+      },
+      error: null,
+    });
     try {
-      const book = await uploadBookRequest(file);
+      const book = await uploadBookRequest(file, (uploadProgress) => {
+        set({ uploadProgress });
+      });
       set((state) => ({ books: [book, ...state.books] }));
       return true;
     } catch (error) {
       set({ error: errorMessage(error) });
       return false;
     } finally {
-      set({ isUploading: false });
+      set({
+        isUploading: false,
+        uploadFileName: null,
+        uploadProgress: null,
+      });
     }
   },
 
@@ -215,6 +235,8 @@ export const useBooksStore = create<BooksState>((set, get) => ({
       books: [],
       isLoading: false,
       isUploading: false,
+      uploadFileName: null,
+      uploadProgress: null,
       mutatingBookIds: [],
       error: null,
       currentBook: null,

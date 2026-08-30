@@ -1,11 +1,98 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuthStore } from "@/store/useAuthStore";
-import { apiFetch } from "./api";
+import { apiFetch, apiUpload } from "./api";
+
+class FakeXMLHttpRequest {
+  static instances: FakeXMLHttpRequest[] = [];
+
+  readonly headers = new Headers();
+  readonly upload: {
+    onprogress: ((event: ProgressEvent) => void) | null;
+  } = { onprogress: null };
+  method = "";
+  url = "";
+  body: Document | XMLHttpRequestBodyInit | null = null;
+  withCredentials = false;
+  status = 0;
+  statusText = "";
+  responseText = "";
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  onabort: (() => void) | null = null;
+
+  constructor() {
+    FakeXMLHttpRequest.instances.push(this);
+  }
+
+  open(method: string, url: string) {
+    this.method = method;
+    this.url = url;
+  }
+
+  setRequestHeader(name: string, value: string) {
+    this.headers.set(name, value);
+  }
+
+  getAllResponseHeaders() {
+    return "content-type: application/json\r\n";
+  }
+
+  send(body: Document | XMLHttpRequestBodyInit | null) {
+    this.body = body;
+  }
+
+  reportProgress(loaded: number, total: number) {
+    this.upload.onprogress?.({
+      lengthComputable: true,
+      loaded,
+      total,
+    } as ProgressEvent);
+  }
+
+  complete(status: number, responseText: string) {
+    this.status = status;
+    this.statusText = status === 201 ? "Created" : "OK";
+    this.responseText = responseText;
+    this.onload?.();
+  }
+}
 
 describe("apiFetch", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    FakeXMLHttpRequest.instances = [];
     useAuthStore.getState().clearAuthentication();
+  });
+
+  it("reports authenticated upload byte progress", async () => {
+    useAuthStore.getState().signIn({
+      accessToken: "upload-access",
+      user: { id: "user-1", email: "reader@example.com", name: "读者" },
+    });
+    vi.stubGlobal("XMLHttpRequest", FakeXMLHttpRequest);
+    const progress = vi.fn();
+    const body = new FormData();
+    body.append("file", new File(["novel"], "novel.txt"));
+
+    const responsePromise = apiUpload("/api/books", body, progress);
+    const request = FakeXMLHttpRequest.instances[0];
+    request.reportProgress(512, 1024);
+    request.complete(201, "{}");
+
+    await expect(responsePromise).resolves.toMatchObject({ status: 201 });
+    expect(request).toMatchObject({
+      method: "POST",
+      url: "/api/books",
+      body,
+      withCredentials: true,
+    });
+    expect(request.headers.get("Authorization")).toBe("Bearer upload-access");
+    expect(progress).toHaveBeenCalledWith({
+      loadedBytes: 512,
+      totalBytes: 1024,
+      percent: 50,
+    });
   });
 
   it("does not attach an identity to unauthenticated requests", async () => {
@@ -28,6 +115,10 @@ describe("apiFetch", () => {
     let refreshCalls = 0;
     let refreshRequest: RequestInit | undefined;
     const businessCalls = new Map<string, number>();
+    const lockRequest = vi.fn(
+      async (_name: string, callback: () => Promise<unknown>) => callback(),
+    );
+    vi.stubGlobal("navigator", { locks: { request: lockRequest } });
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const url = String(input);
       if (url === "/api/auth/refresh") {
@@ -59,6 +150,10 @@ describe("apiFetch", () => {
 
     expect(results.every((response) => response.status === 200)).toBe(true);
     expect(refreshCalls).toBe(1);
+    expect(lockRequest).toHaveBeenCalledWith(
+      "booksoul:refresh-token",
+      expect.any(Function),
+    );
     expect(refreshRequest).toMatchObject({
       method: "POST",
       credentials: "include",

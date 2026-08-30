@@ -39,6 +39,29 @@ describe("auth session lifecycle", () => {
     });
   });
 
+  it("uses one refresh when cookie-only session restoration runs concurrently", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: true,
+          data: { accessToken: "restored-access", user },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    await expect(
+      Promise.all([restoreAuthentication(), restoreAuthentication()]),
+    ).resolves.toEqual(["authenticated", "authenticated"]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(useAuthStore.getState()).toMatchObject({
+      isAuthenticated: true,
+      accessToken: "restored-access",
+      user: { id: "user-1" },
+    });
+  });
+
   it("keeps a stable guest identity when no refresh cookie exists", async () => {
     const guestUserId = useAuthStore.getState().guestUserId;
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
