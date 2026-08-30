@@ -11,7 +11,7 @@ import { convert } from 'html-to-text';
 
 async function bootstrap() {
   const app = await NestFactory.createApplicationContext(AppModule);
-  
+
   const milvusService = app.get(MilvusService);
   const ragService = app.get(RagService);
   const configService = app.get(ConfigService);
@@ -22,7 +22,8 @@ async function bootstrap() {
   const CHUNK_OVERLAP = 50;
 
   const BOOK_NAME = parse(EPUB_FILE).name;
-  const collectionName = configService.get<string>('milvus.collectionName') || 'ebook';
+  const collectionName =
+    configService.get<string>('milvus.collectionName') || 'ebook';
   const vectorDim = configService.get<number>('milvus.vectorDim') || 1024;
 
   async function ensureBookCollection() {
@@ -36,7 +37,12 @@ async function bootstrap() {
         await milvusClient.createCollection({
           collection_name: collectionName,
           fields: [
-            { name: 'id', data_type: DataType.VarChar, max_length: 100, is_primary_key: true },
+            {
+              name: 'id',
+              data_type: DataType.VarChar,
+              max_length: 100,
+              is_primary_key: true,
+            },
             { name: 'book_id', data_type: DataType.VarChar, max_length: 100 },
             { name: 'book_name', data_type: DataType.VarChar, max_length: 100 },
             { name: 'chapter_num', data_type: DataType.Int32 },
@@ -72,7 +78,11 @@ async function bootstrap() {
     }
   }
 
-  async function insertChunksBatch(chunks: string[], bookId: string, chapterNum: number) {
+  async function insertChunksBatch(
+    chunks: string[],
+    bookId: string,
+    chapterNum: number,
+  ) {
     if (chunks.length === 0) return 0;
 
     const data: any[] = [];
@@ -87,10 +97,14 @@ async function bootstrap() {
           vector = await ragService.getEmbedding(chunk);
           break;
         } catch {
-          console.log(`Embedding failed for chunk ${i}, retrying... (${3 - retries + 1}/3)`);
+          console.log(
+            `Embedding failed for chunk ${i}, retrying... (${3 - retries + 1}/3)`,
+          );
           retries--;
           if (retries === 0) {
-            console.error(`Failed to get embedding for chunk ${i} after 3 attempts.`);
+            console.error(
+              `Failed to get embedding for chunk ${i} after 3 attempts.`,
+            );
           }
           await new Promise((resolve) => setTimeout(resolve, 2000));
         }
@@ -114,7 +128,9 @@ async function bootstrap() {
         collection_name: collectionName,
         fields_data: data,
       });
-      console.log(`Inserted ${res.insert_cnt} chunks for chapter ${chapterNum}`);
+      console.log(
+        `Inserted ${res.insert_cnt} chunks for chapter ${chapterNum}`,
+      );
       return res.insert_cnt;
     }
     return 0;
@@ -123,7 +139,7 @@ async function bootstrap() {
   async function ingest() {
     console.log('Starting ingestion process...');
     console.log('Target file:', EPUB_FILE);
-    
+
     await ensureBookCollection();
 
     try {
@@ -154,12 +170,14 @@ async function bootstrap() {
 
         console.log(`Processing chapter ${i + 1}...`);
         const chunks = await textSplitter.splitText(chapterText);
-        
+
         const inserted = await insertChunksBatch(chunks, bookId, i + 1);
         totalInserted += Number(inserted);
       }
 
-      console.log(`\nIngestion complete! Total chunks inserted: ${totalInserted}`);
+      console.log(
+        `\nIngestion complete! Total chunks inserted: ${totalInserted}`,
+      );
     } catch (err) {
       console.error('Ingestion failed:', err);
     }

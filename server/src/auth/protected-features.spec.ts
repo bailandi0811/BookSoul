@@ -6,6 +6,7 @@ import { BooksController } from '../books/books.controller';
 import { BookAssistantsController } from '../books/book-assistants.controller';
 import { BookReadingController } from '../books/book-reading.controller';
 import { BookSessionsController } from '../chat/book-sessions.controller';
+import { ToolsController } from '../tools/tools.controller';
 
 describe('authenticated feature boundary', () => {
   it.each([
@@ -15,6 +16,7 @@ describe('authenticated feature boundary', () => {
     ['book assistants', BookAssistantsController],
     ['book reading', BookReadingController],
     ['book sessions', BookSessionsController],
+    ['email tool', ToolsController],
   ])('requires JWT authentication for %s endpoints', (_name, controller) => {
     const guards = Reflect.getMetadata(
       GUARDS_METADATA,

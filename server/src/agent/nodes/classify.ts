@@ -4,41 +4,174 @@ import type { AgentState, IntentClassification, IntentType } from '../state';
 // ========== Pattern Definitions ==========
 
 const GREETING_PATTERNS = [
-  '你好', '您好', '嗨', 'hi', 'hello', '嗨嗨', '哈喽', '早上好', '下午好', '晚上好',
-  '在吗', '在不在', '有人吗', 'Hi', 'HI', 'Hello', 'HELLO', '嘿', '哟',
-  '谢谢', '谢谢你', '感谢', '多谢', '谢啦', '再见', '拜拜',
+  '你好',
+  '您好',
+  '嗨',
+  'hi',
+  'hello',
+  '嗨嗨',
+  '哈喽',
+  '早上好',
+  '下午好',
+  '晚上好',
+  '在吗',
+  '在不在',
+  '有人吗',
+  'Hi',
+  'HI',
+  'Hello',
+  'HELLO',
+  '嘿',
+  '哟',
+  '谢谢',
+  '谢谢你',
+  '感谢',
+  '多谢',
+  '谢啦',
+  '再见',
+  '拜拜',
 ];
 
 const NOVEL_ENTITY_PATTERNS = [
   // 人物
-  '乔峰', '萧峰', '段誉', '虚竹', '王语嫣', '阿朱', '阿紫', '慕容复', '游坦之',
-  '天山童姥', '李秋水', '无崖子', '丁春秋', '鸠摩智', '玄慈', '玄苦', '玄难',
-  '马夫人', '康敏', '刀白凤', '阮星竹', '秦红棉', '甘宝宝', '钟灵', '木婉清',
-  '风波恶', '包不同', '南海鳄神', '叶二娘', '段正淳', '段正明', '保定帝',
-  '枯荣大师', '本因', '本观', '本相', '本参', '本尘',
+  '乔峰',
+  '萧峰',
+  '段誉',
+  '虚竹',
+  '王语嫣',
+  '阿朱',
+  '阿紫',
+  '慕容复',
+  '游坦之',
+  '天山童姥',
+  '李秋水',
+  '无崖子',
+  '丁春秋',
+  '鸠摩智',
+  '玄慈',
+  '玄苦',
+  '玄难',
+  '马夫人',
+  '康敏',
+  '刀白凤',
+  '阮星竹',
+  '秦红棉',
+  '甘宝宝',
+  '钟灵',
+  '木婉清',
+  '风波恶',
+  '包不同',
+  '南海鳄神',
+  '叶二娘',
+  '段正淳',
+  '段正明',
+  '保定帝',
+  '枯荣大师',
+  '本因',
+  '本观',
+  '本相',
+  '本参',
+  '本尘',
   // 武功
-  '降龙十八掌', '打狗棒法', '六脉神剑', '北冥神功', '凌波微步', '天山六阳掌',
-  '生死符', '小无相功', '易筋经', '洗髓经', '九阴真经', '九阳真经',
-  '斗转星移', '参合指', '化功大法', '吸星大法', '少林七十二绝技',
-  '拈花指', '多罗叶指', '无相劫指', '韦陀掌', '罗汉拳', '铁沙掌',
+  '降龙十八掌',
+  '打狗棒法',
+  '六脉神剑',
+  '北冥神功',
+  '凌波微步',
+  '天山六阳掌',
+  '生死符',
+  '小无相功',
+  '易筋经',
+  '洗髓经',
+  '九阴真经',
+  '九阳真经',
+  '斗转星移',
+  '参合指',
+  '化功大法',
+  '吸星大法',
+  '少林七十二绝技',
+  '拈花指',
+  '多罗叶指',
+  '无相劫指',
+  '韦陀掌',
+  '罗汉拳',
+  '铁沙掌',
   // 地名
-  '大理', '丐帮', '少林', '嵩山', '擂鼓山', '缥缈峰', '灵鹫宫', '燕子坞',
-  '曼陀山庄', '参合庄', '无锡', '松鹤楼', '杏子林', '聚贤庄',
-  '太湖', '西湖', '燕子矶', '西域', '中原', '辽东', '西夏',
+  '大理',
+  '丐帮',
+  '少林',
+  '嵩山',
+  '擂鼓山',
+  '缥缈峰',
+  '灵鹫宫',
+  '燕子坞',
+  '曼陀山庄',
+  '参合庄',
+  '无锡',
+  '松鹤楼',
+  '杏子林',
+  '聚贤庄',
+  '太湖',
+  '西湖',
+  '燕子矶',
+  '西域',
+  '中原',
+  '辽东',
+  '西夏',
   // 组织
-  '丐帮', '大理段氏', '姑苏慕容', '星宿派', '逍遥派', '少林派', '武当派',
-  '峨眉派', '华山派', '嵩山派', '衡山派', '恒山派', '泰山派',
+  '丐帮',
+  '大理段氏',
+  '姑苏慕容',
+  '星宿派',
+  '逍遥派',
+  '少林派',
+  '武当派',
+  '峨眉派',
+  '华山派',
+  '嵩山派',
+  '衡山派',
+  '恒山派',
+  '泰山派',
 ];
 
 const GENERAL_KNOWLEDGE_PATTERNS = [
-  '什么是', '谁知道', '世界上', '中国的', '人口', '首都', '货币',
-  '现在几点', '今天日期', '天气', '温度', '计算', '多少', '怎么算',
+  '什么是',
+  '谁知道',
+  '世界上',
+  '中国的',
+  '人口',
+  '首都',
+  '货币',
+  '现在几点',
+  '今天日期',
+  '天气',
+  '温度',
+  '计算',
+  '多少',
+  '怎么算',
 ];
 
 const COMPLEX_REASONING_PATTERNS = [
-  '为什么', '原因', '怎么回事', '区别', '不同', '比较', '关系',
-  '前后', '先后', '影响', '分析', '评价', '总结', '第几章', '哪一章',
-  '师傅', '师父', '父亲', '母亲', '徒弟',
+  '为什么',
+  '原因',
+  '怎么回事',
+  '区别',
+  '不同',
+  '比较',
+  '关系',
+  '前后',
+  '先后',
+  '影响',
+  '分析',
+  '评价',
+  '总结',
+  '第几章',
+  '哪一章',
+  '师傅',
+  '师父',
+  '父亲',
+  '母亲',
+  '徒弟',
 ];
 
 // ========== Helper Functions ==========
@@ -58,7 +191,11 @@ function classifyByPattern(query: string): IntentType | null {
 
   // 1. 检查寒暄
   for (const pattern of GREETING_PATTERNS) {
-    if (q === pattern || q.startsWith(pattern + ' ') || q.startsWith(pattern + '，')) {
+    if (
+      q === pattern ||
+      q.startsWith(pattern + ' ') ||
+      q.startsWith(pattern + '，')
+    ) {
       return 'simple_greeting';
     }
   }
@@ -74,11 +211,19 @@ function classifyByPattern(query: string): IntentType | null {
   const entities = detectNovelEntities(q);
   if (entities.length > 0) {
     // 简单问人物是谁/武功是什么 → simple_fact
-    if (q.includes('是谁') || q.includes('叫什么') || q.includes('是什么武功') || q.includes('会什么')) {
+    if (
+      q.includes('是谁') ||
+      q.includes('叫什么') ||
+      q.includes('是什么武功') ||
+      q.includes('会什么')
+    ) {
       return 'simple_fact';
     }
     // 比较型问题 → complex_rag
-    if (q.includes('和') && (q.includes('有什么不同') || q.includes('区别') || q.includes('比较'))) {
+    if (
+      q.includes('和') &&
+      (q.includes('有什么不同') || q.includes('区别') || q.includes('比较'))
+    ) {
       return 'complex_rag';
     }
     // 问原因/为什么 → complex_rag
@@ -86,7 +231,12 @@ function classifyByPattern(query: string): IntentType | null {
       return 'complex_rag';
     }
     // 多跳推理（师傅、父亲等）→ complex_rag
-    if (q.includes('师傅') || q.includes('师父') || q.includes('父亲') || q.includes('父亲')) {
+    if (
+      q.includes('师傅') ||
+      q.includes('师父') ||
+      q.includes('父亲') ||
+      q.includes('父亲')
+    ) {
       return 'complex_rag';
     }
     // 默认 → needs_rag
@@ -242,12 +392,15 @@ export const createClassifyNode = (model: ChatOpenAI) => {
 
     // 命中小说实体：默认走RAG，复杂问题也走RAG（后续由rewrite/critique控制深度）
     if (novelEntities.length > 0) {
-      const complex = isComplexReasoningQuestion(query) || patternResult === 'complex_rag';
+      const complex =
+        isComplexReasoningQuestion(query) || patternResult === 'complex_rag';
       return {
         intent_classification: {
           intent_type: complex ? 'complex_rag' : 'needs_rag',
           confidence: 0.9,
-          reasoning: complex ? '命中小说实体且问题包含复杂推理特征，进入RAG流程' : '命中小说实体，进入RAG流程确保事实准确',
+          reasoning: complex
+            ? '命中小说实体且问题包含复杂推理特征，进入RAG流程'
+            : '命中小说实体，进入RAG流程确保事实准确',
           rag_likelihood: complex ? 0.95 : 0.85,
           suggested_action: 'rag_flow',
           keywords_matched: novelEntities.slice(0, 5),
@@ -276,7 +429,10 @@ export const createClassifyNode = (model: ChatOpenAI) => {
     // 使用LLM进行更精细的分类
     const llmResponse = await model.invoke([
       { role: 'system', content: INTENT_CLASSIFY_PROMPT },
-      { role: 'user', content: `query: ${query}\n\nnovel_entities: ${novelEntities.join(', ') || '无'}` },
+      {
+        role: 'user',
+        content: `query: ${query}\n\nnovel_entities: ${novelEntities.join(', ') || '无'}`,
+      },
     ]);
 
     let classification: IntentClassification;
@@ -285,11 +441,13 @@ export const createClassifyNode = (model: ChatOpenAI) => {
     } catch {
       // Fallback
       classification = {
-        intent_type: novelEntities.length > 0 ? 'needs_rag' : 'general_knowledge',
+        intent_type:
+          novelEntities.length > 0 ? 'needs_rag' : 'general_knowledge',
         confidence: 0.5,
         reasoning: '解析失败，使用默认分类',
         rag_likelihood: novelEntities.length > 0 ? 0.7 : 0.3,
-        suggested_action: novelEntities.length > 0 ? 'rag_flow' : 'direct_generate',
+        suggested_action:
+          novelEntities.length > 0 ? 'rag_flow' : 'direct_generate',
         keywords_matched: [],
         novel_entities_detected: novelEntities,
       };
@@ -297,7 +455,10 @@ export const createClassifyNode = (model: ChatOpenAI) => {
 
     // 决定下一步
     let nextAction: AgentState['next_action'];
-    if (classification.suggested_action === 'direct_generate' && classification.confidence >= 0.8) {
+    if (
+      classification.suggested_action === 'direct_generate' &&
+      classification.confidence >= 0.8
+    ) {
       nextAction = 'direct_generate';
     } else if (classification.rag_likelihood >= 0.7) {
       nextAction = 'rewrite';

@@ -22,6 +22,13 @@ export interface RetrievedBookChunk {
   score: number;
 }
 
+export interface BookRetrievalRequest {
+  queries: string[];
+  limit: number;
+  maxContextChars: number;
+  maxPerSection: number;
+}
+
 @Injectable()
 export class BookChunkRetrieverService {
   constructor(
@@ -32,17 +39,34 @@ export class BookChunkRetrieverService {
 
   async retrieve(
     boundary: BookRetrievalBoundary,
-    query: string,
-    limit = 6,
+    request: BookRetrievalRequest,
   ): Promise<RetrievedBookChunk[]> {
-    const safeLimit = Math.min(10, Math.max(1, Math.floor(limit)));
-    const [vector] = await this.embeddings.embedBatch([query]);
-    const hits = await this.vectorStore.searchChunkIds(
-      boundary,
-      vector,
-      boundary.spoilerCeiling,
-      Math.min(50, safeLimit * 2),
+    const queries = [...new Set(request.queries.map((query) => query.trim()))]
+      .filter(Boolean)
+      .slice(0, 3);
+    if (queries.length === 0) return [];
+
+    const safeLimit = Math.min(10, Math.max(1, Math.floor(request.limit)));
+    const maxContextChars = Math.min(
+      12_000,
+      Math.max(1_000, Math.floor(request.maxContextChars)),
     );
+    const maxPerSection = Math.min(
+      safeLimit,
+      Math.max(1, Math.floor(request.maxPerSection)),
+    );
+    const vectors = await this.embeddings.embedBatch(queries);
+    const hitGroups = await Promise.all(
+      vectors.map((vector) =>
+        this.vectorStore.searchChunkIds(
+          boundary,
+          vector,
+          boundary.spoilerCeiling,
+          Math.min(50, safeLimit * 2),
+        ),
+      ),
+    );
+    const hits = this.mergeHits(hitGroups);
     const uniqueIds = [...new Set(hits.map((hit) => hit.id))];
     if (uniqueIds.length === 0) return [];
 
@@ -68,11 +92,31 @@ export class BookChunkRetrieverService {
     const byId = new Map(chunks.map((chunk) => [chunk.id, chunk]));
     const selected: typeof chunks = [];
     const references: RetrievedBookChunk[] = [];
-    for (const hit of hits) {
+    const sectionCounts = new Map<string, number>();
+    let remainingContextChars = maxContextChars;
+    const appendHit = (
+      hit: { id: string; score: number },
+      enforceSectionLimit: boolean,
+    ): void => {
+      if (references.length >= safeLimit || remainingContextChars <= 0) {
+        return;
+      }
       const chunk = byId.get(hit.id);
-      if (!chunk || selected.some((item) => item.id === chunk.id)) continue;
-      if (this.overlapsSelected(chunk, selected)) continue;
+      if (!chunk || selected.some((item) => item.id === chunk.id)) return;
+      if (this.overlapsSelected(chunk, selected)) return;
+      if (
+        enforceSectionLimit &&
+        (sectionCounts.get(chunk.sectionId) ?? 0) >= maxPerSection
+      ) {
+        return;
+      }
+      const contextContent = chunk.content.slice(0, remainingContextChars);
+      if (!contextContent.trim()) return;
       selected.push(chunk);
+      sectionCounts.set(
+        chunk.sectionId,
+        (sectionCounts.get(chunk.sectionId) ?? 0) + 1,
+      );
       references.push({
         bookId: chunk.bookId,
         sectionId: chunk.sectionId,
@@ -80,13 +124,59 @@ export class BookChunkRetrieverService {
         sectionTitle: chunk.section.title,
         chunkId: chunk.id,
         chunkIndex: chunk.chunkIndex,
-        content: chunk.content,
+        content: contextContent,
         excerpt: chunk.content.slice(0, 600),
         score: hit.score,
       });
-      if (references.length >= safeLimit) break;
+      remainingContextChars -= contextContent.length;
+    };
+
+    for (const hit of hits) {
+      appendHit(hit, true);
+      if (references.length >= safeLimit || remainingContextChars <= 0) break;
+    }
+    if (references.length < safeLimit && remainingContextChars > 0) {
+      for (const hit of hits) {
+        appendHit(hit, false);
+        if (references.length >= safeLimit || remainingContextChars <= 0) break;
+      }
     }
     return references;
+  }
+
+  private mergeHits(
+    hitGroups: Array<Array<{ id: string; score: number }>>,
+  ): Array<{ id: string; score: number }> {
+    const merged = new Map<
+      string,
+      { id: string; score: number; rankScore: number; firstSeen: number }
+    >();
+    let sequence = 0;
+    for (const hits of hitGroups) {
+      hits.forEach((hit, rank) => {
+        const existing = merged.get(hit.id);
+        if (existing) {
+          existing.rankScore += 1 / (60 + rank + 1);
+          existing.score = Math.max(existing.score, hit.score);
+          return;
+        }
+        merged.set(hit.id, {
+          id: hit.id,
+          score: hit.score,
+          rankScore: 1 / (60 + rank + 1),
+          firstSeen: sequence,
+        });
+        sequence += 1;
+      });
+    }
+    return [...merged.values()]
+      .sort(
+        (a, b) =>
+          b.rankScore - a.rankScore ||
+          b.score - a.score ||
+          a.firstSeen - b.firstSeen,
+      )
+      .map(({ id, score }) => ({ id, score }));
   }
 
   private overlapsSelected(

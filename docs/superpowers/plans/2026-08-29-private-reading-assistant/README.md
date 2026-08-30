@@ -18,20 +18,20 @@
 
 ## 交付清单
 
-| 顺序 | 编号 | 闭环需求 | 状态 | 依赖 |
-|---|---|---|---|---|
-| 1 | BOOK-01 | 书籍领域模型、私有文件存储、Books API 与权限隔离 | 已完成 | 现有 Auth/Prisma |
-| 2 | INGEST-01 | EPUB/TXT 解析、规范化 section 与安全限制 | 已完成 | BOOK-01 |
-| 3 | INGEST-02 | 持久化 worker、分块、进度、失败重试与崩溃恢复 | 已完成 | INGEST-01 |
-| 4 | VECTOR-01 | `book_chunks_v2`、批量 Embedding、版本化写入与可靠删除 | 已完成 | INGEST-02 |
-| 5 | ASSISTANT-01 | READY 自动创建 BookAssistant 与通用小说 Prompt | 已完成 | VECTOR-01 |
-| 6 | PROGRESS-01 | 阅读进度、section 目录、防剧透 ceiling 与单次放行 | 已完成 | ASSISTANT-01 |
-| 7 | CHAT-02 | 服务端会话创建、session → book scope、按书历史与引用 | 已完成 | ASSISTANT-01、PROGRESS-01 |
-| 8 | MEMORY-02 | 全局偏好与 book-scoped 记忆隔离 | 已完成 | CHAT-02 |
-| 9 | CLIENT-05 | 私人书架、上传、处理状态与失败重试 | 已完成 | INGEST-02 |
-| 10 | CLIENT-06 | 书籍工作区、按书会话、目录与阅读进度 | 已完成 | CHAT-02、PROGRESS-01 |
-| 11 | MIGRATE-01 | 《天龙八部》系统示例、旧会话回填与去角色化 | 实现完成，执行待授权 | CHAT-02、CLIENT-06 |
-| 12 | RELEASE-02 | 隔离、恢复、删除、剧透与端到端发布验收 | 验收完成，发布待系统书授权 | 其余全部 |
+| 顺序 | 编号         | 闭环需求                                               | 状态                       | 依赖                      |
+| ---- | ------------ | ------------------------------------------------------ | -------------------------- | ------------------------- |
+| 1    | BOOK-01      | 书籍领域模型、私有文件存储、Books API 与权限隔离       | 已完成                     | 现有 Auth/Prisma          |
+| 2    | INGEST-01    | EPUB/TXT 解析、规范化 section 与安全限制               | 已完成                     | BOOK-01                   |
+| 3    | INGEST-02    | 持久化 worker、分块、进度、失败重试与崩溃恢复          | 已完成                     | INGEST-01                 |
+| 4    | VECTOR-01    | `book_chunks_v2`、批量 Embedding、版本化写入与可靠删除 | 已完成                     | INGEST-02                 |
+| 5    | ASSISTANT-01 | READY 自动创建 BookAssistant 与通用小说 Prompt         | 已完成                     | VECTOR-01                 |
+| 6    | PROGRESS-01  | 阅读进度、section 目录、防剧透 ceiling 与单次放行      | 已完成                     | ASSISTANT-01              |
+| 7    | CHAT-02      | 服务端会话创建、session → book scope、按书历史与引用   | 已完成                     | ASSISTANT-01、PROGRESS-01 |
+| 8    | MEMORY-02    | 全局偏好与 book-scoped 记忆隔离                        | 已完成                     | CHAT-02                   |
+| 9    | CLIENT-05    | 私人书架、上传、处理状态与失败重试                     | 已完成                     | INGEST-02                 |
+| 10   | CLIENT-06    | 书籍工作区、按书会话、目录与阅读进度                   | 已完成                     | CHAT-02、PROGRESS-01      |
+| 11   | MIGRATE-01   | 《天龙八部》系统示例、旧会话回填与去角色化             | 实现完成，执行待授权       | CHAT-02、CLIENT-06        |
+| 12   | RELEASE-02   | 隔离、恢复、删除、剧透与端到端发布验收                 | 验收完成，发布待系统书授权 | 其余全部                  |
 
 ## 当前交付：BOOK-01
 
@@ -125,7 +125,7 @@
 已完成：
 
 - 新增 `POST/GET /api/books/:bookId/sessions`，会话 UUID 只能由服务端生成，并绑定当前用户的当前书籍助手。
-- `POST /api/chat` 请求只接受 `sessionId + message + spoilerOverride`，不再接受角色或客户端指定的书籍/owner。
+- `POST /api/chat` 请求只接受 `sessionId + message + spoilerOverride + externalResearch`，不再接受角色或客户端指定的书籍/owner；`externalResearch` 只对当次显式联网生效。
 - session 反查链同时验证 session owner、assistant owner、book visibility 与 READY 状态；历史读取和删除复用同一边界。
 - Milvus 搜索 filter 固定包含 `owner_scope + book_id + embedding_version + section_order <= ceiling`，自由文本不能进入 filter。
 - Milvus 仅返回 chunk id/score；PostgreSQL 再按预期 book/version/ceiling 查询正文和章节标题，外书 id 被丢弃。
@@ -179,7 +179,7 @@
 - 系统书以 `owner_scope = "__system__"` 进入 `book_chunks_v2`，普通用户不能重试或删除系统语料。
 - READY 后可为注册用户幂等创建各自的助手和阅读进度，并回填 `bookAssistantId` 与小说内容类旧记忆的 `bookId`；全局偏好和用户事实不改作用域。
 - 无对应 User 的旧访客会话不会伪造身份，迁移会保留并报告跳过数量。
-- 固定角色、旧 RAG、MCP 与邮件模块已从应用运行图和公开路由移除；旧源码暂留作迁移审计，不进入新产品主链。
+- 固定角色、旧 RAG、高德 MCP 与旧邮件入口已从应用运行图和公开路由移除；旧源码暂留作迁移审计，不进入新产品主链。新增的 Tavily MCP 只作为用户显式开启的只读联网资料通道，不受模型或正文自动调用。
 - 客户端固定角色入口已完全退出运行路径，角色兼容文件不进入构建产物。
 - 真实《天龙八部》索引会把正文发送到当前外部 Embedding/Zilliz 目标，必须在确认文件处理权和数据目的地后执行。
 

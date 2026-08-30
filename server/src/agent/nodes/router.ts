@@ -3,7 +3,11 @@ import type { AgentState } from '../state';
 export const createRouterNode = () => {
   return async (state: AgentState): Promise<Partial<AgentState>> => {
     // 根据critique结果和retry_count决定下一步
-    if (state.critique && !state.critique.is_adequate && state.retry_count < 2) {
+    if (
+      state.critique &&
+      !state.critique.is_adequate &&
+      state.retry_count < 2
+    ) {
       return { next_action: 'rewrite' as const };
     }
 

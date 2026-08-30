@@ -45,7 +45,12 @@ describe('BookChunkRetrieverService', () => {
       spoilerCeiling: 2,
     };
 
-    const result = await service.retrieve(boundary, '谁在夜里出现？');
+    const result = await service.retrieve(boundary, {
+      queries: ['谁在夜里出现？'],
+      limit: 6,
+      maxContextChars: 5_400,
+      maxPerSection: 3,
+    });
 
     expect(vectorStore.searchChunkIds).toHaveBeenCalledWith(
       boundary,
@@ -67,6 +72,108 @@ describe('BookChunkRetrieverService', () => {
     );
     expect(result.map((item) => item.chunkId)).toEqual(['chunk-a', 'chunk-b']);
     expect(result.every((item) => item.bookId === 'book-a')).toBe(true);
+  });
+
+  it('merges multiple retrieval queries while preserving scoped hydration', async () => {
+    embeddings.embedBatch.mockResolvedValue([
+      [1, 0, 0],
+      [0, 1, 0],
+    ]);
+    vectorStore.searchChunkIds
+      .mockResolvedValueOnce([
+        { id: 'chunk-a', score: 0.95 },
+        { id: 'chunk-b', score: 0.7 },
+      ])
+      .mockResolvedValueOnce([{ id: 'chunk-b', score: 0.96 }]);
+
+    const result = await service.retrieve(
+      {
+        ownerScope: 'user-a',
+        bookId: 'book-a',
+        embeddingVersion: 'book-embedding-v1',
+        spoilerCeiling: 2,
+      },
+      {
+        queries: ['他为什么这么做？', '旧友交出信件的原因'],
+        limit: 8,
+        maxContextChars: 7_200,
+        maxPerSection: 2,
+      },
+    );
+
+    expect(embeddings.embedBatch).toHaveBeenCalledWith([
+      '他为什么这么做？',
+      '旧友交出信件的原因',
+    ]);
+    expect(vectorStore.searchChunkIds).toHaveBeenCalledTimes(2);
+    expect(result.map((item) => item.chunkId)).toEqual(['chunk-b', 'chunk-a']);
+  });
+
+  it('caps the source text sent to the model without expanding the citation excerpt', async () => {
+    const longContent = '甲'.repeat(1_500);
+    prisma.bookChunk.findMany.mockResolvedValue([
+      {
+        ...chunk('chunk-a', 1, 0, 0, 1_500),
+        content: longContent,
+      },
+    ]);
+    vectorStore.searchChunkIds.mockResolvedValue([
+      { id: 'chunk-a', score: 0.95 },
+    ]);
+
+    const [result] = await service.retrieve(
+      {
+        ownerScope: 'user-a',
+        bookId: 'book-a',
+        embeddingVersion: 'book-embedding-v1',
+        spoilerCeiling: 2,
+      },
+      {
+        queries: ['发生了什么？'],
+        limit: 4,
+        maxContextChars: 1_000,
+        maxPerSection: 4,
+      },
+    );
+
+    expect(result.content).toHaveLength(1_000);
+    expect(result.excerpt).toHaveLength(600);
+  });
+
+  it('limits repeated chunks from one section for broad context diversity', async () => {
+    prisma.bookChunk.findMany.mockResolvedValue([
+      chunk('chunk-a', 1, 0, 0, 100),
+      chunk('chunk-c', 1, 2, 200, 300),
+      chunk('chunk-b', 2, 0, 0, 100),
+      chunk('chunk-d', 3, 0, 0, 100),
+    ]);
+    vectorStore.searchChunkIds.mockResolvedValue([
+      { id: 'chunk-a', score: 0.95 },
+      { id: 'chunk-c', score: 0.9 },
+      { id: 'chunk-b', score: 0.85 },
+      { id: 'chunk-d', score: 0.8 },
+    ]);
+
+    const result = await service.retrieve(
+      {
+        ownerScope: 'user-a',
+        bookId: 'book-a',
+        embeddingVersion: 'book-embedding-v1',
+        spoilerCeiling: 3,
+      },
+      {
+        queries: ['比较两个章节'],
+        limit: 3,
+        maxContextChars: 7_200,
+        maxPerSection: 1,
+      },
+    );
+
+    expect(result.map((item) => item.chunkId)).toEqual([
+      'chunk-a',
+      'chunk-b',
+      'chunk-d',
+    ]);
   });
 
   function chunk(

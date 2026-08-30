@@ -15,6 +15,7 @@ import { ClaimModule } from './claim/claim.module';
 import { validateEnvironment } from './config/env.validation';
 import { BooksModule } from './books/books.module';
 import { IngestionModule } from './ingestion/ingestion.module';
+import { ToolsModule } from './tools/tools.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { IngestionModule } from './ingestion/ingestion.module';
     IngestionModule,
     MilvusModule,
     ChatModule,
+    ToolsModule,
     MemoryModule,
   ],
   controllers: [AppController],

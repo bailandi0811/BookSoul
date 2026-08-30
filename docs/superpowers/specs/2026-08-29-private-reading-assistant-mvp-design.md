@@ -77,20 +77,20 @@ BookSoul 当前是一个围绕《天龙八部》构建的角色对话应用：�
 
 ## 3. 已确认决策
 
-| 项目 | 一期决策 |
-|------|----------|
-| 产品优先级 | 私人阅读助手优先，不做用户 Agent 分享平台 |
-| 一级导航对象 | 小说/书籍，而不是角色 |
-| 助手数量 | 每本书自动创建一个私人助手 |
-| 角色扮演 | 从主流程移除；未来可作为书籍助手的可选对话模式 |
-| 支持格式 | EPUB、TXT；不支持扫描 PDF、DOCX、在线抓取 |
-| 阅读器 | 一期不做完整正文阅读器，只做目录、进度与引用片段 |
-| 防剧透 | 默认开启；按章节序号约束向量检索与引用 |
-| 上传处理 | 异步、可恢复、可重试；上传请求不等待 Embedding 完成 |
-| 数据隔离 | 服务端校验 owner；向量按 `owner_scope + book_id` 双重过滤 |
-| 聊天作用域 | 客户端只提交服务端生成的 `sessionId`；服务端反查 assistant/book |
-| 文件可见性 | 私有上传不可公开；保留只读 `SYSTEM` 类型用于现有《天龙八部》示例迁移 |
-| 删除语义 | 删除书籍时异步清理源文件、章节、向量、助手、书籍会话与书籍记忆 |
+| 项目         | 一期决策                                                             |
+| ------------ | -------------------------------------------------------------------- |
+| 产品优先级   | 私人阅读助手优先，不做用户 Agent 分享平台                            |
+| 一级导航对象 | 小说/书籍，而不是角色                                                |
+| 助手数量     | 每本书自动创建一个私人助手                                           |
+| 角色扮演     | 从主流程移除；未来可作为书籍助手的可选对话模式                       |
+| 支持格式     | EPUB、TXT；不支持扫描 PDF、DOCX、在线抓取                            |
+| 阅读器       | 一期不做完整正文阅读器，只做目录、进度与引用片段                     |
+| 防剧透       | 默认开启；按章节序号约束向量检索与引用                               |
+| 上传处理     | 异步、可恢复、可重试；上传请求不等待 Embedding 完成                  |
+| 数据隔离     | 服务端校验 owner；向量按 `owner_scope + book_id` 双重过滤            |
+| 聊天作用域   | 客户端只提交服务端生成的 `sessionId`；服务端反查 assistant/book      |
+| 文件可见性   | 私有上传不可公开；保留只读 `SYSTEM` 类型用于现有《天龙八部》示例迁移 |
+| 删除语义     | 删除书籍时异步清理源文件、章节、向量、助手、书籍会话与书籍记忆       |
 
 ---
 
@@ -184,6 +184,8 @@ BookSoul
 - 阅读进度入口。
 - 助手设置。
 
+用户登录后进入书籍工作区时默认展示新对话；历史会话只在用户主动选择后加载，不自动恢复最近一次对话。
+
 聊天空状态显示与当前书籍相关的动态建议，例如：
 
 - “帮我总结已读章节的重要事件。”
@@ -195,11 +197,11 @@ BookSoul
 
 用户第一次进入可对话状态时必须选择：
 
-| 选择 | 系统行为 |
-|------|----------|
-| 尚未开始 | 默认只允许第 1 个正文 section；回答限于作品简介与开篇信息 |
-| 正在阅读 | 用户选择当前章节；检索只允许该章及之前内容 |
-| 已读完 / 不介意剧透 | 允许检索全书 |
+| 选择                | 系统行为                                                  |
+| ------------------- | --------------------------------------------------------- |
+| 尚未开始            | 默认只允许第 1 个正文 section；回答限于作品简介与开篇信息 |
+| 正在阅读            | 用户选择当前章节；检索只允许该章及之前内容                |
+| 已读完 / 不介意剧透 | 允许检索全书                                              |
 
 当问题可能需要后文信息、但当前范围内没有证据时，助手回答：
 
@@ -232,29 +234,29 @@ Book
 
 ### 6.2 `Book`
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `id` | UUID | 书籍与向量过滤的稳定标识 |
-| `ownerId` | UUID? | 私有书籍必填；系统示例为空 |
-| `visibility` | `PRIVATE \| SYSTEM` | 一期没有 PUBLIC |
-| `title` | String | EPUB 元数据、TXT 文件名或用户修改值 |
-| `author` | String? | 可选元数据 |
-| `originalFileName` | String | 仅展示；绝不作为磁盘路径 |
-| `storageKey` | String | 服务端生成的内部路径键 |
-| `mimeType` | String | 服务端探测结果 |
-| `fileSizeBytes` | BigInt | 配额与校验 |
-| `contentHash` | String | SHA-256；用于同一用户内重复上传提示 |
-| `language` | String? | 可选 |
-| `coverStorageKey` | String? | 可选封面 |
-| `status` | `QUEUED \| PARSING \| CHUNKING \| EMBEDDING \| READY \| FAILED \| DELETING` | 生命周期 |
-| `statusProgress` | Int | 0～100，仅用于 UI |
-| `failureCode` | String? | 稳定错误码 |
-| `failureMessage` | String? | 对用户安全的错误信息 |
-| `sectionCount` | Int | section 总数 |
-| `chunkCount` | Int | chunk 总数 |
-| `parserVersion` | String | 支持重建 |
-| `embeddingVersion` | String | 模型、维度和分块策略版本 |
-| `createdAt/updatedAt/readyAt` | DateTime | 生命周期时间 |
+| 字段                          | 类型                                                                        | 说明                                |
+| ----------------------------- | --------------------------------------------------------------------------- | ----------------------------------- |
+| `id`                          | UUID                                                                        | 书籍与向量过滤的稳定标识            |
+| `ownerId`                     | UUID?                                                                       | 私有书籍必填；系统示例为空          |
+| `visibility`                  | `PRIVATE \| SYSTEM`                                                         | 一期没有 PUBLIC                     |
+| `title`                       | String                                                                      | EPUB 元数据、TXT 文件名或用户修改值 |
+| `author`                      | String?                                                                     | 可选元数据                          |
+| `originalFileName`            | String                                                                      | 仅展示；绝不作为磁盘路径            |
+| `storageKey`                  | String                                                                      | 服务端生成的内部路径键              |
+| `mimeType`                    | String                                                                      | 服务端探测结果                      |
+| `fileSizeBytes`               | BigInt                                                                      | 配额与校验                          |
+| `contentHash`                 | String                                                                      | SHA-256；用于同一用户内重复上传提示 |
+| `language`                    | String?                                                                     | 可选                                |
+| `coverStorageKey`             | String?                                                                     | 可选封面                            |
+| `status`                      | `QUEUED \| PARSING \| CHUNKING \| EMBEDDING \| READY \| FAILED \| DELETING` | 生命周期                            |
+| `statusProgress`              | Int                                                                         | 0～100，仅用于 UI                   |
+| `failureCode`                 | String?                                                                     | 稳定错误码                          |
+| `failureMessage`              | String?                                                                     | 对用户安全的错误信息                |
+| `sectionCount`                | Int                                                                         | section 总数                        |
+| `chunkCount`                  | Int                                                                         | chunk 总数                          |
+| `parserVersion`               | String                                                                      | 支持重建                            |
+| `embeddingVersion`            | String                                                                      | 模型、维度和分块策略版本            |
+| `createdAt/updatedAt/readyAt` | DateTime                                                                    | 生命周期时间                        |
 
 约束与索引：
 
@@ -266,56 +268,56 @@ Book
 
 小说的“章节”在不同文件中并不统一，因此底层命名使用 `Section`：
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `id` | UUID | 稳定 section 标识 |
-| `bookId` | UUID | 所属书籍 |
-| `order` | Int | 从 1 开始，防剧透过滤依据 |
-| `title` | String | 识别出的章节名或“第 N 节” |
-| `sourceRef` | String? | EPUB spine/href 等内部定位 |
-| `content` | Text | 规范化纯文本，作为可重建的事实源 |
-| `charCount` | Int | 质量与进度统计 |
+| 字段        | 类型    | 说明                             |
+| ----------- | ------- | -------------------------------- |
+| `id`        | UUID    | 稳定 section 标识                |
+| `bookId`    | UUID    | 所属书籍                         |
+| `order`     | Int     | 从 1 开始，防剧透过滤依据        |
+| `title`     | String  | 识别出的章节名或“第 N 节”        |
+| `sourceRef` | String? | EPUB spine/href 等内部定位       |
+| `content`   | Text    | 规范化纯文本，作为可重建的事实源 |
+| `charCount` | Int     | 质量与进度统计                   |
 
 约束：`@@unique([bookId, order])`。
 
 ### 6.4 `BookChunk`
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `id` | UUID | 同时作为 Milvus 主键 |
-| `bookId` | UUID | 所属书籍 |
-| `sectionId` | UUID | 所属 section |
-| `sectionOrder` | Int | 冗余，便于筛选与重建 |
-| `chunkIndex` | Int | section 内顺序 |
-| `content` | Text | 检索后用于生成和引用 |
-| `startOffset/endOffset` | Int? | section 文本范围 |
-| `embeddingVersion` | String | 向量版本 |
+| 字段                    | 类型   | 说明                 |
+| ----------------------- | ------ | -------------------- |
+| `id`                    | UUID   | 同时作为 Milvus 主键 |
+| `bookId`                | UUID   | 所属书籍             |
+| `sectionId`             | UUID   | 所属 section         |
+| `sectionOrder`          | Int    | 冗余，便于筛选与重建 |
+| `chunkIndex`            | Int    | section 内顺序       |
+| `content`               | Text   | 检索后用于生成和引用 |
+| `startOffset/endOffset` | Int?   | section 文本范围     |
+| `embeddingVersion`      | String | 向量版本             |
 
 Milvus 只保存向量和过滤字段；搜索返回 chunk id，再从 PostgreSQL 批量取 `BookChunk.content`。PostgreSQL 是正文与引用的事实源，Milvus 可随时重建。
 
 ### 6.5 `BookAssistant`
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `id` | UUID | 私人助手标识 |
-| `ownerId` | UUID | 助手所属用户 |
-| `bookId` | UUID | 助手只能绑定一本书 |
-| `name` | String | 默认“《书名》阅读助手” |
-| `responseDepth` | `BRIEF \| BALANCED \| DEEP` | 默认 BALANCED |
-| `tone` | `NATURAL \| WARM \| ANALYTICAL` | 默认 NATURAL |
-| `customInstruction` | String? | 最大 1000 字；低于系统安全规则 |
-| `createdAt/updatedAt` | DateTime | |
+| 字段                  | 类型                            | 说明                           |
+| --------------------- | ------------------------------- | ------------------------------ |
+| `id`                  | UUID                            | 私人助手标识                   |
+| `ownerId`             | UUID                            | 助手所属用户                   |
+| `bookId`              | UUID                            | 助手只能绑定一本书             |
+| `name`                | String                          | 默认“《书名》阅读助手”         |
+| `responseDepth`       | `BRIEF \| BALANCED \| DEEP`     | 默认 BALANCED                  |
+| `tone`                | `NATURAL \| WARM \| ANALYTICAL` | 默认 NATURAL                   |
+| `customInstruction`   | String?                         | 最大 1000 字；低于系统安全规则 |
+| `createdAt/updatedAt` | DateTime                        |                                |
 
 约束：`@@unique([ownerId, bookId])`。一期不允许同一用户为同一本书创建多个助手。
 
 ### 6.6 `ReadingProgress`
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `ownerId + bookId` | 复合唯一键 | 用户在该书上的进度 |
-| `mode` | `NOT_STARTED \| IN_PROGRESS \| FINISHED` | 阅读状态 |
-| `currentSectionOrder` | Int? | `IN_PROGRESS` 必填 |
-| `updatedAt` | DateTime | |
+| 字段                  | 类型                                     | 说明               |
+| --------------------- | ---------------------------------------- | ------------------ |
+| `ownerId + bookId`    | 复合唯一键                               | 用户在该书上的进度 |
+| `mode`                | `NOT_STARTED \| IN_PROGRESS \| FINISHED` | 阅读状态           |
+| `currentSectionOrder` | Int?                                     | `IN_PROGRESS` 必填 |
+| `updatedAt`           | DateTime                                 |                    |
 
 服务端计算 `spoilerCeiling`：
 
@@ -325,15 +327,15 @@ Milvus 只保存向量和过滤字段；搜索返回 chunk id，再从 PostgreSQ
 
 ### 6.7 `IngestionJob`
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `id` | UUID | 任务 id |
-| `bookId` | UUID | 一书同一时刻只允许一个活跃任务 |
-| `status` | `QUEUED \| RUNNING \| SUCCEEDED \| FAILED` | 任务状态 |
-| `attempt` | Int | 重试次数 |
-| `lockedAt/heartbeatAt` | DateTime? | 崩溃恢复 |
-| `lastError` | String? | 内部诊断信息，不直接返回前端 |
-| `createdAt/updatedAt` | DateTime | |
+| 字段                   | 类型                                       | 说明                           |
+| ---------------------- | ------------------------------------------ | ------------------------------ |
+| `id`                   | UUID                                       | 任务 id                        |
+| `bookId`               | UUID                                       | 一书同一时刻只允许一个活跃任务 |
+| `status`               | `QUEUED \| RUNNING \| SUCCEEDED \| FAILED` | 任务状态                       |
+| `attempt`              | Int                                        | 重试次数                       |
+| `lockedAt/heartbeatAt` | DateTime?                                  | 崩溃恢复                       |
+| `lastError`            | String?                                    | 内部诊断信息，不直接返回前端   |
+| `createdAt/updatedAt`  | DateTime                                   |                                |
 
 一期采用 PostgreSQL 持久化任务 + NestJS 单实例有界 worker，不引入 Redis。worker 每次原子领取一个任务，定期写 heartbeat；服务重启后可回收超时任务。水平扩展或高并发上传时再替换为 BullMQ/专用队列，领域接口不变。
 
@@ -357,12 +359,12 @@ assistant.book.status == READY
 
 记忆被明确分为：
 
-| 类型 | 作用域 | 示例 |
-|------|--------|------|
-| 全局用户偏好 | User | “喜欢简洁回答” |
-| 书籍阅读状态 | User + Book | 当前章节、关注人物 |
-| 会话记忆 | User + Book + Session | 本次讨论过哪些问题 |
-| 小说事实 | BookSection/BookChunk | 只能来自原文，不写进用户事实 |
+| 类型         | 作用域                | 示例                         |
+| ------------ | --------------------- | ---------------------------- |
+| 全局用户偏好 | User                  | “喜欢简洁回答”               |
+| 书籍阅读状态 | User + Book           | 当前章节、关注人物           |
+| 会话记忆     | User + Book + Session | 本次讨论过哪些问题           |
+| 小说事实     | BookSection/BookChunk | 只能来自原文，不写进用户事实 |
 
 `MemoryRecord` 增加可空 `bookId`；会话型和书籍型记忆必须写 `bookId`。构建 Agent 上下文时只能加载全局偏好与当前 `bookId` 的记忆，不允许跨书召回剧情、人物和会话摘要。
 
@@ -372,14 +374,14 @@ assistant.book.status == READY
 
 ### 7.1 支持范围与默认限制
 
-| 项 | 默认值 |
-|----|--------|
-| 格式 | `.epub`、`.txt` |
-| 单文件大小 | 50 MB，可配置 |
-| TXT 编码 | UTF-8、带 BOM UTF-8、GB18030 自动探测 |
-| 单用户处理中任务 | 最多 2 个 |
-| 单用户书籍数量 | 开发期 20 本，可配置 |
-| EPUB 解压后总大小 | 100 MB，可配置 |
+| 项                | 默认值                                |
+| ----------------- | ------------------------------------- |
+| 格式              | `.epub`、`.txt`                       |
+| 单文件大小        | 50 MB，可配置                         |
+| TXT 编码          | UTF-8、带 BOM UTF-8、GB18030 自动探测 |
+| 单用户处理中任务  | 最多 2 个                             |
+| 单用户书籍数量    | 开发期 20 本，可配置                  |
+| EPUB 解压后总大小 | 100 MB，可配置                        |
 
 必须同时校验扩展名、MIME/文件签名和解析结果，不能只相信客户端 `Content-Type`。
 
@@ -498,16 +500,16 @@ READY
 
 不要直接复用当前缺少 owner 过滤的 `ebook` schema。建立版本化 collection，例如 `book_chunks_v2`：
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `id` | VarChar PK | `BookChunk.id` |
-| `owner_scope` | VarChar | 私有书 owner UUID；系统书为 `__system__` |
-| `book_id` | VarChar | `Book.id` |
-| `section_id` | VarChar | `BookSection.id` |
-| `section_order` | Int32 | 防剧透过滤 |
-| `chunk_index` | Int32 | 稳定排序 |
-| `embedding_version` | VarChar | 重建与灰度 |
-| `vector` | FloatVector | 维度由配置决定 |
+| 字段                | 类型        | 说明                                     |
+| ------------------- | ----------- | ---------------------------------------- |
+| `id`                | VarChar PK  | `BookChunk.id`                           |
+| `owner_scope`       | VarChar     | 私有书 owner UUID；系统书为 `__system__` |
+| `book_id`           | VarChar     | `Book.id`                                |
+| `section_id`        | VarChar     | `BookSection.id`                         |
+| `section_order`     | Int32       | 防剧透过滤                               |
+| `chunk_index`       | Int32       | 稳定排序                                 |
+| `embedding_version` | VarChar     | 重建与灰度                               |
+| `vector`            | FloatVector | 维度由配置决定                           |
 
 正文不再以 Milvus 为唯一副本。
 
@@ -533,6 +535,27 @@ AND embedding_version == "{activeVersion}"
 3. 按向量 score 排序、去重相邻重叠片段。
 4. 生成引用 `{ bookId, sectionId, sectionOrder, sectionTitle, chunkId, excerpt }`。
 5. 任一引用的 `sectionOrder` 超过 spoiler ceiling 时整个回答失败关闭，不允许“只隐藏引用但保留答案”。
+
+### 9.4 对话 Context 获取
+
+Context 不固定塞入同样数量的历史、原文和记忆，而采用“确定性快速路由 + 条件式结构化 Planner + 确定性执行器”：
+
+1. 服务端先解析 owner、book、embedding version 和 spoiler ceiling。Planner 不能生成或修改权限、过滤条件、阅读进度和数值预算。
+2. 明确问候不调用 Embedding 和向量检索；单点事实题直接执行单查询 RAG。只有复杂分析和具有指代的追问才调用结构化 Planner 模型。
+3. Planner 最多生成 3 条互补检索词，只读取当前问题、书名和最近两条用户问题，不把模型历史回答反哺给事实检索。Planner 超时、取消以外的错误或非法输出统一回到当前问题的标准 RAG，不降级为无原文回答。
+4. 单点事实题最多取 4 个 chunk，普通问题最多 6 个，比较、关系、原因、总结等宽问题最多 8 个；宽问题限制同一章节占用，避免 Context 被单章垄断。
+5. 多查询结果使用确定性融合后，再执行 owner、book、embedding version、spoiler ceiling 的 Milvus 过滤和 PostgreSQL 二次校验，并去重相邻重叠片段。
+6. 普通历史最多保留 4 条、合计 6000 字符；追问最多保留 8 条、合计 12000 字符。原文 Context 按问题类型限制为 3600、5400 或 7200 字符。裁剪只影响本次模型上下文，不修改持久化历史和原文。
+7. 只有问题明确涉及用户偏好或当前书笔记时才加载记忆：全局偏好最多 3 条，当前书笔记与全局偏好合计最多 5 条。记忆不能作为小说事实依据。
+
+### 9.5 受控联网资料
+
+1. 联网资料只用于现实背景、作者信息、历史典故和用户明确要求的网络查证，不代替书内 RAG。
+2. 只有用户在单次提问中显式开启 `externalResearch` 才允许调用；模型、小说正文、检索片段、记忆和历史消息都不能触发。
+3. 外部请求只包含当前问题和必要书名，不发送小说正文、用户记忆、会话历史、owner、book id 或其他账号信息。
+4. 一期仅允许 Tavily `tavily_search`，限制为 5 条结果、basic 深度、不含图像和网页全文；输入、输出、超时和 URL 协议由服务端确定性校验。
+5. 外部结果以不可信资料分区注入 Prompt，不能当作指令或小说事实。回答引用外部资料时必须附 URL，并与书内章节引用分开展示。
+6. MCP 失败必须显式告知用户；只要书内 RAG 仍可用，本轮可继续基于当前可见原文回答，但不得伪装已经联网。
 
 ---
 
@@ -633,7 +656,7 @@ AND embedding_version == "{activeVersion}"
 - `ChatDto.character` 与前端 `CharacterType`。
 - 所有《天龙八部》硬编码提示词、问候语和 query rewrite 示例。
 - 检索工具对固定 `ebook` collection 的无过滤搜索。
-- 地图、角色口吻和邮件等非核心工具默认入口；未来以明确能力开关恢复。
+- 地图和角色口吻等非核心工具默认入口。邮件仅作为用户在某条助手回复上主动打开的受控能力，不恢复模型可直接执行的旧发送工具。
 
 ---
 
@@ -643,14 +666,14 @@ AND embedding_version == "{activeVersion}"
 
 ### 12.1 Books
 
-| Method | Path | 说明 |
-|--------|------|------|
-| `POST` | `/api/books` | multipart 上传；成功返回 `202` 与 Book |
-| `GET` | `/api/books` | 当前用户的私有书 + 可用系统示例 |
-| `GET` | `/api/books/:bookId` | 详情、状态、section 列表摘要、助手信息 |
-| `POST` | `/api/books/:bookId/retry` | 仅 FAILED 可重试 |
-| `DELETE` | `/api/books/:bookId` | 标记 DELETING 并异步清理 |
-| `GET` | `/api/books/:bookId/cover` | 鉴权读取封面 |
+| Method   | Path                       | 说明                                   |
+| -------- | -------------------------- | -------------------------------------- |
+| `POST`   | `/api/books`               | multipart 上传；成功返回 `202` 与 Book |
+| `GET`    | `/api/books`               | 当前用户的私有书 + 可用系统示例        |
+| `GET`    | `/api/books/:bookId`       | 详情、状态、section 列表摘要、助手信息 |
+| `POST`   | `/api/books/:bookId/retry` | 仅 FAILED 可重试                       |
+| `DELETE` | `/api/books/:bookId`       | 标记 DELETING 并异步清理               |
+| `GET`    | `/api/books/:bookId/cover` | 鉴权读取封面                           |
 
 上传响应示例：
 
@@ -668,12 +691,12 @@ AND embedding_version == "{activeVersion}"
 
 ### 12.2 阅读进度与助手
 
-| Method | Path | 说明 |
-|--------|------|------|
-| `GET` | `/api/books/:bookId/sections` | section 目录，不返回整章正文 |
-| `PUT` | `/api/books/:bookId/reading-progress` | 设置状态和当前 section |
-| `GET` | `/api/books/:bookId/assistant` | 获取当前用户的助手 |
-| `PATCH` | `/api/books/:bookId/assistant` | 修改名称、深度、语气、自定义指令 |
+| Method  | Path                                  | 说明                             |
+| ------- | ------------------------------------- | -------------------------------- |
+| `GET`   | `/api/books/:bookId/sections`         | section 目录，不返回整章正文     |
+| `PUT`   | `/api/books/:bookId/reading-progress` | 设置状态和当前 section           |
+| `GET`   | `/api/books/:bookId/assistant`        | 获取当前用户的助手               |
+| `PATCH` | `/api/books/:bookId/assistant`        | 修改名称、深度、语气、自定义指令 |
 
 进度更新示例：
 
@@ -688,17 +711,25 @@ AND embedding_version == "{activeVersion}"
 
 ### 12.3 Sessions 与 Chat
 
-| Method | Path | 说明 |
-|--------|------|------|
-| `POST` | `/api/books/:bookId/sessions` | 为当前书助手创建服务端 UUID 会话 |
-| `GET` | `/api/books/:bookId/sessions` | 只列当前书的会话 |
-| `GET` | `/api/chat/history/:sessionId` | 校验 owner 后读取消息 |
-| `DELETE` | `/api/chat/history/:sessionId` | 校验 owner 后删除 |
-| `POST` | `/api/chat` | SSE；body 只含 sessionId、message、spoilerOverride |
+| Method   | Path                           | 说明                                                                       |
+| -------- | ------------------------------ | -------------------------------------------------------------------------- |
+| `POST`   | `/api/books/:bookId/sessions`  | 为当前书助手创建服务端 UUID 会话                                           |
+| `GET`    | `/api/books/:bookId/sessions`  | 只列当前书的会话                                                           |
+| `GET`    | `/api/chat/history/:sessionId` | 校验 owner 后读取消息                                                      |
+| `DELETE` | `/api/chat/history/:sessionId` | 校验 owner 后删除                                                          |
+| `POST`   | `/api/chat`                    | SSE；body 只含 sessionId、message、spoilerOverride 和单次 externalResearch |
 
 现有 `/api/chat/history` 全局列表可在迁移期保留，最终书架侧只展示按 book scoped 的会话。
 
-### 12.4 状态轮询
+### 12.4 邮件工具
+
+| Method | Path               | 说明                                           |
+| ------ | ------------------ | ---------------------------------------------- |
+| `POST` | `/api/tools/email` | JWT 用户在可编辑草稿中明确确认后发送纯文本邮件 |
+
+客户端只能从已完成的助手回复打开邮件草稿，默认收件人为当前登录账号邮箱。请求必须携带 `confirmed: true`，并受服务端长度校验、邮箱校验、独立限流和 SMTP 超时约束。不接受 HTML，不在日志中记录收件人、正文或服务商错误详情。
+
+### 12.5 状态轮询
 
 一期由书架每 2～4 秒轮询仍在处理的 Book；页面隐藏后降低频率。状态达到 `READY` 或 `FAILED` 后停止。不为上传进度另建 WebSocket。
 
@@ -713,6 +744,7 @@ AND embedding_version == "{activeVersion}"
 - `SYSTEM Book` 只读，用户只能修改自己的 assistant/progress/session。
 - 客户端传入的 bookId/sessionId 只用于查找，不能直接决定 owner filter。
 - 任何不存在或不属于当前用户的私有资源统一返回 404，减少资源枚举。
+- 邮件属于外部写操作；只能由用户在可见草稿上二次确认，不能由模型、检索内容或工具输出自动执行。
 
 ### 13.2 隐私原则
 
@@ -733,6 +765,7 @@ AND embedding_version == "{activeVersion}"
 - 放入明确数据分隔符。
 - 系统提示声明其中的指令无效。
 - 不允许正文触发 MCP、邮件或外部工具。
+- 外部搜索结果同样放入独立数据分隔符，不能覆盖书内事实域、权限或防剧透规则。
 - 自定义指令有长度限制，并处在平台规则与防剧透规则之后。
 
 ---
@@ -783,15 +816,15 @@ AND embedding_version == "{activeVersion}"
 
 ### 15.3 前端迁移
 
-| 当前 | 目标 |
-|------|------|
-| `Entrance` 选择人物 | `LibraryPage` 展示/上传书籍 |
-| `CharacterType` | `BookSummary` + `BookAssistant` |
-| `currentCharacter` | `currentBookId/currentSessionId` |
-| `switchCharacter` | `openBook/createBookSession` |
-| 固定 greeting/suggestions | 按 Book 与进度动态生成 |
-| CharacterSwitchPanel | Book switcher / 返回书架 |
-| 消息 `characterId` | 可选 `assistantSnapshot`，不再决定后端行为 |
+| 当前                      | 目标                                       |
+| ------------------------- | ------------------------------------------ |
+| `Entrance` 选择人物       | `LibraryPage` 展示/上传书籍                |
+| `CharacterType`           | `BookSummary` + `BookAssistant`            |
+| `currentCharacter`        | `currentBookId/currentSessionId`           |
+| `switchCharacter`         | `openBook/createBookSession`               |
+| 固定 greeting/suggestions | 按 Book 与进度动态生成                     |
+| CharacterSwitchPanel      | Book switcher / 返回书架                   |
+| 消息 `characterId`        | 可选 `assistantSnapshot`，不再决定后端行为 |
 
 ### 15.4 后端迁移
 
@@ -892,16 +925,16 @@ server/src/storage/**
 
 MVP 不以“上传了多少文件”为成功，而以“上传后是否形成持续阅读对话”为准：
 
-| 指标 | 定义 |
-|------|------|
-| 上传可用率 | 合法文件最终 READY 的比例 |
-| 激活率 | READY 后 24 小时内至少完成一次有效提问的用户比例 |
-| 首次价值时间 | 上传开始到第一次收到有引用回答的时间 |
-| 每本活跃书消息数 | READY 书籍在 7 天内的用户消息数 |
-| 7 日回访率 | 用户是否回到同一本书继续对话或更新进度 |
-| 空检索率 | 需要原文依据的问题中未找到有效 chunk 的比例 |
-| 引用打开率 | 用户展开引用片段的比例 |
-| 剧透投诉率 | 用户主动标记“超出阅读进度”的回答比例，目标接近 0 |
+| 指标             | 定义                                             |
+| ---------------- | ------------------------------------------------ |
+| 上传可用率       | 合法文件最终 READY 的比例                        |
+| 激活率           | READY 后 24 小时内至少完成一次有效提问的用户比例 |
+| 首次价值时间     | 上传开始到第一次收到有引用回答的时间             |
+| 每本活跃书消息数 | READY 书籍在 7 天内的用户消息数                  |
+| 7 日回访率       | 用户是否回到同一本书继续对话或更新进度           |
+| 空检索率         | 需要原文依据的问题中未找到有效 chunk 的比例      |
+| 引用打开率       | 用户展开引用片段的比例                           |
+| 剧透投诉率       | 用户主动标记“超出阅读进度”的回答比例，目标接近 0 |
 
 最先验证的产品假设是：**用户会不会为了正在阅读的一本书，完成上传并在之后多次回来询问，而不仅是体验一次。**
 
@@ -909,14 +942,14 @@ MVP 不以“上传了多少文件”为成功，而以“上传后是否形成�
 
 ## 19. 实施分期建议
 
-| 阶段 | 交付内容 |
-|------|----------|
-| T1 · 领域底座 | Prisma 模型、Books API、私有文件存储、权限测试 |
-| T2 · 异步导入 | EPUB/TXT parser、section/chunk、持久化 job、状态与重试 |
-| T3 · 向量隔离 | `book_chunks_v2`、批量 Embedding、owner/book/version 过滤、删除 |
-| T4 · 通用 Agent | session → book scope、通用 Prompt、引用、去角色化、防剧透 |
-| T5 · 前端闭环 | 私人书架、上传与进度、书籍工作区、按书历史、助手设置基础版 |
-| T6 · 迁移与验收 | 《天龙八部》系统示例、旧会话回填、隔离/恢复/删除 E2E、README |
+| 阶段            | 交付内容                                                        |
+| --------------- | --------------------------------------------------------------- |
+| T1 · 领域底座   | Prisma 模型、Books API、私有文件存储、权限测试                  |
+| T2 · 异步导入   | EPUB/TXT parser、section/chunk、持久化 job、状态与重试          |
+| T3 · 向量隔离   | `book_chunks_v2`、批量 Embedding、owner/book/version 过滤、删除 |
+| T4 · 通用 Agent | session → book scope、通用 Prompt、引用、去角色化、防剧透       |
+| T5 · 前端闭环   | 私人书架、上传与进度、书籍工作区、按书历史、助手设置基础版      |
+| T6 · 迁移与验收 | 《天龙八部》系统示例、旧会话回填、隔离/恢复/删除 E2E、README    |
 
 每个阶段应能独立测试；不要先大面积重做 UI，再补书籍作用域和向量隔离。
 
@@ -926,20 +959,20 @@ MVP 不以“上传了多少文件”为成功，而以“上传后是否形成�
 
 以下事项不阻塞实现，若无新的产品决策则采用默认值：
 
-| 开放项 | 一期默认 |
-|--------|----------|
-| 最大上传大小 | 50 MB |
-| TXT 编码 | UTF-8 + GB18030 自动探测 |
-| 一本书能否创建多个助手 | 否 |
-| 是否支持编辑书名/作者 | 支持元数据修改，不修改正文 |
-| 未选择阅读状态能否聊天 | 首次聊天前必须选择；默认不擅自开放全书 |
-| 防剧透单次放行 | 支持 `FULL_BOOK_ONCE`，需要显式确认 |
-| 私有内容跨用户去重 | 不做 |
-| 处理任务队列 | PostgreSQL 持久化 + 单实例 worker |
-| 文件存储 | 本地私有目录 + adapter，后续可切对象存储 |
-| 系统示例 | 保留《天龙八部》，只读且与私人上传明确区分 |
-| 旧角色入口 | 移除；不在 MVP 中作为模式保留 |
-| 完整阅读器 | 不做，只显示目录、进度和短引用 |
+| 开放项                 | 一期默认                                   |
+| ---------------------- | ------------------------------------------ |
+| 最大上传大小           | 50 MB                                      |
+| TXT 编码               | UTF-8 + GB18030 自动探测                   |
+| 一本书能否创建多个助手 | 否                                         |
+| 是否支持编辑书名/作者  | 支持元数据修改，不修改正文                 |
+| 未选择阅读状态能否聊天 | 首次聊天前必须选择；默认不擅自开放全书     |
+| 防剧透单次放行         | 支持 `FULL_BOOK_ONCE`，需要显式确认        |
+| 私有内容跨用户去重     | 不做                                       |
+| 处理任务队列           | PostgreSQL 持久化 + 单实例 worker          |
+| 文件存储               | 本地私有目录 + adapter，后续可切对象存储   |
+| 系统示例               | 保留《天龙八部》，只读且与私人上传明确区分 |
+| 旧角色入口             | 移除；不在 MVP 中作为模式保留              |
+| 完整阅读器             | 不做，只显示目录、进度和短引用             |
 
 ---
 

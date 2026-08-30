@@ -6,6 +6,7 @@ import {
   Quote,
   ChevronDown,
   Loader2,
+  Mail,
 } from "lucide-react";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
@@ -13,6 +14,10 @@ import { ReferenceCard } from "./ReferenceCard";
 import { type Message } from "@/store/useChatStore";
 import { useBooksStore } from "@/store/useBooksStore";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuthStore } from "@/store/useAuthStore";
+import { createEmailDraft } from "@/lib/email-draft";
+import { EmailComposerDialog } from "./EmailComposerDialog";
+import { ExternalReferenceCard } from "./ExternalReferenceCard";
 
 interface MessageBubbleProps {
   message: Message;
@@ -21,9 +26,21 @@ interface MessageBubbleProps {
 export const MessageBubble = ({ message }: MessageBubbleProps) => {
   const isUser = message.role === "user";
   const [isCopied, setIsCopied] = useState(false);
+  const [isEmailComposerOpen, setIsEmailComposerOpen] = useState(false);
   const assistantName = useBooksStore(
     (state) => state.assistant?.name ?? "阅读助手",
   );
+  const bookTitle = useBooksStore(
+    (state) => state.currentBook?.title ?? "当前书籍",
+  );
+  const accountEmail = useAuthStore((state) => state.user?.email ?? "");
+  const emailDraft = createEmailDraft({
+    recipient: accountEmail,
+    bookTitle,
+    assistantName,
+    content: message.content,
+    references: message.references,
+  });
 
   const displayContent = message.content;
 
@@ -54,29 +71,29 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
       initial={{ opacity: 0, y: 12, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-      className={`flex gap-3 group ${isUser ? "flex-row-reverse" : ""}`}
+      className={`group flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}
     >
-      <div className="flex-shrink-0 mt-1.5">
+      <div className="mt-1.5 flex-shrink-0">
         {isUser ? (
-          <div className="w-7 h-7 rounded-full bg-primary/12 flex items-center justify-center">
-            <User className="w-3.5 h-3.5 text-primary/80" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-[12px] bg-primary/12">
+            <User className="h-3.5 w-3.5 text-primary/80" />
           </div>
         ) : (
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <BookOpen className="h-3.5 w-3.5" />
+          <span className="warm-tint flex h-8 w-8 items-center justify-center rounded-[12px] text-primary">
+            <BookOpen className="h-4 w-4" />
           </span>
         )}
       </div>
 
       <div
-        className={`flex flex-col min-w-0 ${
+        className={`flex min-w-0 flex-col ${
           isUser
-            ? "items-end max-w-[min(100%,34rem)]"
-            : "items-start w-full max-w-[42rem]"
+            ? "max-w-[min(100%,38rem)] items-end"
+            : "w-full max-w-[50rem] items-start"
         }`}
       >
         {isUser ? (
-          <div className="bg-primary/[0.12] text-foreground rounded-2xl rounded-br-md px-4 py-2.5 text-[15px] leading-[1.6] border border-primary/15">
+          <div className="rounded-[20px] rounded-br-md border border-primary/15 bg-primary/[0.12] px-4 py-2.5 text-[15px] leading-[1.65] text-foreground">
             <div className="space-y-1">
               {message.content.split("\n").map((line, i) => (
                 <p key={i} className={line.trim() === "" ? "h-2" : ""}>
@@ -86,37 +103,50 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
             </div>
           </div>
         ) : (
-          <div className="w-full relative group/content rounded-2xl rounded-tl-md bg-white dark:bg-card px-5 py-4 border border-black/[0.05] dark:border-border shadow-[0_1px_3px_rgba(20,20,19,0.04),0_8px_24px_-12px_rgba(20,20,19,0.08)]">
-            <div className="flex items-center justify-between gap-3 mb-2.5">
-              <div className="flex items-center gap-2 min-w-0">
+          <div className="warm-card-raised group/content relative w-full rounded-[24px] rounded-tl-md px-5 py-4 sm:px-6 sm:py-5">
+            <div className="mb-3 flex items-center justify-between gap-3 border-b border-border/60 pb-3">
+              <div className="flex min-w-0 items-center gap-2">
                 <span className="truncate text-[13px] font-semibold text-primary">
                   {assistantName}
                 </span>
-                <span className="text-[11px] text-muted-foreground truncate hidden sm:inline">
-                  当前书籍
+                <span className="hidden truncate rounded-full bg-secondary px-2 py-1 text-[10px] font-medium text-muted-foreground sm:inline">
+                  阅读笔记
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={handleCopy}
-                aria-label="复制回答"
-                className="p-1.5 rounded-lg text-muted-foreground/35 hover:text-foreground hover:bg-secondary transition-all opacity-0 group-hover/content:opacity-100"
-              >
-                {isCopied ? (
-                  <Check className="w-3.5 h-3.5 text-primary" />
-                ) : (
-                  <Copy className="w-3.5 h-3.5" />
+              <div className="flex items-center gap-1">
+                {!message.isStreaming && displayContent.trim().length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setIsEmailComposerOpen(true)}
+                    aria-label="发送到邮箱"
+                    title="发送到邮箱"
+                    className="rounded-lg p-1.5 text-muted-foreground/55 opacity-70 transition-[color,background-color,opacity] hover:bg-secondary hover:text-foreground group-hover/content:opacity-100"
+                  >
+                    <Mail className="h-3.5 w-3.5" />
+                  </button>
                 )}
-              </button>
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  aria-label="复制回答"
+                  className="rounded-lg p-1.5 text-muted-foreground/55 opacity-70 transition-[color,background-color,opacity] hover:bg-secondary hover:text-foreground group-hover/content:opacity-100"
+                >
+                  {isCopied ? (
+                    <Check className="w-3.5 h-3.5 text-primary" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              </div>
             </div>
 
-            <div className="prose-ai text-[15px] leading-[1.7] text-foreground/90">
+            <div className="prose-ai text-[15px] leading-[1.8] text-foreground/90">
               {message.thinkingSteps && message.thinkingSteps.length > 0 && (
                 <div className="mb-3">
                   <button
                     type="button"
                     onClick={() => setIsThinkingExpanded(!isThinkingExpanded)}
-                    className="flex items-center gap-2 py-1.5 px-2.5 -ml-1 rounded-lg bg-secondary/80 border border-border/50 hover:opacity-80 transition-opacity"
+                    className="warm-inset -ml-1 flex items-center gap-2 rounded-xl px-2.5 py-1.5 transition-opacity hover:opacity-80"
                   >
                     {message.isThinking ? (
                       <div className="flex items-center gap-2">
@@ -146,7 +176,7 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                         exit={{ height: 0, opacity: 0 }}
                         className="overflow-hidden"
                       >
-                        <div className="mt-2 pl-4 border-l-2 border-primary/25 space-y-2.5 py-1 bg-secondary/50 rounded-r-lg">
+                        <div className="mt-2 space-y-2.5 rounded-r-xl border-l-2 border-primary/25 bg-secondary/50 py-2 pl-4">
                           {message.thinkingSteps.map((step, idx) => (
                             <motion.div
                               key={idx}
@@ -218,7 +248,7 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                           </ol>
                         ),
                         blockquote: ({ children }) => (
-                          <blockquote className="flex gap-3 my-4 pl-0 border-l-4 border-primary/30 italic text-muted-foreground bg-muted/30 p-4 rounded-r-xl">
+                          <blockquote className="font-reading my-4 flex gap-3 rounded-r-xl border-l-4 border-primary/30 bg-muted/30 p-4 pl-0 italic text-muted-foreground">
                             <Quote className="w-5 h-5 text-primary/40 flex-shrink-0 rotate-180 mt-0.5" />
                             <div className="flex-1">{children}</div>
                           </blockquote>
@@ -300,12 +330,20 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                 </motion.div>
               )}
             </div>
-          </div>
-        )}
 
-        {!isUser && message.references && message.references.length > 0 && (
-          <div className="mt-2.5 w-full">
-            <ReferenceCard references={message.references} />
+            {message.references && message.references.length > 0 && (
+              <div className="mt-4 border-t border-border/65 pt-4">
+                <ReferenceCard references={message.references} />
+              </div>
+            )}
+            {message.externalReferences &&
+              message.externalReferences.length > 0 && (
+                <div className="mt-3 border-t border-border/65 pt-4">
+                  <ExternalReferenceCard
+                    references={message.externalReferences}
+                  />
+                </div>
+              )}
           </div>
         )}
 
@@ -318,6 +356,12 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
           </div>
         )}
       </div>
+      {!isUser && isEmailComposerOpen && (
+        <EmailComposerDialog
+          draft={emailDraft}
+          onClose={() => setIsEmailComposerOpen(false)}
+        />
+      )}
     </motion.div>
   );
 };

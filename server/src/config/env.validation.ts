@@ -23,6 +23,7 @@ export function validateEnvironment(
   for (const name of [
     'OPENAI_REQUEST_TIMEOUT_MS',
     'MILVUS_REQUEST_TIMEOUT_MS',
+    'MCP_TOOL_TIMEOUT_MS',
     'BOOK_MAX_UPLOAD_BYTES',
     'BOOK_MAX_EPUB_ENTRIES',
     'BOOK_MAX_EPUB_UNCOMPRESSED_BYTES',
@@ -34,6 +35,10 @@ export function validateEnvironment(
     'BOOK_EMBEDDING_BATCH_SIZE',
     'BOOK_EMBEDDING_MAX_ATTEMPTS',
     'BOOK_DELETION_RETRY_MS',
+    'SMTP_PORT',
+    'SMTP_CONNECTION_TIMEOUT_MS',
+    'SMTP_GREETING_TIMEOUT_MS',
+    'SMTP_SOCKET_TIMEOUT_MS',
   ]) {
     if (config[name] === undefined || config[name] === '') continue;
     const value = Number(config[name]);
@@ -68,6 +73,41 @@ export function validateEnvironment(
     !['true', 'false'].includes(String(config.BOOK_INGESTION_WORKER_ENABLED))
   ) {
     throw new Error('BOOK_INGESTION_WORKER_ENABLED must be true or false');
+  }
+
+  if (
+    config.SMTP_SECURE !== undefined &&
+    !['true', 'false'].includes(String(config.SMTP_SECURE))
+  ) {
+    throw new Error('SMTP_SECURE must be true or false');
+  }
+
+  const tavilyMcpUrl = String(config.TAVILY_MCP_URL ?? '').trim();
+  if (tavilyMcpUrl) {
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(tavilyMcpUrl);
+    } catch {
+      throw new Error('TAVILY_MCP_URL must be a valid HTTPS URL');
+    }
+    if (parsedUrl.protocol !== 'https:') {
+      throw new Error('TAVILY_MCP_URL must be a valid HTTPS URL');
+    }
+  }
+
+  const allowedMcpTools = String(
+    config.MCP_ALLOWED_TOOL_NAMES ?? 'tavily_search',
+  )
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean);
+  const unsupportedMcpTool = allowedMcpTools.find(
+    (name) => name !== 'tavily_search',
+  );
+  if (unsupportedMcpTool) {
+    throw new Error(
+      `MCP_ALLOWED_TOOL_NAMES contains unsupported tool: ${unsupportedMcpTool}`,
+    );
   }
 
   return config;

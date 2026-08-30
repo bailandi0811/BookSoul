@@ -26,10 +26,21 @@ describe("book-scoped chat state", () => {
     });
   });
 
-  it("prepares a book using only its server sessions", async () => {
+  it("prepares a book on a new conversation while keeping server sessions available", async () => {
+    const existingSession = {
+      sessionId: "existing-session",
+      title: "之前的对话",
+      updatedAt: "2026-08-29T00:00:00.000Z",
+    };
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
-      .mockResolvedValue(success([]));
+      .mockResolvedValue(success([existingSession]));
+
+    useChatStore.setState({
+      currentBookId: "previous-book",
+      sessionId: "previous-session",
+      messages: [{ role: "user", content: "旧消息" }],
+    });
 
     await useChatStore.getState().prepareBook("book-a");
 
@@ -41,7 +52,9 @@ describe("book-scoped chat state", () => {
       currentBookId: "book-a",
       sessionId: null,
       messages: [],
+      sessions: [existingSession],
     });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("uses the server generated session id for a new conversation", async () => {
@@ -63,15 +76,18 @@ describe("book-scoped chat state", () => {
     });
   });
 
-  it("sends only message, session, and one-time spoiler choice", async () => {
+  it("sends only the scoped chat choices and keeps external sources separate", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
       .mockImplementation(async (input) => {
         if (input === "/api/chat") {
-          return new Response('data: {"content":"回答"}\n\ndata: [DONE]\n\n', {
-            status: 200,
-            headers: { "Content-Type": "text/event-stream" },
-          });
+          return new Response(
+            'data: {"externalReferences":[{"title":"资料","url":"https://example.com/source","snippet":"摘要"}]}\n\ndata: {"content":"回答"}\n\ndata: [DONE]\n\n',
+            {
+              status: 200,
+              headers: { "Content-Type": "text/event-stream" },
+            },
+          );
         }
         return success([]);
       });
@@ -80,7 +96,7 @@ describe("book-scoped chat state", () => {
       sessionId: "server-session",
     });
 
-    await useChatStore.getState().sendMessage("问题", true);
+    await useChatStore.getState().sendMessage("问题", true, true);
 
     const chatCall = fetchMock.mock.calls.find(
       ([input]) => input === "/api/chat",
@@ -94,10 +110,20 @@ describe("book-scoped chat state", () => {
       message: "问题",
       sessionId: "server-session",
       spoilerOverride: true,
+      externalResearch: true,
     });
     expect(body).not.toHaveProperty("character");
     expect(body).not.toHaveProperty("bookId");
     expect(useChatStore.getState().messages.at(-1)?.content).toBe("回答");
+    expect(useChatStore.getState().messages.at(-1)?.externalReferences).toEqual(
+      [
+        {
+          title: "资料",
+          url: "https://example.com/source",
+          snippet: "摘要",
+        },
+      ],
+    );
   });
 
   it("resetBookChat aborts an in-flight response and clears private state", () => {

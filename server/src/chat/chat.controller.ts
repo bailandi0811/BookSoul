@@ -82,13 +82,14 @@ export class ChatController {
     };
 
     try {
-      for await (const event of this.chatService.stream(
-        context,
-        body.message,
-        abortController.signal,
-      )) {
+      for await (const event of this.chatService.stream(context, body.message, {
+        externalResearch: body.externalResearch === true,
+        abortSignal: abortController.signal,
+      })) {
         if (event.type === 'references') {
           writeEvent({ references: event.data });
+        } else if (event.type === 'external_references') {
+          writeEvent({ externalReferences: event.data });
         } else if (event.type === 'content') {
           writeEvent({ content: event.data });
         } else if (event.type === 'memory_update') {

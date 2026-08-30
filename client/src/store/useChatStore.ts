@@ -13,6 +13,12 @@ export interface Reference {
   score: number;
 }
 
+export interface ExternalReference {
+  title: string;
+  url: string;
+  snippet: string;
+}
+
 export interface HistorySession {
   sessionId: string;
   title: string;
@@ -24,6 +30,7 @@ export interface Message {
   role: "user" | "assistant";
   content: string;
   references?: Reference[];
+  externalReferences?: ExternalReference[];
   isStreaming?: boolean;
   isThinking?: boolean;
   thinkingText?: string;
@@ -66,7 +73,11 @@ interface ChatState {
   startNewSession: (bookId?: string) => Promise<string | null>;
   loadSession: (sessionId: string) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
-  sendMessage: (content: string, spoilerOverride?: boolean) => Promise<void>;
+  sendMessage: (
+    content: string,
+    spoilerOverride?: boolean,
+    externalResearch?: boolean,
+  ) => Promise<void>;
 }
 
 const CHAT_INACTIVITY_TIMEOUT_MS = 30_000;
@@ -175,10 +186,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
       activeRequestId: null,
     });
     await get().fetchSessions(bookId);
-    const firstSession = get().sessions[0];
-    if (get().currentBookId === bookId && firstSession) {
-      await get().loadSession(firstSession.sessionId);
-    }
   },
 
   resetBookChat: () => {
@@ -310,7 +317,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  sendMessage: async (content, spoilerOverride = false) => {
+  sendMessage: async (
+    content,
+    spoilerOverride = false,
+    externalResearch = false,
+  ) => {
     const currentBookId = get().currentBookId;
     if (!currentBookId) return;
     let sessionId = get().sessionId;
@@ -375,7 +386,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const response = await apiFetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: content, sessionId, spoilerOverride }),
+        body: JSON.stringify({
+          message: content,
+          sessionId,
+          spoilerOverride,
+          externalResearch,
+        }),
         signal: abortController.signal,
       });
       if (!response.ok) throw new Error(await readApiError(response));
@@ -401,6 +417,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 error?: string;
                 thinking?: string;
                 references?: Reference[];
+                externalReferences?: ExternalReference[];
                 content?: string;
                 memoryUpdate?: MemoryUpdateData;
               };
@@ -426,6 +443,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     messages[messages.length - 1] = {
                       ...last,
                       references: data.references,
+                    };
+                  }
+                  return { messages };
+                });
+              }
+              if (data.externalReferences) {
+                set((state) => {
+                  if (state.activeRequestId !== requestId) return state;
+                  const messages = [...state.messages];
+                  const last = messages[messages.length - 1];
+                  if (last) {
+                    messages[messages.length - 1] = {
+                      ...last,
+                      externalReferences: data.externalReferences,
                     };
                   }
                   return { messages };

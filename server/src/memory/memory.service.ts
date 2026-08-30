@@ -25,6 +25,8 @@ export interface AgentMemoryContext {
   recalledMemoryIds: string[];
 }
 
+export type BookMemoryContextPolicy = 'preferences' | 'book_notes';
+
 @Injectable()
 export class MemoryService {
   private readonly logger = new Logger(MemoryService.name);
@@ -574,6 +576,7 @@ ${messages.map((m) => `- ${m}`).join('\n')}
     bookId: string,
     query: string,
     topK = 5,
+    policy: BookMemoryContextPolicy = 'book_notes',
   ): Promise<AgentMemoryContext> {
     requireSafePathSegment(userId, '用户标识');
     requireSafePathSegment(sessionId, '会话标识');
@@ -586,19 +589,25 @@ ${messages.map((m) => `- ${m}`).join('\n')}
         entry.userId === userId &&
         (entry.bookId == null || entry.bookId === bookId) &&
         entry.metadata.verified &&
-        (entry.level !== MemoryLevel.EPISODIC || entry.sessionId === sessionId),
+        (entry.level !== MemoryLevel.EPISODIC ||
+          entry.sessionId === sessionId) &&
+        (policy === 'preferences'
+          ? entry.bookId == null && entry.category === MemoryCategory.PREFERENCE
+          : entry.bookId === bookId ||
+            (entry.bookId == null &&
+              entry.category === MemoryCategory.PREFERENCE)),
     );
     const ranked = this.rankTextMemories(stable, query);
-    const recalled = [...ranked, ...stable]
+    const fallback = [...stable].sort(
+      (a, b) =>
+        Number(b.bookId === bookId) - Number(a.bookId === bookId) ||
+        b.importance - a.importance ||
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+    );
+    const recalled = [...ranked, ...fallback]
       .filter(
         (entry, index, entries) =>
           entries.findIndex((candidate) => candidate.id === entry.id) === index,
-      )
-      .sort(
-        (a, b) =>
-          Number(b.bookId === bookId) - Number(a.bookId === bookId) ||
-          b.importance - a.importance ||
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
       )
       .slice(0, safeTopK);
 

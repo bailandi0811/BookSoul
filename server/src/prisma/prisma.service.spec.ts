@@ -1,12 +1,76 @@
-import { config } from 'dotenv';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from './prisma.service';
 
-config();
+const TEST_EMAILS = [
+  'unique@example.com',
+  'rt@example.com',
+  'cascade@example.com',
+];
+
+function databaseIdentity(rawUrl: string): string {
+  const url = new URL(rawUrl);
+  const databaseName = decodeURIComponent(url.pathname.replace(/^\//, ''));
+  const schemaName = url.searchParams.get('schema') ?? 'public';
+
+  return [
+    url.hostname.toLowerCase(),
+    url.port || '5432',
+    databaseName.toLowerCase(),
+    schemaName.toLowerCase(),
+  ].join('/');
+}
+
+function resolveTestDatabaseUrl(): string {
+  const rawUrl = process.env.TEST_DATABASE_URL?.trim();
+  if (!rawUrl) {
+    throw new Error(
+      'Database tests require an explicit isolated TEST_DATABASE_URL.',
+    );
+  }
+
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    throw new Error('TEST_DATABASE_URL must be a valid PostgreSQL URL.');
+  }
+
+  const databaseName = decodeURIComponent(url.pathname.replace(/^\//, ''));
+  const schemaName = url.searchParams.get('schema') ?? '';
+  if (
+    !databaseName.toLowerCase().endsWith('_test') ||
+    !schemaName.toLowerCase().startsWith('test_')
+  ) {
+    throw new Error(
+      'Refusing database tests: TEST_DATABASE_URL must target an isolated *_test database and test_* schema.',
+    );
+  }
+
+  const applicationUrl = process.env.DATABASE_URL?.trim();
+  if (
+    applicationUrl &&
+    databaseIdentity(applicationUrl) === databaseIdentity(rawUrl)
+  ) {
+    throw new Error(
+      'Refusing database tests: TEST_DATABASE_URL points to the application database.',
+    );
+  }
+
+  return rawUrl;
+}
+
+const testDatabaseUrl = resolveTestDatabaseUrl();
+process.env.DATABASE_URL = testDatabaseUrl;
 
 describe('PrismaService foundation', () => {
   let prisma: PrismaService;
+
+  async function removeTestFixtures(): Promise<void> {
+    await prisma.user.deleteMany({
+      where: { email: { in: TEST_EMAILS } },
+    });
+  }
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -18,12 +82,12 @@ describe('PrismaService foundation', () => {
   });
 
   afterAll(async () => {
+    await removeTestFixtures();
     await prisma.$disconnect();
   });
 
   beforeEach(async () => {
-    await prisma.refreshToken.deleteMany();
-    await prisma.user.deleteMany();
+    await removeTestFixtures();
   });
 
   it('enforces unique User.email', async () => {
