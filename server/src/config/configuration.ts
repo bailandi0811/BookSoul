@@ -37,6 +37,15 @@ export default () => ({
     accessExpires: process.env.JWT_ACCESS_EXPIRES || '15m',
     refreshExpiresDays: Number(process.env.REFRESH_TOKEN_EXPIRES_DAYS || 7),
   },
+  agentAdmission: {
+    mode: process.env.AGENT_ADMISSION_MODE || 'local',
+    redisUrl: process.env.REDIS_URL?.trim() || undefined,
+    perUserLimit: Number(process.env.AGENT_MAX_CONCURRENT_PER_USER || 2),
+    globalLimit: Number(process.env.AGENT_MAX_CONCURRENT_GLOBAL || 20),
+    leaseTtlMs: Number(process.env.AGENT_RUN_LEASE_TTL_MS || 120_000),
+    heartbeatMs: Number(process.env.AGENT_RUN_HEARTBEAT_MS || 30_000),
+    retryAfterSeconds: Number(process.env.AGENT_RETRY_AFTER_SECONDS || 5),
+  },
   milvus: {
     address: process.env.MILVUS_ADDRESS || 'localhost:19530',
     token: process.env.MILVUS_TOKEN || 'root:Milvus',

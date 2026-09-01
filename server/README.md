@@ -50,6 +50,14 @@ npm run test:db
 - 使用私有、持久化的 `BOOK_UPLOAD_DIR`；
 - 不记录密码、Token、Cookie、正文、完整访客标识或私有路径。
 
+### Agent 并发准入
+
+实时聊天在进入模型调用前依次占用“当前会话、当前用户、系统全局”三个并发名额。同一会话只允许一个活动 Run；超过用户上限时返回 `429 AGENT_USER_LIMIT`，超过系统容量时返回 `429 AGENT_CAPACITY_EXCEEDED`，会话已在生成时返回 `409 AGENT_SESSION_BUSY`。客户端断开、运行结束或租约丢失都会释放名额；租约丢失同时会取消仍在执行的模型和工具调用。
+
+`AGENT_ADMISSION_MODE=local` 仅供单个 API 实例开发或部署，计数不跨进程。多个 API 实例必须使用 `redis`，并配置仅服务端可访问的 `REDIS_URL`。Redis 中只保存带 TTL 的 `ownerId`、`sessionId` 和 `runId` 租约键，不保存问题、回答、原文或邮箱；PostgreSQL `AgentRun` 只保存运行作用域、状态和时间。Redis 不可用时请求默认失败，不会绕过并发门禁。
+
+默认每用户最多 2 个、全局最多 20 个活动 Run。`AGENT_MAX_CONCURRENT_PER_USER`、`AGENT_MAX_CONCURRENT_GLOBAL`、`AGENT_RUN_LEASE_TTL_MS`、`AGENT_RUN_HEARTBEAT_MS` 和 `AGENT_RETRY_AFTER_SECONDS` 可按模型 RPM/TPM 与压测结果调整；心跳间隔必须小于租约时长的一半。修改真实部署配置前先核对模型配额、数据库连接池和预期峰值，不要把 `REDIS_URL` 写入日志或提交仓库。
+
 ### 可选联网资料检索
 
 填写 `TAVILY_API_KEY` 即会启用 Tavily 远程 MCP。`TAVILY_MCP_URL`、`MCP_ALLOWED_TOOL_NAMES` 和 `MCP_TOOL_TIMEOUT_MS` 已有默认值；当前只允许只读的 `tavily_search`，不开放 extract、crawl、map 或写工具。Key 只能通过密钥管理或 `.env` 注入，不要放入 URL、日志或仓库。
