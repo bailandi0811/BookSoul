@@ -8,6 +8,7 @@ BookSoul 是一个私人小说阅读助手。用户登录后可以上传自己�
 - PostgreSQL
 - OpenAI API 兼容的 Chat 与 Embedding 服务
 - Milvus 或 Zilliz Cloud
+- Redis（多个 API 实例共享 Agent 并发门禁时必需；单实例开发可使用本地模式）
 
 Embedding 模型必须输出 1024 维向量。
 
@@ -43,6 +44,8 @@ MILVUS_TOKEN=root:Milvus
 邮件发送是可选能力。如需使用，另行填写 `SMTP_USER`、`SMTP_PASS` 和 `SMTP_FROM`；其他 SMTP 选项见 `server/.env.example`。
 
 联网资料检索也是可选能力。只需填写 `TAVILY_API_KEY` 即会启用，MCP 地址、工具白名单和超时已有安全默认值。用户必须在单次问答中主动授予 Agent 联网权限；模型只根据本次问题与必要书名决定是否调用一次 `tavily_search`，小说正文、笔记、历史消息和账号信息不会进入联网决策或搜索请求。
+
+单实例开发默认使用 `AGENT_ADMISSION_MODE=local`。部署多个后端实例前必须改为 `redis` 并配置 `REDIS_URL`，让同一会话、每用户和系统全局并发限制在所有实例之间一致生效；Redis 不保存问题、回答或小说正文。完整参数见 `server/.env.example` 和 `server/README.md`。
 
 初始化并启动：
 

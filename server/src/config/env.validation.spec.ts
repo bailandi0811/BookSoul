@@ -54,4 +54,36 @@ describe('validateEnvironment optional integrations', () => {
       'MCP_ALLOWED_TOOL_NAMES contains unsupported tool: tavily_extract',
     );
   });
+
+  it('accepts Redis-backed Agent admission with a valid lease cadence', () => {
+    const config = {
+      ...validBase,
+      AGENT_ADMISSION_MODE: 'redis',
+      REDIS_URL: 'rediss://redis.internal:6380',
+      AGENT_RUN_LEASE_TTL_MS: 120_000,
+      AGENT_RUN_HEARTBEAT_MS: 30_000,
+    };
+    expect(validateEnvironment(config)).toEqual(config);
+  });
+
+  it('rejects Redis admission without a private Redis URL', () => {
+    expect(() =>
+      validateEnvironment({
+        ...validBase,
+        AGENT_ADMISSION_MODE: 'redis',
+      }),
+    ).toThrow('REDIS_URL must be a valid redis:// or rediss:// URL');
+  });
+
+  it('rejects an Agent heartbeat that cannot renew safely before expiry', () => {
+    expect(() =>
+      validateEnvironment({
+        ...validBase,
+        AGENT_RUN_LEASE_TTL_MS: 60_000,
+        AGENT_RUN_HEARTBEAT_MS: 30_000,
+      }),
+    ).toThrow(
+      'AGENT_RUN_HEARTBEAT_MS must be less than half of AGENT_RUN_LEASE_TTL_MS',
+    );
+  });
 });

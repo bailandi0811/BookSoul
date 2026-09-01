@@ -35,6 +35,11 @@ export function validateEnvironment(
     'BOOK_EMBEDDING_BATCH_SIZE',
     'BOOK_EMBEDDING_MAX_ATTEMPTS',
     'BOOK_DELETION_RETRY_MS',
+    'AGENT_MAX_CONCURRENT_PER_USER',
+    'AGENT_MAX_CONCURRENT_GLOBAL',
+    'AGENT_RUN_LEASE_TTL_MS',
+    'AGENT_RUN_HEARTBEAT_MS',
+    'AGENT_RETRY_AFTER_SECONDS',
     'SMTP_PORT',
     'SMTP_CONNECTION_TIMEOUT_MS',
     'SMTP_GREETING_TIMEOUT_MS',
@@ -45,6 +50,35 @@ export function validateEnvironment(
     if (!Number.isFinite(value) || value <= 0) {
       throw new Error(`${name} must be a positive number`);
     }
+  }
+
+  const admissionMode = String(config.AGENT_ADMISSION_MODE ?? 'local').trim();
+  if (!['local', 'redis'].includes(admissionMode)) {
+    throw new Error('AGENT_ADMISSION_MODE must be local or redis');
+  }
+  if (admissionMode === 'redis') {
+    const redisUrl = String(config.REDIS_URL ?? '').trim();
+    let parsedRedisUrl: URL;
+    try {
+      parsedRedisUrl = new URL(redisUrl);
+    } catch {
+      throw new Error(
+        'REDIS_URL must be a valid redis:// or rediss:// URL when AGENT_ADMISSION_MODE=redis',
+      );
+    }
+    if (!['redis:', 'rediss:'].includes(parsedRedisUrl.protocol)) {
+      throw new Error(
+        'REDIS_URL must be a valid redis:// or rediss:// URL when AGENT_ADMISSION_MODE=redis',
+      );
+    }
+  }
+
+  const agentLeaseTtlMs = Number(config.AGENT_RUN_LEASE_TTL_MS ?? 120_000);
+  const agentHeartbeatMs = Number(config.AGENT_RUN_HEARTBEAT_MS ?? 30_000);
+  if (agentHeartbeatMs * 2 >= agentLeaseTtlMs) {
+    throw new Error(
+      'AGENT_RUN_HEARTBEAT_MS must be less than half of AGENT_RUN_LEASE_TTL_MS',
+    );
   }
 
   if (config.BOOK_EMBEDDING_RETRY_BASE_MS !== undefined) {

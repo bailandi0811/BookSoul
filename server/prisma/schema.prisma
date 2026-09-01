@@ -18,6 +18,7 @@ model User {
   books           Book[]
   bookAssistants  BookAssistant[]
   readingProgress ReadingProgress[]
+  agentRuns       AgentRun[]
 }
 
 model RefreshToken {
@@ -125,6 +126,14 @@ enum IngestionJobStatus {
   FAILED
 }
 
+enum AgentRunStatus {
+  RUNNING
+  SUCCEEDED
+  CANCELLED
+  FAILED
+  LEASE_LOST
+}
+
 model Book {
   id               String            @id @default(uuid())
   ownerId          String?
@@ -156,10 +165,32 @@ model Book {
   readingProgress  ReadingProgress[]
   ingestionJob     IngestionJob?
   memories         MemoryRecord[]
+  agentRuns        AgentRun[]
 
   @@unique([ownerId, contentHash])
   @@index([ownerId, updatedAt])
   @@index([status, updatedAt])
+}
+
+model AgentRun {
+  id             String         @id
+  ownerId        String
+  owner          User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  sessionId      String
+  bookId         String?
+  book           Book?          @relation(fields: [bookId], references: [id], onDelete: SetNull)
+  status         AgentRunStatus @default(RUNNING)
+  startedAt      DateTime       @default(now())
+  heartbeatAt    DateTime       @default(now())
+  leaseExpiresAt DateTime
+  completedAt    DateTime?
+  failureCode    String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([ownerId, sessionId, status])
+  @@index([status, leaseExpiresAt])
+  @@index([bookId, startedAt])
 }
 
 model BookSection {

@@ -12,6 +12,8 @@ import { BookSessionsController } from './book-sessions.controller';
 import { BookSessionsService } from './book-sessions.service';
 import { ChatController } from './chat.controller';
 import { ExternalResearchService } from './external-research.service';
+import { AgentAdmissionService } from './admission/agent-admission.service';
+import { AgentAdmissionStore } from './admission/agent-admission.store';
 
 @Module({
   imports: [AuthModule, BooksModule, BookVectorModule, MemoryModule, McpModule],
@@ -23,6 +25,8 @@ import { ExternalResearchService } from './external-research.service';
     BookContextService,
     ExternalResearchService,
     BookChatService,
+    AgentAdmissionStore,
+    AgentAdmissionService,
   ],
   exports: [BookSessionsService, BookChunkRetrieverService, BookChatService],
 })
