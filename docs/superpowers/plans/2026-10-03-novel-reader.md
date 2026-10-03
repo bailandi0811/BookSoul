@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 默认在当前会话内执行；只有用户另行要求并行代理时才委派。
 
-**Goal:** 保留现有聊天模块，新增独立阅读模块，在书架提供阅读与聊天两个入口；阅读器支持按需加载正文、连续阅读、自动续读、助手面板与引用回原文。
+**Goal:** 首页点击图书进入“本书空间”，由该页提供阅读与聊天两个入口；复用全站背景、主题与封面，保留现有聊天模块，新增独立阅读模块，支持按需加载正文、连续阅读、自动续读、助手面板与引用回原文。
 
 **Architecture:** 直接读取 PostgreSQL 中规范化的 BookSection 正文，按有界文字窗口返回和展示；独立 BookReadingPosition 记录续读位置。新增 BookReader 与 useReaderStore，保留 BookChat 原页面结构；阅读助手面板复用已有消息、输入组件和 useChatStore，引用通过服务端验证过的片段偏移定位。
 
@@ -13,7 +13,8 @@
 ## Global Constraints
 
 - 保留当前未提交工作；未经要求不创建分支、不提交、不 push、不开 PR。
-- 新增阅读模块，不覆盖 BookChat；书架原聊天操作继续进入聊天，新增独立阅读操作。阅读器仍可展开助手面板。
+- 新增阅读模块，不覆盖 BookChat；首页书卡按最新确认进入“本书空间”，再选择阅读或聊天。首页明确标为“继续对话”的快捷操作仍直接聊天。阅读器仍可展开助手面板。
+- 本书空间复用 AppHeader/ScenicBackground/BookCover/useAppearanceStore，背景和明暗主题沿用全局选择，导航不重置外观；不创建另一套背景、封面或主题实现。
 - 不修改 .env、现有密钥或部署配置，不启动 ingestion worker，不自动迁移真实数据库。
 - PRIVATE 只允许 owner；SYSTEM 仍要求登录；续读位置始终以 owner/book 隔离。
 - 保留 ReadingProgress 和章节级 spoilerCeiling；NOT_STARTED 仍允许第 1 节。
@@ -132,7 +133,7 @@ interface SaveReaderPositionInput {
 - API：`getSectionWindow(bookId,sectionId,offset?,signal?)`、`getReferenceLocation(bookId,chunkId,signal?)`、`getReaderPosition(bookId,signal?)`、`saveReaderPosition(bookId,input,signal?)`。类型与步骤 1—2 的契约一致。
 - 新请求设置 15 秒上限并传播 AbortSignal；响应先作为 unknown 检查类型和范围，不依赖泛型断言承诺合法。
 - Store：`openReader(bookId)`、`previewSection(sectionId)`、`previewReference(reference)`、`returnToReading()`、`continueFromPreview()`、`recordVisibleOffset(offset)`、`retrySave()`、`clearPrivateState()`。
-- 新增 `BooksView="reader"`；`openBook(bookId, target="workspace")` 保持默认兼容，新增 `switchBookView("reader" | "workspace")`。
+- 新增 `BooksView="book" | "reader"`；`openBook(bookId, target="workspace")` 保持内部默认兼容，首页书卡显式使用 target="book"，新增 `switchBookView("book" | "reader" | "workspace")`。首次进入 book 只准备元数据、续读位置和助手范围摘要，不准备聊天或正文。
 - `ensureBookChat(bookId: string): Promise<void>` 放在新导航模块：当前 chatStore.currentBookId 为同书时保留状态；不同书时调用现有 prepareBook，并在完成后重新校验活动 owner/book/导航代次。reader 打开仅加载阅读所需数据；助手面板展开和进入聊天页才调用该函数。
 
 - [ ] 写 API 失败用例：正确 path/envelope、signal 和 timeout；无效响应拒绝；409 保留稳定 code；模拟 401 走既有刷新机制，不新增持久 Token 或重放无关请求。
@@ -140,10 +141,10 @@ interface SaveReaderPositionInput {
 - [ ] 写保存行为用例：正常用户滚动 1000ms 后只提交最新 offset；同书 PUT 串行；预览/自动恢复/排版重排不写；冲突不自动重试，明确“使用本窗口的位置”才使用读回的 revision 再保存。
 - [ ] 写按需请求用例：首屏只加载所需窗口，临近边界才预取一邻窗；并发的同窗口触发只产生一个请求；请求完成后以 nextOffset 前进；缓存最多 3 窗且键包含身份代次/book/section/hash/offset；切章、切书后前台和预取都取消。加载失败不丢当前文本且只在用户重试时再次请求。
 - [ ] 写恢复用例：无记录从第 1 节开始；hash 改变从该节开头恢复并显示原因；网络失败保留 dirty 与重试入口；readerPosition 不调用 updateReadingProgress。
-- [ ] 写双入口导航用例：默认 openBook 仍进入 workspace；reader 不调用 prepareBook 或创建 session；首次展开助手只准备一次；同书 reader/workspace 切换保留 sessionId/messages/draftInput；切换聊天书籍后才准备新书，迟到初始化不能导航到旧书。
+- [ ] 写导航用例：首页书卡显式进入 book，选中书籍身份与摘要一致；默认 openBook 和“继续对话”仍进入 workspace。book 不加载正文，book/reader 不调用 prepareBook 或创建 session；首次展开助手只准备一次；同书 book/reader/workspace 切换保留 sessionId/messages/draftInput；切换聊天书籍后才准备新书，迟到初始化不能导航到旧书。
 - [ ] 运行 `npm test -- src/lib/book-reader-api.test.ts src/lib/book-workspace-navigation.test.ts src/store/useReaderStore.test.ts src/store/useBooksStore.test.ts`，确认新增契约失败。
 - [ ] 实现 API 与新 store：按 scope 管理 AbortController、generation 和同窗口请求合并，15 秒结束请求；一个前台请求加至多一个相邻预取，正文窗口最多 3 个；不持久缓存正文。对保存队列只合并尚未发送的更新，已发送请求的 revision 响应不能乱序应用。
-- [ ] 实现新导航模块，为 useBooksStore 的 openBook/clearPrivateState/相关进度写回加入代次和 bookId 校验，保存与关闭使用新 store 的清理入口；首次 reader 不准备聊天，保留当前账号恢复与主题改动。
+- [ ] 实现新导航模块，为 useBooksStore 的 openBook/clearPrivateState/相关进度写回加入代次和 bookId 校验，保存与关闭使用新 store 的清理入口；首次 book/reader 不准备聊天，保留当前账号恢复与主题改动。
 - [ ] 重跑上述命令，再运行 `npm test -- src/App.test.tsx src/lib/app-flow.test.ts src/store/useChatStore.view.test.ts`。
 
 **可审阅交付：** 快速切书、登出与保存冲突的确定性测试，以及正文不进入浏览器持久存储的代码证据。
@@ -153,10 +154,11 @@ interface SaveReaderPositionInput {
 **Files**
 
 - 新建：`client/src/components/BookReader/index.tsx`、`components/ReaderBody.tsx`、`ReaderToolbar.tsx`、`ReaderContents.tsx`。
+- 新建：`client/src/components/BookOverview/index.tsx`、`BookOverview.test.tsx`，单书入口页标题为“本书空间”。复用现有 AppHeader/ScenicBackground/BookCover 与全局外观 store，不新增背景组件或独立外观存储。
 - 新建：`client/src/lib/reader-text-position.ts`、`reader-text-position.test.ts`。
 - 新建：`client/src/store/useReadingPreferencesStore.ts`、`useReadingPreferencesStore.test.ts`。
 - 新建测试：`client/src/components/BookReader/BookReader.test.tsx`。
-- 修改：`client/src/App.tsx`、`lib/app-flow.ts`、`lib/app-flow.test.ts`、`components/Entrance/index.tsx`，增加 reader 视图与书架双入口。
+- 修改：`client/src/App.tsx`、`lib/app-flow.ts`、`lib/app-flow.test.ts`、`components/Entrance/index.tsx`，增加 book/reader 视图，将首页书卡连接到本书空间，保留明确的继续对话快捷入口。
 - 新建：`client/src/theme/reader.css`；只在 `client/src/index.css` 增加必要 import，复用当前 token。
 
 **Interfaces**
@@ -170,10 +172,12 @@ interface SaveReaderPositionInput {
 - [ ] 在 useReaderWindows.test.ts 中以可控 IntersectionObserver 测试接近边界加载、重复回调去重、离开窗口后的有界渲染、反向滚动重新加载和 observer cleanup；组件测试确认淘汰窗口保留占位，字体变化按文字锚点恢复，不将 scroll 更新扩散到所有消息和目录。
 - [ ] 写偏好用例：无值使用默认值，非法 localStorage 内容恢复默认，数值越界拒绝；记录中没有 bookId、正文、会话或身份信息。
 - [ ] 写流程用例：同书 reader/chat 切换保留会话；首次进入 reader 不根据助手范围跳到末尾；目录预览后返回续读锚点；应用原有 auth/reset-password 路由不受 reader 影响。
+- [ ] 写 BookOverview 流程测试：首页点击封面/标题/书卡进入选中书；该页使用“本书空间”标题，不显示书架总数；阅读、聊天及返回书库入口目标正确，未点击入口前不加载正文或聊天。切换背景/主题后前往 reader/workspace，useAppearanceStore 的选择不变；同书 BookCover 的绑定不变。复用控件的 Escape/焦点语义保持原有行为。
 - [ ] 运行 `npm test -- src/lib/reader-text-position.test.ts src/store/useReadingPreferencesStore.test.ts src/components/BookReader/BookReader.test.tsx src/lib/app-flow.test.ts src/App.test.tsx`。
 - [ ] 实现 useReaderWindows 与有界窗口展示：IntersectionObserver 在内容边界约一个视口处触发相邻预取，测量用 requestAnimationFrame 合并，保留窗口占位高度；字体/宽度变化时重新测量并恢复文字锚点，避免移除旧窗口使视口跳动。组件读取步骤 3 的 store，不直接调用进度 API。App 通过 lazy import 单独加载 BookReader，原 BookChat 的 lazy import 保留。
 - [ ] 运行 `npm test -- src/components/BookReader/useReaderWindows.test.ts src/store/useReaderStore.test.ts src/components/BookReader/BookReader.test.tsx`，要求按需请求与有界渲染用例全部通过。
-- [ ] 接入可访问目录和排版控制，复用主题/背景；刷新和重排只恢复文字位置，不触发保存。书架明确显示阅读、聊天两个按钮，原书卡聊天点击行为保留，不将整张卡默认改为阅读。
+- [ ] 实现 BookOverview，复用全站头部、背景、封面和主题 token；首页书卡显式进入该页，阅读/聊天按钮分别进入对应模块，返回入口为我的书库，reader/chat 的返回入口为本书空间。接入可访问目录和排版控制；刷新和重排只恢复文字位置，不触发保存。
+- [ ] 运行 `npm test -- src/components/BookOverview/BookOverview.test.tsx src/store/useBooksStore.test.ts src/lib/book-workspace-navigation.test.ts src/lib/app-flow.test.ts src/App.test.tsx`，确认新增页面、全局外观复用与导航契约通过。
 - [ ] 重跑上述测试。happy-dom 不具备真实排版能力，DOM Range 与滚动精度还必须通过步骤 6 的真实浏览器验收，不能仅凭 mock rect 宣称通过。
 
 **可审阅交付：** 连续阅读页面、独立排版偏好与文本锚点测试；真实布局和续读精度留到浏览器验收。
@@ -195,7 +199,7 @@ interface SaveReaderPositionInput {
 - 面板内“进入聊天页”和原聊天侧栏“阅读本书”通过新导航模块切换，同书不清消息或草稿；阅读位置与助手范围均不因切换而改变。
 
 - [ ] 写面板测试：打开/关闭/重开保留同书会话与草稿；新书不沿用旧书对话；关闭正在生成的面板触发取消，旧 SSE 不能补写；移动面板支持 Escape 和焦点返回。
-- [ ] 写独立聊天回归：从书架聊天入口仍显示原 Sidebar、历史、助手设置和 InputArea；邮件、联网开关和停止生成保持原行为。打开 reader 不能将 BookChat 替换为正文页；同书面板/聊天页之间切换保留当前对话。
+- [ ] 写独立聊天回归：从本书空间聊天入口或首页“继续对话”仍显示原 Sidebar、历史、助手设置和 InputArea；邮件、联网开关和停止生成保持原行为。打开 reader 不能将 BookChat 替换为正文页；同书面板/聊天页之间切换保留当前对话。
 - [ ] 写引用测试：正常 locator 返回准确高亮与临时预览；precision=section 显示无法精确高亮；404 保留引用卡并允许尝试原章节；重复原句不搜索猜定位；越过当前助手范围先提示再主动阅读。
 - [ ] 写防剧透流程用例：阅读第 18 节、助手范围第 1—17 节时，reader 打开/预加载/保存/引用返回都不调用 reading-progress PUT；聊天 body 仍仅发送现有 sessionId/message/单次开关。
 - [ ] 运行 `npm test -- src/components/BookReader/components/ReaderAssistantPanel.test.tsx src/components/BookChat/components/ReferenceCard.test.tsx src/components/BookChat/BookChat.reading.test.tsx src/store/useChatStore.view.test.ts`。
@@ -217,7 +221,7 @@ interface SaveReaderPositionInput {
 - [ ] 测试入口在挂载 App 前安装 mock fetch，覆盖恢复认证、书架、目录、位置、正文、引用与固定聊天请求；未列入 allowlist 的请求直接失败。阻断测试入口中的 XMLHttpRequest 和 sendBeacon，不能落入现有 localhost:3000 代理。示例身份和令牌仅为公开测试值，测试入口不启动真实后端。
 - [ ] 在 client 运行 `npm run dev -- --host 127.0.0.1`，使用启动输出中的实际端口访问 `/reader.acceptance.html`。该 Vite 服务只用于合成 fixture；不启动 API、worker 或真实模型。
 - [ ] 在真实浏览器检查 375×812、768×1024、1440×900，分别覆盖明/暗主题；记录截图或观察证据。通过标准：页面无水平溢出，手机面板不横向挤压正文，目录/面板支持 Tab/Escape 和焦点恢复。
-- [ ] 分别从书架阅读、聊天入口进入，截图确认是独立页面；阅读助手仅在 reader 展开，原聊天布局完整保留。同书切换前后比较 sessionId/messages/draftInput 和续读 revision，均不应被无关导航重置。
+- [ ] 从首页点击图书进入本书空间，再分别进入阅读、聊天并返回；截图确认首页和单书页职责、标题与目标正确。单书页更换背景、切换明暗主题，进入 reader/workspace 后外观保持一致，封面图案和颜色不变；375px 下背景控件可操作且无水平溢出。阅读助手仅在 reader 展开，原聊天布局完整保留。同书切换前后比较 sessionId/messages/draftInput 和续读 revision，均不应被无关导航重置。
 - [ ] 将长段落读到中部，确认保存成功后刷新；改变字号 20→28、宽度 640→480 和窗口宽度后，原锚点仍出现在正文可见首行附近，误差不超过一行。记录具体 fixture offset、保存 revision 和恢复 offset。
 - [ ] 滚动遍历 80000 code unit 章节，验证正文窗口拼接无遗漏/重复，DOM 中真实正文窗口最多 3 个；引用预览前后 GET reading-position 的 sectionId/offset/revision 不变。fixture 模拟 CAS 只证明界面，真实 CAS 仍以步骤 2 的专用 PostgreSQL 测试为准。
 - [ ] 在 Network/fixture 请求日志检查首屏、预取与切章：首屏没有请求全书或全部章节，同 offset 重入请求合并，每个正文响应最多 32000 code unit；人为延迟/断开下一窗口后当前正文保留且重试可达。通过 Performance 面板记录长时间滚动与字体调整是否出现持续长任务；写明设备和测量结果，不以合成延时模拟充当真实网络性能证据。
