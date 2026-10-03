@@ -41,10 +41,10 @@ export const ExternalReferenceCard = ({
     >
       <motion.button
         type="button"
-        whileHover={{ y: -1 }}
         whileTap={{ scale: 0.98 }}
         onClick={() => setIsExpanded(!isExpanded)}
-        className={`warm-inset flex w-full items-center gap-2 rounded-[14px] px-3.5 py-2.5 text-left text-xs font-medium transition-colors ${
+        aria-expanded={isExpanded}
+        className={`flex min-h-11 w-full items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-2.5 text-left text-sm transition-colors ${
           isExpanded
             ? "text-foreground"
             : "text-muted-foreground hover:text-foreground"

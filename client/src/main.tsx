@@ -3,17 +3,18 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.tsx";
 import { MotionConfig } from "framer-motion";
+import { ScenicBackground } from "./components/ScenicBackground";
+import "./theme/scenic-ui.css";
+import { useAppearanceStore } from "./store/useAppearanceStore";
 
-const savedTheme = localStorage.getItem("booksoul_theme");
-const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-document.documentElement.classList.toggle(
-  "dark",
-  savedTheme ? savedTheme === "dark" : prefersDark,
-);
+const initialTheme = useAppearanceStore.getState().theme;
+document.documentElement.classList.toggle("dark", initialTheme === "dark");
+document.documentElement.style.colorScheme = initialTheme;
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <MotionConfig reducedMotion="user">
+      <ScenicBackground />
       <App />
     </MotionConfig>
   </StrictMode>,

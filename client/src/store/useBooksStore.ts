@@ -17,12 +17,14 @@ import {
   type ReadingProgress,
 } from "@/lib/books-api";
 import { useChatStore } from "@/store/useChatStore";
+import { assignBookCoverBindings, type CoverVariant } from "@/lib/book-cover";
 
 export type BooksView = "library" | "workspace";
 
 interface BooksState {
   view: BooksView;
   books: BookView[];
+  coverBindings: Record<string, CoverVariant>;
   isLoading: boolean;
   isUploading: boolean;
   uploadFileName: string | null;
@@ -63,6 +65,7 @@ function errorMessage(error: unknown): string {
 export const useBooksStore = create<BooksState>((set, get) => ({
   view: "library",
   books: [],
+  coverBindings: {},
   isLoading: false,
   isUploading: false,
   uploadFileName: null,
@@ -80,7 +83,11 @@ export const useBooksStore = create<BooksState>((set, get) => ({
     const showInitialLoading = get().books.length === 0;
     set({ isLoading: showInitialLoading, error: null });
     try {
-      set({ books: await listBooks() });
+      const books = await listBooks();
+      set((state) => ({
+        books,
+        coverBindings: assignBookCoverBindings(books, state.coverBindings),
+      }));
     } catch (error) {
       set({ error: errorMessage(error) });
     } finally {
@@ -103,7 +110,13 @@ export const useBooksStore = create<BooksState>((set, get) => ({
       const book = await uploadBookRequest(file, (uploadProgress) => {
         set({ uploadProgress });
       });
-      set((state) => ({ books: [book, ...state.books] }));
+      set((state) => {
+        const books = [book, ...state.books];
+        return {
+          books,
+          coverBindings: assignBookCoverBindings(books, state.coverBindings),
+        };
+      });
       return true;
     } catch (error) {
       set({ error: errorMessage(error) });
@@ -143,9 +156,13 @@ export const useBooksStore = create<BooksState>((set, get) => ({
     }));
     try {
       await deleteBookRequest(bookId);
-      set((state) => ({
-        books: state.books.filter((book) => book.id !== bookId),
-      }));
+      set((state) => {
+        const books = state.books.filter((book) => book.id !== bookId);
+        return {
+          books,
+          coverBindings: assignBookCoverBindings(books, state.coverBindings),
+        };
+      });
     } catch (error) {
       set({ error: errorMessage(error) });
     } finally {
@@ -233,6 +250,7 @@ export const useBooksStore = create<BooksState>((set, get) => ({
     set({
       view: "library",
       books: [],
+      coverBindings: {},
       isLoading: false,
       isUploading: false,
       uploadFileName: null,

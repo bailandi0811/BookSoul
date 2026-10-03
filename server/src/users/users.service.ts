@@ -6,6 +6,18 @@ export interface PublicUser {
   id: string;
   email: string;
   name: string;
+  emailVerifiedAt: string | null;
+}
+
+export function toPublicUser(
+  user: Pick<User, 'id' | 'email' | 'name' | 'emailVerifiedAt'>,
+): PublicUser {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
+  };
 }
 
 @Injectable()
@@ -16,15 +28,35 @@ export class UsersService {
     return this.prisma.user.findUnique({ where: { email } });
   }
 
-  findPublicById(id: string): Promise<PublicUser | null> {
-    return this.prisma.user.findUnique({
+  async findPublicById(id: string): Promise<PublicUser | null> {
+    const user = await this.prisma.user.findUnique({
       where: { id },
       select: {
         id: true,
         email: true,
         name: true,
+        emailVerifiedAt: true,
       },
     });
+    return user ? toPublicUser(user) : null;
+  }
+
+  async findAuthStateById(
+    id: string,
+  ): Promise<{ user: PublicUser; authVersion: number } | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        emailVerifiedAt: true,
+        authVersion: true,
+      },
+    });
+    return user
+      ? { user: toPublicUser(user), authVersion: user.authVersion }
+      : null;
   }
 
   async create(

@@ -20,6 +20,15 @@ import type { AuthData, PublicAuthData, SuccessResponse } from './auth.types';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { AuthEmailVerificationService } from './auth-email-verification.service';
+import { AuthPasswordResetService } from './auth-password-reset.service';
+import { RequestRegistrationCodeDto } from './dto/request-registration-code.dto';
+import {
+  ConfirmEmailVerificationDto,
+  RequestCurrentUserCodeDto,
+} from './dto/confirm-email-verification.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 interface AuthenticatedRequest {
   user: PublicUser;
@@ -36,7 +45,71 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly configService: ConfigService,
+    private readonly verification: AuthEmailVerificationService,
+    private readonly recovery: AuthPasswordResetService,
   ) {}
+
+  @Post('registration-code')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async registrationCode(@Body() dto: RequestRegistrationCodeDto) {
+    return {
+      success: true,
+      data: await this.verification.requestRegistrationCode(dto.email),
+    };
+  }
+
+  @Post('email-verification/code')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.ACCEPTED)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async currentUserCode(
+    @Request() request: AuthenticatedRequest,
+    @Body() _dto: RequestCurrentUserCodeDto,
+  ) {
+    return {
+      success: true,
+      data: await this.verification.requestCurrentUserCode(request.user.id),
+    };
+  }
+
+  @Post('email-verification/confirm')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async confirmEmail(
+    @Request() request: AuthenticatedRequest,
+    @Body() dto: ConfirmEmailVerificationDto,
+  ) {
+    return {
+      success: true,
+      data: {
+        user: await this.verification.confirmCurrentUserEmail(
+          request.user.id,
+          dto,
+        ),
+      },
+    };
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return { success: true, data: await this.recovery.requestReset(dto.email) };
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async resetPassword(
+    @Body() dto: ResetPasswordDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    await this.recovery.resetPassword(dto);
+    this.clearRefreshCookie(response);
+    return { success: true, data: { message: '密码已重置，请重新登录。' } };
+  }
 
   @Post('register')
   @Throttle({ default: { limit: 8, ttl: 60_000 } })

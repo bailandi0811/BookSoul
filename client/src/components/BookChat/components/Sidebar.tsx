@@ -1,19 +1,13 @@
-import { AccountSection } from "@/components/auth/AccountSection";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useBooksStore } from "@/store/useBooksStore";
 import { useChatStore } from "@/store/useChatStore";
-import {
-  ArrowLeft,
-  BookOpen,
-  History,
-  PanelLeftClose,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { ArrowLeft, History, PanelLeftClose, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { AssistantSettings } from "./AssistantSettings";
+import { BookCover } from "@/components/BookCover";
+import { ReadingProgressDialog } from "./ReadingProgressDialog";
 
 export const Sidebar = ({ onClose }: { onClose: () => void }) => {
   const {
@@ -36,6 +30,7 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
     sessionId: string;
     title: string;
   } | null>(null);
+  const [progressOpen, setProgressOpen] = useState(false);
 
   const mode = readingProgress?.mode ?? "NOT_STARTED";
   const currentSectionOrder = readingProgress?.currentSectionOrder ?? 1;
@@ -48,13 +43,13 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
         : 0;
 
   return (
-    <div className="flex h-full w-full flex-col border-r border-border/80 bg-secondary/80">
-      <div className="border-b border-border/75 p-4">
+    <div className="workspace-sidebar flex h-full w-full flex-col">
+      <div className="sidebar-book-heading">
         <div className="flex items-start justify-between gap-3">
           <button
             type="button"
             onClick={backToLibrary}
-            className="tap-spring inline-flex items-center gap-2 rounded-lg px-1 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground"
+            className="tap-spring inline-flex min-h-11 items-center gap-2 rounded-lg px-1 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             返回书架
@@ -62,18 +57,24 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
           <button
             type="button"
             onClick={onClose}
-            className="tap-spring rounded-xl p-2 text-muted-foreground hover:bg-card hover:text-foreground"
+            className="tap-spring grid h-11 w-11 place-items-center rounded-xl text-muted-foreground hover:bg-card hover:text-foreground"
             aria-label="关闭侧栏"
           >
             <PanelLeftClose className="h-4 w-4" />
           </button>
         </div>
-        <div className="warm-card mt-4 flex items-center gap-3 rounded-[18px] p-3">
-          <span className="grid h-12 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#a85f4b] to-[#744137] text-[#fff2df] shadow-sm">
-            <BookOpen className="h-4 w-4" />
-          </span>
+        <div className="current-volume mt-2 flex items-center gap-4">
+          <div className="w-[58px] shrink-0">
+            <BookCover
+              bookId={currentBook?.id ?? "current"}
+              title={currentBook?.title ?? "当前书籍"}
+              compact
+              shared
+              bookmarked={mode === "IN_PROGRESS"}
+            />
+          </div>
           <div className="min-w-0">
-            <h2 className="font-reading line-clamp-2 text-sm font-semibold leading-snug">
+            <h2 className="font-reading line-clamp-2 text-xl leading-snug">
               {currentBook?.title ?? "当前书籍"}
             </h2>
             <p className="mt-1 text-[11px] text-muted-foreground">
@@ -83,89 +84,61 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
         </div>
       </div>
 
-      <ScrollArea className="flex-1 scrollbar-thin">
-        <div className="space-y-5 p-4">
+      <ScrollArea className="min-h-0 flex-1 scrollbar-thin">
+        <div className="sidebar-sections space-y-4">
           {workspaceError && (
             <div className="rounded-xl border border-destructive/30 bg-destructive/8 px-3 py-2 text-xs leading-relaxed text-destructive">
               {workspaceError}
             </div>
           )}
 
-          <section>
+          <section className="progress-card">
             <h3 className="mb-3 text-xs font-semibold text-foreground">
-              阅读进度
+              阅读书签
             </h3>
-            <div className="warm-card space-y-2.5 rounded-[18px] p-3.5">
+            <p className="font-display text-2xl mb-3">
+              {mode === "FINISHED"
+                ? "已读完"
+                : mode === "NOT_STARTED"
+                  ? "尚未开始"
+                  : `第 ${currentSectionOrder} 节`}
+              <span className="ml-3 text-xs font-sans text-muted-foreground">
+                {progressPercent}%
+              </span>
+            </p>
+            <div className="h-1 rounded-full bg-secondary overflow-hidden">
               <div
-                role="progressbar"
-                aria-label="阅读进度"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={progressPercent}
-                className="h-1.5 overflow-hidden rounded-full bg-secondary"
-              >
-                <div
-                  className="h-full rounded-full bg-primary transition-[width] duration-300"
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
-              <label className="grid gap-1.5 text-[11px] font-medium text-muted-foreground">
-                阅读状态
-                <select
-                  value={mode}
-                  onChange={(event) => {
-                    const next = event.target.value;
-                    if (next === "NOT_STARTED") {
-                      void updateProgress("NOT_STARTED");
-                    } else if (next === "FINISHED") {
-                      void updateProgress("FINISHED");
-                    } else {
-                      void updateProgress("IN_PROGRESS", currentSectionOrder);
-                    }
-                  }}
-                  className="h-9 rounded-xl border border-input bg-background px-2.5 text-xs text-foreground outline-none focus:border-primary"
-                >
-                  <option value="NOT_STARTED">尚未开始</option>
-                  <option value="IN_PROGRESS">阅读中</option>
-                  <option value="FINISHED">已读完</option>
-                </select>
-              </label>
-              {mode === "IN_PROGRESS" && (
-                <label className="grid gap-1.5 text-[11px] font-medium text-muted-foreground">
-                  当前读到
-                  <select
-                    value={currentSectionOrder}
-                    onChange={(event) =>
-                      void updateProgress(
-                        "IN_PROGRESS",
-                        Number(event.target.value),
-                      )
-                    }
-                    className="h-9 rounded-xl border border-input bg-background px-2.5 text-xs text-foreground outline-none focus:border-primary"
-                  >
-                    {sections.map((section) => (
-                      <option key={section.id} value={section.order}>
-                        {section.order}. {section.title}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              <p className="text-[11px] leading-relaxed text-muted-foreground">
-                默认只检索第 {readingProgress?.spoilerCeiling ?? 1}{" "}
-                节及以前内容。
-              </p>
+                className="h-full bg-primary transition-[width]"
+                style={{ width: `${progressPercent}%` }}
+              />
             </div>
+            <p className="mt-3 text-[11px] text-muted-foreground leading-6">
+              默认检索第 1—{readingProgress?.spoilerCeiling ?? 1} 节
+            </p>
+            <button
+              type="button"
+              className="progress-link"
+              onClick={() => setProgressOpen(true)}
+            >
+              更新阅读进度 <ArrowLeft size={13} className="rotate-180" />
+            </button>
           </section>
+          <ReadingProgressDialog
+            open={progressOpen}
+            onClose={() => setProgressOpen(false)}
+          />
 
-          <section>
+          <details className="sidebar-directory">
+            <summary className="cursor-pointer text-xs text-muted-foreground py-3">
+              目录 · {sections.length} 节
+            </summary>
             <div className="mb-3 flex items-center justify-between gap-3">
               <h3 className="text-xs font-semibold text-foreground">目录</h3>
               <span className="text-[10px] text-muted-foreground">
                 {sections.length} 节
               </span>
             </div>
-            <div className="warm-inset max-h-48 space-y-0.5 overflow-y-auto rounded-[16px] p-1.5 scrollbar-thin">
+            <div className="max-h-52 space-y-0.5 overflow-y-auto scrollbar-thin">
               {sections.map((section) => {
                 const isCurrent =
                   mode === "IN_PROGRESS" &&
@@ -177,7 +150,7 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
                     onClick={() =>
                       void updateProgress("IN_PROGRESS", section.order)
                     }
-                    className={`w-full rounded-xl px-2.5 py-2 text-left text-xs transition-colors ${
+                    className={`min-h-11 w-full rounded-lg px-2.5 py-2 text-left text-sm transition-colors ${
                       isCurrent
                         ? "bg-card font-semibold text-foreground shadow-sm"
                         : "text-muted-foreground hover:bg-card/70 hover:text-foreground"
@@ -191,9 +164,9 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
                 );
               })}
             </div>
-          </section>
+          </details>
 
-          <section>
+          <section className="history-section">
             <div className="mb-3 flex items-center justify-between gap-3">
               <h3 className="flex items-center gap-2 text-xs font-semibold text-foreground">
                 <History className="h-3.5 w-3.5" />
@@ -202,7 +175,7 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
               <button
                 type="button"
                 onClick={() => void startNewSession()}
-                className="tap-spring inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-primary hover:bg-primary/10"
+                className="tap-spring inline-flex min-h-11 items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-primary hover:bg-primary/10"
               >
                 <Plus className="h-3.5 w-3.5" />
                 新建
@@ -253,7 +226,7 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
                             title: session.title,
                           })
                         }
-                        className="rounded-md p-1.5 text-muted-foreground opacity-0 hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 focus:opacity-100"
+                        className="grid h-11 w-11 place-items-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                         aria-label={`删除会话：${session.title}`}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -264,15 +237,12 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
               )}
             </div>
           </section>
-
-          <AssistantSettings />
         </div>
       </ScrollArea>
 
-      <div className="border-t border-border/75 bg-secondary/90 p-4">
-        <div className="mb-3">
-          <AccountSection />
-        </div>
+      <div className="sidebar-footer">
+        <AssistantSettings />
+        <p className="sidebar-note">对话与引用仅属于当前这本书</p>
         <div className="flex justify-end">
           <ThemeToggle />
         </div>

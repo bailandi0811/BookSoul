@@ -7,6 +7,7 @@ import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
+import { AuthChallengesService } from './auth-challenges.service';
 
 describe('AuthService', () => {
   interface RefreshTokenWrite {
@@ -22,6 +23,8 @@ describe('AuthService', () => {
     email: 'reader@example.com',
     name: 'Reader',
     passwordHash: '',
+    emailVerifiedAt: null,
+    authVersion: 0,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
   };
@@ -32,12 +35,15 @@ describe('AuthService', () => {
   };
   let prisma: {
     refreshToken: {
+      findUnique: jest.Mock;
       create: jest.Mock;
       updateMany: jest.Mock;
     };
     $transaction: jest.Mock;
   };
   let transaction: {
+    $queryRaw: jest.Mock;
+    user: { findUnique: jest.Mock; create: jest.Mock };
     refreshToken: {
       findUnique: jest.Mock;
       updateMany: jest.Mock;
@@ -49,10 +55,22 @@ describe('AuthService', () => {
     signAsync: jest.Mock;
   };
   let service: AuthService;
+  const challenges = { verify: jest.fn(), consume: jest.fn() };
   let refreshTokenWrite: RefreshTokenWrite | undefined;
   let storedPasswordHash: string | undefined;
 
   beforeEach(() => {
+    challenges.verify.mockReset().mockResolvedValue({
+      status: 'valid',
+      challenge: {
+        id: 'row',
+        generation: 1,
+        email: user.email,
+        purpose: 'REGISTRATION',
+        userId: null,
+      },
+    });
+    challenges.consume.mockReset().mockResolvedValue(true);
     refreshTokenWrite = undefined;
     storedPasswordHash = undefined;
     usersService = {
@@ -61,6 +79,7 @@ describe('AuthService', () => {
     };
     prisma = {
       refreshToken: {
+        findUnique: jest.fn().mockResolvedValue({ userId: user.id }),
         create: jest.fn((input: RefreshTokenWrite) => {
           refreshTokenWrite = input;
           return Promise.resolve({});
@@ -72,10 +91,36 @@ describe('AuthService', () => {
       ),
     };
     transaction = {
+      $queryRaw: jest.fn().mockResolvedValue([user]),
+      user: {
+        findUnique: jest.fn((input: { where: { email: string } }) =>
+          usersService.findByEmail(input.where.email),
+        ),
+        create: jest.fn(
+          async (input: {
+            data: {
+              email: string;
+              name: string;
+              passwordHash: string;
+              emailVerifiedAt: Date;
+            };
+          }) => {
+            const created = (await usersService.create(
+              input.data.email,
+              input.data.name,
+              input.data.passwordHash,
+            )) as User;
+            return { ...created, emailVerifiedAt: input.data.emailVerifiedAt };
+          },
+        ),
+      },
       refreshToken: {
         findUnique: jest.fn(),
         updateMany: jest.fn(),
-        create: jest.fn(),
+        create: jest.fn((input: RefreshTokenWrite) => {
+          refreshTokenWrite = input;
+          return Promise.resolve({ id: 'refresh-1' });
+        }),
         update: jest.fn(),
       },
     };
@@ -98,6 +143,7 @@ describe('AuthService', () => {
       prisma as unknown as PrismaService,
       jwtService as unknown as JwtService,
       configService as unknown as ConfigService,
+      challenges as unknown as AuthChallengesService,
     );
   });
 
@@ -111,6 +157,8 @@ describe('AuthService', () => {
     );
 
     const result = await service.register({
+      verificationId: 'receipt',
+      code: '000123',
       email: '  Reader@Example.COM ',
       password: 'correct horse battery staple',
       name: ' Reader ',
@@ -130,6 +178,7 @@ describe('AuthService', () => {
         sub: user.id,
         email: user.email,
         type: 'access',
+        authVersion: 0,
       },
       expect.objectContaining({
         secret: 'test-access-secret',
@@ -143,6 +192,7 @@ describe('AuthService', () => {
       id: user.id,
       email: user.email,
       name: user.name,
+      emailVerifiedAt: expect.any(String),
     });
     expect(result.user).not.toHaveProperty('passwordHash');
 
@@ -163,17 +213,25 @@ describe('AuthService', () => {
 
     await expect(
       service.register({
+        verificationId: 'receipt',
+        code: '000123',
         email: user.email,
         password: 'password123',
         name: user.name,
       }),
-    ).rejects.toEqual(new ConflictException('该邮箱已被注册'));
+    ).rejects.toEqual(
+      new ConflictException({
+        code: 'EMAIL_ALREADY_REGISTERED',
+        message: '该邮箱已被注册',
+      }),
+    );
     expect(usersService.create).not.toHaveBeenCalled();
   });
 
   it('logs in with the correct credentials', async () => {
     const passwordHash = await hash('password123', 10);
     usersService.findByEmail.mockResolvedValue({ ...user, passwordHash });
+    transaction.$queryRaw.mockResolvedValue([{ ...user, passwordHash }]);
 
     const result = await service.login({
       email: ' READER@example.com ',
@@ -259,6 +317,7 @@ describe('AuthService', () => {
       id: user.id,
       email: user.email,
       name: user.name,
+      emailVerifiedAt: null,
     });
   });
 
@@ -412,6 +471,39 @@ describe('AuthService', () => {
       },
       data: { revokedAt: expect.any(Date) as Date },
     });
+  });
+
+  it('rejects registration without valid mailbox proof before looking up the user', async () => {
+    challenges.verify.mockResolvedValue({ status: 'invalid' });
+    await expect(
+      service.register({
+        email: user.email,
+        name: user.name,
+        password: 'password123',
+        verificationId: 'receipt',
+        code: '000123',
+      }),
+    ).rejects.toMatchObject({
+      response: { code: 'INVALID_VERIFICATION_CODE' },
+    });
+    expect(usersService.findByEmail).not.toHaveBeenCalled();
+    expect(transaction.user.create).not.toHaveBeenCalled();
+    expect(jwtService.signAsync).not.toHaveBeenCalled();
+  });
+
+  it('rejects a password snapshot changed while waiting for the user lock', async () => {
+    usersService.findByEmail.mockResolvedValue({
+      ...user,
+      passwordHash: await hash('password123', 10),
+    });
+    transaction.$queryRaw.mockResolvedValue([
+      { ...user, authVersion: 1, passwordHash: 'changed' },
+    ]);
+    await expect(
+      service.login({ email: user.email, password: 'password123' }),
+    ).rejects.toEqual(new UnauthorizedException('邮箱或密码错误'));
+    expect(transaction.refreshToken.create).not.toHaveBeenCalled();
+    expect(jwtService.signAsync).not.toHaveBeenCalled();
   });
 
   it('keeps repeated and unknown session logout idempotent', async () => {

@@ -1,63 +1,58 @@
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
-/* Cream reading-room theme tokens */
+/* Shared paper and ink tokens for every screen. */
 :root {
-  --background: 247 242 233;
-  --foreground: 45 39 34;
-  --card: 255 252 246;
-  --card-foreground: 45 39 34;
-  --popover: 255 252 246;
-  --popover-foreground: 45 39 34;
-  --primary: 168 73 49;
-  --primary-foreground: 255 250 243;
-  --secondary: 239 229 215;
-  --secondary-foreground: 70 58 49;
-  --muted: 242 234 222;
-  --muted-foreground: 111 96 84;
-  --accent: 168 73 49;
-  --accent-foreground: 255 250 243;
-  --destructive: 164 52 52;
-  --destructive-foreground: 255 250 243;
-  --border: 222 207 188;
-  --input: 211 191 168;
-  --ring: 168 73 49;
-  --radius: 18px;
-
-  --surface-soft: 249 240 227;
-  --surface-tint: 246 226 211;
-  --shadow-color: 104 70 48;
-
-  --font-display: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", system-ui,
-    sans-serif;
-  --font-body: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", system-ui,
-    sans-serif;
-  --font-reading: "Noto Serif SC", "Songti SC", "STSong", "SimSun", serif;
+  --background: 245 245 242;
+  --foreground: 36 36 36;
+  --card: 251 251 248;
+  --card-foreground: 36 36 36;
+  --popover: 251 251 248;
+  --popover-foreground: 36 36 36;
+  --primary: 36 36 36;
+  --primary-foreground: 251 251 248;
+  --secondary: 235 235 230;
+  --secondary-foreground: 36 36 36;
+  --muted: 235 235 230;
+  --muted-foreground: 102 102 97;
+  --accent: 130 112 78;
+  --accent-foreground: 36 36 36;
+  --destructive: 163 66 56;
+  --destructive-foreground: 251 251 248;
+  --border: 216 216 207;
+  --input: 193 193 183;
+  --ring: 90 90 85;
+  --surface-soft: 241 241 237;
+  --surface-tint: 232 232 225;
+  --shadow-color: 25 25 25;
+  --radius: 12px;
+  --font-display: "Songti SC", "STSong", "SimSun", Georgia, serif;
+  --font-body:
+    "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+  --font-reading: "Songti SC", "STSong", "SimSun", Georgia, serif;
 }
-
 .dark {
-  --background: 32 27 24;
-  --foreground: 246 238 227;
-  --card: 43 36 32;
-  --card-foreground: 246 238 227;
-  --popover: 43 36 32;
-  --popover-foreground: 246 238 227;
-  --primary: 222 126 92;
-  --primary-foreground: 38 29 25;
-  --secondary: 54 44 38;
-  --secondary-foreground: 246 238 227;
-  --muted: 54 44 38;
-  --muted-foreground: 190 172 157;
-  --accent: 222 126 92;
-  --accent-foreground: 38 29 25;
-  --destructive: 224 104 104;
-  --destructive-foreground: 38 29 25;
-  --border: 78 63 53;
-  --input: 94 74 62;
-  --ring: 222 126 92;
-
-  --surface-soft: 49 40 35;
-  --surface-tint: 67 46 38;
+  --background: 31 31 30;
+  --foreground: 236 236 229;
+  --card: 38 38 37;
+  --card-foreground: 236 236 229;
+  --popover: 38 38 37;
+  --popover-foreground: 236 236 229;
+  --primary: 236 236 229;
+  --primary-foreground: 31 31 30;
+  --secondary: 52 52 50;
+  --secondary-foreground: 236 236 229;
+  --muted: 52 52 50;
+  --muted-foreground: 183 182 176;
+  --accent: 195 177 141;
+  --accent-foreground: 31 31 30;
+  --destructive: 226 166 158;
+  --destructive-foreground: 31 31 30;
+  --border: 70 70 66;
+  --input: 87 87 81;
+  --ring: 195 195 184;
+  --surface-soft: 46 46 44;
+  --surface-tint: 52 52 49;
   --shadow-color: 0 0 0;
 }
 
@@ -123,15 +118,19 @@
 
   .paper-atmosphere {
     background-color: rgb(var(--background));
-    background-image:
-      radial-gradient(circle at 8% 0%, rgb(var(--primary) / 0.07), transparent 28rem),
-      radial-gradient(circle at 96% 12%, rgb(207 151 91 / 0.08), transparent 26rem);
+    background-image: radial-gradient(
+      ellipse at 90% 0%,
+      rgb(var(--primary) / 0.035),
+      transparent 40rem
+    );
   }
 
   .dark .paper-atmosphere {
-    background-image:
-      radial-gradient(circle at 8% 0%, rgb(var(--primary) / 0.08), transparent 28rem),
-      radial-gradient(circle at 96% 12%, rgb(181 121 77 / 0.06), transparent 26rem);
+    background-image: radial-gradient(
+      ellipse at 90% 0%,
+      rgb(var(--primary) / 0.04),
+      transparent 40rem
+    );
   }
 
   .warm-card {
@@ -362,7 +361,8 @@
 /* Prose styling for markdown content */
 .prose-ai {
   font-size: 15px;
-  line-height: 1.625;
+  line-height: 1.95;
+  overflow-wrap: anywhere;
 }
 
 .prose-ai p {
@@ -393,14 +393,14 @@
 }
 
 .prose-ai blockquote {
-  border-left: 4px solid rgb(var(--primary) / 0.3);
+  border-left: 2px solid rgb(var(--accent));
   padding-left: 1rem;
   margin: 1rem 0;
-  font-style: italic;
-  color: rgb(var(--muted-foreground));
-  background: rgb(var(--muted) / 0.3);
+  font-style: normal;
+  color: rgb(var(--foreground));
+  background: transparent;
   padding: 0.5rem 1rem;
-  border-radius: 0 0.5rem 0.5rem 0;
+  border-radius: 0;
 }
 
 .prose-ai code {
@@ -463,4 +463,193 @@
 
 .card-hover:hover {
   box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+}
+
+/* Book and workspace interactions share the same small, deliberate vocabulary. */
+.booksoul-mark {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  color: rgb(var(--primary));
+  flex-shrink: 0;
+}
+.booksoul-mark > svg:first-child {
+  width: 30px;
+  height: 30px;
+}
+.booksoul-mark-spark {
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  right: -4px;
+  top: -4px;
+  color: rgb(var(--accent));
+}
+.booksoul-mark-active .booksoul-mark-spark {
+  animation: book-soul-breathe 2s ease-in-out infinite;
+}
+@keyframes book-soul-breathe {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+}
+
+.book-cover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3/4;
+  border-radius: 2px 6px 6px 2px;
+  color: #f5f4ec;
+  isolation: isolate;
+  box-shadow:
+    inset -1px 0 0 rgb(255 255 255 / 0.16),
+    7px 8px 12px -6px rgb(var(--shadow-color) / 0.4),
+    0 20px 24px -20px rgb(var(--shadow-color) / 0.7);
+  transform-origin: left center;
+  transition:
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 240ms ease;
+}
+.book-cover::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 2px,
+      rgb(255 255 255 / 0.045) 2px 3px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 3px,
+      rgb(0 0 0 / 0.06) 3px 4px
+    ),
+    linear-gradient(
+      110deg,
+      rgb(255 255 255 / 0.12),
+      transparent 45%,
+      rgb(0 0 0 / 0.15)
+    );
+  pointer-events: none;
+}
+.book-cover::after {
+  content: "";
+  position: absolute;
+  inset: 14px 12px 13px 21px;
+  border: 1px solid rgb(222 211 180 / 0.46);
+  border-radius: 39% 39% 1px 1px;
+  pointer-events: none;
+}
+.book-cover[data-cover-tone="1"]::after {
+  border-radius: 1px;
+  outline: 1px solid rgb(222 211 180 / 0.17);
+  outline-offset: -5px;
+}
+.book-cover[data-cover-tone="2"]::after {
+  border-radius: 50% 50% 2px 2px;
+}
+.book-cover[data-cover-tone="3"]::after {
+  inset: 20px 17px 17px 23px;
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+}
+.book-cover-pages {
+  position: absolute;
+  z-index: -1;
+  top: 4px;
+  bottom: -3px;
+  right: -5px;
+  width: 10px;
+  border-radius: 0 5px 5px 0;
+  background: repeating-linear-gradient(90deg, #dedbcf 0 1px, #f7f4e9 1px 3px);
+  box-shadow: 1px 1px 1px rgb(var(--shadow-color) / 0.12);
+}
+.book-cover-spine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 14px;
+  border-radius: 2px 0 0 2px;
+  background: linear-gradient(
+    90deg,
+    rgb(0 0 0 / 0.24),
+    rgb(255 255 255 / 0.08) 30%,
+    transparent 75%
+  );
+  border-right: 1px solid rgb(0 0 0 / 0.2);
+}
+.book-cover-title {
+  position: absolute;
+  left: 23px;
+  right: 17px;
+  bottom: 23%;
+  font-size: 22px;
+  line-height: 1.45;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-align: center;
+  text-shadow: 0 1px 1px rgb(0 0 0 / 0.2);
+}
+.book-cover-imprint {
+  position: absolute;
+  bottom: 10%;
+  left: 20px;
+  right: 13px;
+  font:
+    8px/1.4 Georgia,
+    serif;
+  letter-spacing: 0.06em;
+  text-align: center;
+  color: #d4cbb7;
+}
+.book-cover-emblem {
+  position: absolute;
+  left: 25%;
+  top: 20%;
+  width: 55%;
+  height: 32%;
+  color: #dfd3b6;
+  opacity: 0.83;
+}
+.book-cover-bookmark {
+  position: absolute;
+  right: 24px;
+  top: -1px;
+  width: 13px;
+  height: 38px;
+  background: #b6a77d;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 83%, 0 100%);
+}
+.book-cover-compact::after {
+  inset: 7px 6px 7px 10px;
+  border-radius: 1px;
+  outline: none;
+}
+.book-cover-compact .book-cover-emblem {
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  transform: translate(-50%, -50%);
+}
+.book-cover-compact .book-cover-bookmark {
+  right: 10px;
+  width: 8px;
+  height: 23px;
 }

@@ -1,26 +1,24 @@
 import { Moon, Sun } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useAppearanceStore } from "@/store/useAppearanceStore";
 
 export function ThemeToggle() {
-  const [isDark, setIsDark] = useState(() => {
-    const saved = localStorage.getItem("booksoul_theme");
-    if (saved) return saved === "dark";
-    return window.matchMedia("(prefers-color-scheme: dark)").matches;
-  });
+  const theme = useAppearanceStore((state) => state.theme);
+  const setTheme = useAppearanceStore((state) => state.setTheme);
+  const isDark = theme === "dark";
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDark);
-  }, [isDark]);
+    document.documentElement.style.colorScheme = theme;
+  }, [isDark, theme]);
 
   return (
     <button
       type="button"
       onClick={() => {
-        const next = !isDark;
-        setIsDark(next);
-        localStorage.setItem("booksoul_theme", next ? "dark" : "light");
+        setTheme(isDark ? "light" : "dark");
       }}
-      className="tap-spring inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground hover:text-foreground"
+      className="appearance-theme tap-spring"
       aria-label={isDark ? "切换到浅色主题" : "切换到深色主题"}
       title={isDark ? "浅色主题" : "深色主题"}
     >

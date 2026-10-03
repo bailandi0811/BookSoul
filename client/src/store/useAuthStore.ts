@@ -5,12 +5,17 @@ export interface AuthUser {
   id: string;
   email: string;
   name: string;
+  emailVerifiedAt: string | null;
 }
 
 export interface AuthTokens {
   accessToken: string;
   user: AuthUser;
 }
+type SessionInput = {
+  accessToken: string;
+  user: Omit<AuthUser, "emailVerifiedAt"> & { emailVerifiedAt?: string | null };
+};
 
 export type ClaimState = "idle" | "claiming" | "partial" | "failed";
 
@@ -21,8 +26,11 @@ interface AuthState {
   claimState: ClaimState;
   claimMessage: string | null;
   isAuthenticated: boolean;
-  signIn: (data: AuthTokens) => void;
-  restoreSession: (data: AuthTokens) => void;
+  authGeneration: number;
+  invalidatePendingAuthentication: () => void;
+  updateCurrentUser: (user: AuthUser) => void;
+  signIn: (data: SessionInput) => void;
+  restoreSession: (data: SessionInput) => void;
   updateTokens: (accessToken: string) => void;
   setClaimState: (state: ClaimState, message?: string | null) => void;
   completeClaim: () => void;
@@ -62,18 +70,24 @@ export const useAuthStore = create<AuthState>()(
       claimState: "idle",
       claimMessage: null,
       isAuthenticated: false,
+      authGeneration: 0,
+      invalidatePendingAuthentication: () =>
+        set((state) => ({ authGeneration: state.authGeneration + 1 })),
+      updateCurrentUser: (user) =>
+        set((state) => (state.user?.id === user.id ? { user } : {})),
       signIn: ({ accessToken, user }) =>
-        set({
+        set((state) => ({
+          authGeneration: state.authGeneration + 1,
           accessToken,
-          user,
+          user: { ...user, emailVerifiedAt: user.emailVerifiedAt ?? null },
           isAuthenticated: true,
           claimState: "idle",
           claimMessage: null,
-        }),
+        })),
       restoreSession: ({ accessToken, user }) =>
         set({
           accessToken,
-          user,
+          user: { ...user, emailVerifiedAt: user.emailVerifiedAt ?? null },
           isAuthenticated: true,
         }),
       updateTokens: (accessToken) =>
@@ -94,13 +108,14 @@ export const useAuthStore = create<AuthState>()(
           claimMessage: null,
         }),
       clearAuthentication: () =>
-        set({
+        set((state) => ({
+          authGeneration: state.authGeneration + 1,
           user: null,
           accessToken: null,
           isAuthenticated: false,
           claimState: "idle",
           claimMessage: null,
-        }),
+        })),
     }),
     {
       name: "booksoul-auth",
@@ -111,8 +126,14 @@ export const useAuthStore = create<AuthState>()(
         return {
           ...current,
           ...saved,
+          authGeneration: current.authGeneration,
           guestUserId: normalizeGuestUserId(saved.guestUserId),
-          user: validUserState ? saved.user! : null,
+          user: validUserState
+            ? {
+                ...saved.user!,
+                emailVerifiedAt: saved.user!.emailVerifiedAt ?? null,
+              }
+            : null,
           accessToken: validUserState ? saved.accessToken! : null,
           isAuthenticated: validUserState,
         };

@@ -1,6 +1,9 @@
 import { ConfigService } from '@nestjs/config';
+import { createClient } from 'redis';
 import { AgentAdmissionStore } from './agent-admission.store';
 import type { AgentAdmissionStoreInput } from './agent-admission.types';
+
+jest.mock('redis', () => ({ createClient: jest.fn() }));
 
 describe('AgentAdmissionStore local mode', () => {
   let store: AgentAdmissionStore;
@@ -106,5 +109,96 @@ describe('AgentAdmissionStore local mode', () => {
     await expect(
       store.tryAcquire(input({ runId: 'run-b', nowMs: 1_061 })),
     ).resolves.toEqual({ accepted: true });
+  });
+});
+
+describe('AgentAdmissionStore Redis startup', () => {
+  const redis = {
+    on: jest.fn(),
+    connect: jest.fn(),
+    destroy: jest.fn(),
+    eval: jest.fn(),
+    isOpen: true,
+  };
+  let store: AgentAdmissionStore;
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.clearAllMocks();
+    redis.isOpen = true;
+    jest
+      .mocked(createClient)
+      .mockReturnValue(redis as unknown as ReturnType<typeof createClient>);
+    store = new AgentAdmissionStore({
+      get: jest.fn((key: string) => {
+        if (key === 'agentAdmission.mode') return 'redis';
+        if (key === 'agentAdmission.redisUrl')
+          return 'redis://fixture:fixture-secret@redis.example.invalid:6379';
+        return undefined;
+      }),
+    } as unknown as ConfigService);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('rejects startup within five seconds and stops an endless reconnect', async () => {
+    let finish!: () => void;
+    redis.connect.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    let outcome = 'pending';
+    const initialization = store.onModuleInit().then(
+      () => {
+        outcome = 'ready';
+      },
+      (error: unknown) => {
+        outcome = error instanceof Error ? error.message : String(error);
+      },
+    );
+    try {
+      await jest.advanceTimersByTimeAsync(5_000);
+      expect(outcome).toContain(
+        'Failed to connect to the Redis agent admission store',
+      );
+      expect(outcome).not.toContain('fixture-secret');
+      expect(redis.destroy).toHaveBeenCalledTimes(1);
+    } finally {
+      finish();
+      await initialization;
+    }
+  });
+
+  it('cleans up a rejected connection and keeps admission closed without local fallback', async () => {
+    redis.connect.mockRejectedValue(new Error('fixture-secret'));
+    await expect(store.onModuleInit()).rejects.toThrow(
+      'Failed to connect to the Redis agent admission store',
+    );
+    expect(redis.destroy).toHaveBeenCalledTimes(1);
+    redis.eval.mockRejectedValue(new Error('connection closed'));
+    await expect(
+      store.tryAcquire({
+        ownerId: 'fixture-owner',
+        sessionId: 'fixture-session',
+        bookId: 'fixture-book',
+        runId: 'fixture-run',
+        nowMs: 1_000,
+        leaseTtlMs: 100,
+        perUserLimit: 2,
+        globalLimit: 3,
+      }),
+    ).rejects.toThrow('Agent admission store is unavailable');
+  });
+
+  it('keeps a successful Redis connection until module shutdown', async () => {
+    redis.connect.mockResolvedValue(undefined);
+    await expect(store.onModuleInit()).resolves.toBeUndefined();
+    expect(redis.destroy).not.toHaveBeenCalled();
+    store.onModuleDestroy();
+    expect(redis.destroy).toHaveBeenCalledTimes(1);
   });
 });

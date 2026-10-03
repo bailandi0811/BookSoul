@@ -1,4 +1,6 @@
 import { useAuthStore, type AuthTokens } from "@/store/useAuthStore";
+import { parseAuthTokens, successData } from "./auth-contract";
+import { withAuthTimeout } from "./auth-request";
 
 interface ApiOptions extends RequestInit {
   skipAuth?: boolean;
@@ -13,15 +15,20 @@ export interface ApiUploadProgress {
 
 type RefreshResult =
   | { status: "success"; data: AuthTokens }
-  | { status: "unauthorized" | "unavailable" };
+  | { status: "unauthorized" | "unavailable" | "superseded" };
 
 export type AuthenticationRefreshStatus =
   | "authenticated"
   | "unauthorized"
   | "unavailable";
+// A stale response must neither restore nor clear a newer session.
+export type RefreshStatus = AuthenticationRefreshStatus | "superseded";
 
 const REFRESH_LOCK_NAME = "booksoul:refresh-token";
-let refreshPromise: Promise<RefreshResult> | null = null;
+let refreshPromise: {
+  generation: number;
+  promise: Promise<RefreshResult>;
+} | null = null;
 
 function withIdentityHeaders(options: ApiOptions): Headers {
   const headers = new Headers(options.headers);
@@ -37,49 +44,86 @@ function invalidateAuthentication(): void {
   window.dispatchEvent(new Event("booksoul:auth-invalidated"));
 }
 
-async function performTokenRefresh(): Promise<RefreshResult> {
+async function performTokenRefresh(signal: AbortSignal): Promise<RefreshResult> {
   try {
     const response = await fetch("/api/auth/refresh", {
       method: "POST",
       credentials: "include",
+      signal,
     });
     if (response.status === 401 || response.status === 403) {
       return { status: "unauthorized" };
     }
     if (!response.ok) return { status: "unavailable" };
-    const payload = (await response.json()) as {
-      success: true;
-      data: AuthTokens;
-    };
-    return { status: "success", data: payload.data };
+    const payload: unknown = await response.json();
+    return { status: "success", data: parseAuthTokens(successData(payload)) };
   } catch {
     return { status: "unavailable" };
   }
 }
 
-async function performCoordinatedTokenRefresh(): Promise<RefreshResult> {
-  if (!globalThis.navigator?.locks) return performTokenRefresh();
+async function performCoordinatedTokenRefresh(
+  generation: number,
+  signal: AbortSignal,
+): Promise<RefreshResult> {
+  const run = async () => {
+    signal.throwIfAborted();
+    return generation === useAuthStore.getState().authGeneration
+      ? performTokenRefresh(signal)
+      : Promise.resolve({ status: "superseded" } as const);
+  };
+  if (!globalThis.navigator?.locks) return run();
   return await globalThis.navigator.locks.request(
     REFRESH_LOCK_NAME,
-    () => performTokenRefresh(),
+    { signal },
+    run,
   );
 }
 
-function requestTokenRefresh(): Promise<RefreshResult> {
+function requestTokenRefresh(): {
+  generation: number;
+  promise: Promise<RefreshResult>;
+} {
   if (refreshPromise) return refreshPromise;
-  const pendingRefresh = performCoordinatedTokenRefresh();
+  const generation = useAuthStore.getState().authGeneration;
+  const pendingRefresh = withAuthTimeout((signal) =>
+    performCoordinatedTokenRefresh(generation, signal),
+  );
   const coordinatedRefresh = pendingRefresh
     .catch(() => ({ status: "unavailable" }) as const)
     .finally(() => {
       refreshPromise = null;
     });
-  refreshPromise = coordinatedRefresh;
-  return coordinatedRefresh;
+  refreshPromise = { generation, promise: coordinatedRefresh };
+  return refreshPromise;
 }
 
-export async function refreshAuthentication(): Promise<AuthenticationRefreshStatus> {
-  const result = await requestTokenRefresh();
+export async function refreshAuthentication(
+  options: { signal?: AbortSignal } = {},
+): Promise<RefreshStatus> {
+  const state = useAuthStore.getState();
+  const generation = state.authGeneration;
+  const userId = state.user?.id;
+  if (options.signal?.aborted) return "superseded";
+  const pending = requestTokenRefresh();
+  let result: RefreshResult;
+  try {
+    // Cancel this waiter without canceling the refresh used by other callers.
+    result = await withAuthTimeout(() => pending.promise, options.signal);
+  } catch {
+    return options.signal?.aborted ||
+      generation !== useAuthStore.getState().authGeneration
+      ? "superseded"
+      : "unavailable";
+  }
+  if (
+    options.signal?.aborted ||
+    generation !== useAuthStore.getState().authGeneration ||
+    pending.generation !== generation
+  )
+    return "superseded";
   if (result.status === "success") {
+    if (userId && result.data.user.id !== userId) return "superseded";
     useAuthStore.getState().restoreSession(result.data);
     return "authenticated";
   }
@@ -91,11 +135,17 @@ export async function refreshAuthentication(): Promise<AuthenticationRefreshStat
 
 function responseHeadersFromXhr(xhr: XMLHttpRequest): Headers {
   const headers = new Headers();
-  for (const line of xhr.getAllResponseHeaders().trim().split(/[\r\n]+/)) {
+  for (const line of xhr
+    .getAllResponseHeaders()
+    .trim()
+    .split(/[\r\n]+/)) {
     if (!line) continue;
     const separator = line.indexOf(":");
     if (separator < 0) continue;
-    headers.append(line.slice(0, separator).trim(), line.slice(separator + 1).trim());
+    headers.append(
+      line.slice(0, separator).trim(),
+      line.slice(separator + 1).trim(),
+    );
   }
   return headers;
 }
@@ -140,6 +190,7 @@ export async function apiFetch(
   options: ApiOptions = {},
 ): Promise<Response> {
   const { skipAuth, skipRefresh, ...requestOptions } = options;
+  const generation = useAuthStore.getState().authGeneration;
   const response = await fetch(input, {
     ...requestOptions,
     credentials: "include",
@@ -149,8 +200,20 @@ export async function apiFetch(
     return response;
   }
   if (!useAuthStore.getState().user) return response;
-  const refreshStatus = await refreshAuthentication();
-  if (refreshStatus !== "authenticated") return response;
+  if (
+    generation !== useAuthStore.getState().authGeneration ||
+    options.signal?.aborted
+  )
+    return response;
+  const refreshStatus = await refreshAuthentication({
+    signal: options.signal ?? undefined,
+  });
+  if (
+    refreshStatus !== "authenticated" ||
+    generation !== useAuthStore.getState().authGeneration ||
+    options.signal?.aborted
+  )
+    return response;
   return fetch(input, {
     ...requestOptions,
     credentials: "include",
@@ -163,12 +226,18 @@ export async function apiUpload(
   body: FormData,
   onProgress?: (progress: ApiUploadProgress) => void,
 ): Promise<Response> {
+  const generation = useAuthStore.getState().authGeneration;
   const response = await uploadRequest(input, body, onProgress);
   if (response.status !== 401 || !useAuthStore.getState().user) {
     return response;
   }
+  if (generation !== useAuthStore.getState().authGeneration) return response;
   const refreshStatus = await refreshAuthentication();
-  if (refreshStatus !== "authenticated") return response;
+  if (
+    refreshStatus !== "authenticated" ||
+    generation !== useAuthStore.getState().authGeneration
+  )
+    return response;
   return uploadRequest(input, body, onProgress);
 }
 

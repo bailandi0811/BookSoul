@@ -4,6 +4,7 @@ export interface AccessTokenPayload {
   sub: string;
   email: string;
   type: 'access';
+  authVersion?: number;
 }
 
 export interface AuthData {

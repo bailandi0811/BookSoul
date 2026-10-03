@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient } from 'redis';
+import { withTimeout } from '../../common/promise-timeout';
 import type {
   AgentAdmissionStoreDecision,
   AgentAdmissionStoreInput,
@@ -109,10 +110,16 @@ export class AgentAdmissionStore implements OnModuleInit, OnModuleDestroy {
       return;
     }
     try {
-      await this.redisClient().connect();
+      // connectTimeout limits one attempt; Redis otherwise reconnects forever.
+      await withTimeout(
+        this.redisClient().connect(),
+        5_000,
+        'Redis admission store startup',
+      );
     } catch {
+      if (this.redis?.isOpen) this.redis.destroy();
       throw new Error(
-        'Failed to connect to the Redis agent admission store; verify REDIS_URL without exposing credentials',
+        'Failed to connect to the Redis agent admission store; ensure Redis is running and verify REDIS_URL without exposing credentials',
       );
     }
   }

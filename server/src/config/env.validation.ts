@@ -1,3 +1,4 @@
+import { trustedAuthPublicUrl } from './auth-mail.config';
 const PLACEHOLDER_SECRET = 'replace-with-a-long-random-secret';
 
 export function validateEnvironment(
@@ -16,6 +17,18 @@ export function validateEnvironment(
   }
 
   const refreshDays = Number(config.REFRESH_TOKEN_EXPIRES_DAYS ?? 7);
+  const challengeSecret = String(config.AUTH_CHALLENGE_SECRET ?? '').trim();
+  if (
+    challengeSecret &&
+    (!/^[a-f0-9]{64}$/i.test(challengeSecret) ||
+      challengeSecret === accessSecret)
+  )
+    throw new Error(
+      'AUTH_CHALLENGE_SECRET must be independent 64-character hex',
+    );
+  const publicBaseUrl = String(config.AUTH_PUBLIC_BASE_URL ?? '').trim();
+  if (publicBaseUrl)
+    trustedAuthPublicUrl(publicBaseUrl, config.NODE_ENV === 'production');
   if (!Number.isFinite(refreshDays) || refreshDays <= 0) {
     throw new Error('REFRESH_TOKEN_EXPIRES_DAYS must be a positive number');
   }

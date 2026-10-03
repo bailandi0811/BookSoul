@@ -1,7 +1,7 @@
 {
   "moduleFileExtensions": ["js", "json", "ts"],
   "rootDir": "../src",
-  "testRegex": "prisma/prisma\\.service\\.spec\\.ts$",
+  "testRegex": "(?:prisma[/\\\\]prisma\\.service|auth[/\\\\].*\\.db)\\.spec\\.ts$",
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   },

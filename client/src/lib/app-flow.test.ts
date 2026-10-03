@@ -2,6 +2,41 @@ import { describe, expect, it } from "vitest";
 import { resolveAppScreen } from "./app-flow";
 
 describe("app authentication flow", () => {
+  it("opens the account page only after successful authentication restoration", () => {
+    expect(
+      resolveAppScreen({
+        authReady: false,
+        isAuthenticated: true,
+        view: "library",
+        isAccountRoute: true,
+      }),
+    ).toBe("loading");
+    expect(
+      resolveAppScreen({
+        authReady: true,
+        isAuthenticated: false,
+        view: "library",
+        isAccountRoute: true,
+      }),
+    ).toBe("auth");
+    expect(
+      resolveAppScreen({
+        authReady: true,
+        isAuthenticated: true,
+        view: "workspace",
+        isAccountRoute: true,
+      }),
+    ).toBe("account");
+    expect(
+      resolveAppScreen({
+        authReady: true,
+        isAuthenticated: true,
+        view: "library",
+        isAccountRoute: true,
+        isResetRoute: true,
+      }),
+    ).toBe("reset-password");
+  });
   it("waits for session restoration before choosing a screen", () => {
     expect(
       resolveAppScreen({

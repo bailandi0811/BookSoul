@@ -12,13 +12,52 @@ model User {
   email           String            @unique
   name            String
   passwordHash    String
+  emailVerifiedAt DateTime?
+  authVersion     Int               @default(0)
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
   refreshTokens   RefreshToken[]
+  authChallenges  AuthChallenge[]
   books           Book[]
   bookAssistants  BookAssistant[]
   readingProgress ReadingProgress[]
   agentRuns       AgentRun[]
+}
+
+enum AuthChallengePurpose {
+  REGISTRATION
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+}
+
+enum AuthChallengeDeliveryState {
+  PENDING
+  SENT
+  FAILED
+  SUPPRESSED
+}
+
+model AuthChallenge {
+  id               String                     @id @default(uuid())
+  verificationId   String                     @unique @default(uuid())
+  email            String
+  purpose          AuthChallengePurpose
+  userId           String?
+  user             User?                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  generation       Int                        @default(0)
+  secretHash       String                     @unique
+  expiresAt        DateTime
+  attempts         Int                        @default(0)
+  consumedAt       DateTime?
+  deliveryState    AuthChallengeDeliveryState @default(PENDING)
+  resendAllowedAt  DateTime
+  windowStartedAt  DateTime
+  sendCount        Int                        @default(0)
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+
+  @@unique([email, purpose])
+  @@index([expiresAt])
 }
 
 model RefreshToken {

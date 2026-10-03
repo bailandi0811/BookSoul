@@ -7,6 +7,7 @@ import {
 import { MailerService } from '@nestjs-modules/mailer';
 import { ConfigService } from '@nestjs/config';
 import { SendEmailDto } from './dto/send-email.dto';
+import { buildReadingMail } from '../mail/mail-template';
 
 @Injectable()
 export class ToolsService {
@@ -37,6 +38,7 @@ export class ToolsService {
         to: dto.to.trim(),
         subject: dto.subject.trim(),
         text: dto.text,
+        ...buildReadingMail(dto.subject.trim(), dto.text),
         from,
       });
       this.logger.log('A user-confirmed email was sent');

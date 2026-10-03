@@ -1,13 +1,4 @@
-import {
-  BookOpen,
-  User,
-  Copy,
-  Check,
-  Quote,
-  ChevronDown,
-  Loader2,
-  Mail,
-} from "lucide-react";
+import { User, Copy, Check, Quote, ChevronDown, Mail } from "lucide-react";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { ReferenceCard } from "./ReferenceCard";
@@ -18,6 +9,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { createEmailDraft } from "@/lib/email-draft";
 import { EmailComposerDialog } from "./EmailComposerDialog";
 import { ExternalReferenceCard } from "./ExternalReferenceCard";
+import { BookSoulMark } from "@/components/BookSoulMark";
 
 interface MessageBubbleProps {
   message: Message;
@@ -44,15 +36,13 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
 
   const displayContent = message.content;
 
-  const [isThinkingExpanded, setIsThinkingExpanded] = useState(
-    message.isThinking,
-  );
+  const [isThinkingExpanded, setIsThinkingExpanded] = useState(false);
 
   const [prevIsThinking, setPrevIsThinking] = useState(message.isThinking);
   if (message.isThinking !== prevIsThinking) {
     setPrevIsThinking(message.isThinking);
     if (message.isThinking) {
-      setIsThinkingExpanded(true);
+      setIsThinkingExpanded(false);
     } else if (message.thinkingSteps && message.thinkingSteps.length > 0) {
       setIsThinkingExpanded(false);
     }
@@ -68,20 +58,18 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
     message.isStreaming && displayContent.trim().length > 0;
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-      className={`group flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.16 }}
+      className={`chat-message-row group flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}
     >
-      <div className="mt-1.5 flex-shrink-0">
+      <div className="chat-message-avatar mt-1.5 flex-shrink-0">
         {isUser ? (
           <div className="flex h-8 w-8 items-center justify-center rounded-[12px] bg-primary/12">
             <User className="h-3.5 w-3.5 text-primary/80" />
           </div>
         ) : (
-          <span className="warm-tint flex h-8 w-8 items-center justify-center rounded-[12px] text-primary">
-            <BookOpen className="h-4 w-4" />
-          </span>
+          <BookSoulMark active={message.isStreaming} />
         )}
       </div>
 
@@ -103,24 +91,23 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
             </div>
           </div>
         ) : (
-          <div className="warm-card-raised group/content relative w-full rounded-[24px] rounded-tl-md px-5 py-4 sm:px-6 sm:py-5">
-            <div className="mb-3 flex items-center justify-between gap-3 border-b border-border/60 pb-3">
+          <div className="chat-assistant-answer group/content relative">
+            <div className="chat-message-header">
               <div className="flex min-w-0 items-center gap-2">
                 <span className="truncate text-[13px] font-semibold text-primary">
                   {assistantName}
                 </span>
                 <span className="hidden truncate rounded-full bg-secondary px-2 py-1 text-[10px] font-medium text-muted-foreground sm:inline">
-                  阅读笔记
+                  {message.isStreaming ? "正在回应" : "阅读助手"}
                 </span>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="chat-message-actions">
                 {!message.isStreaming && displayContent.trim().length > 0 && (
                   <button
                     type="button"
                     onClick={() => setIsEmailComposerOpen(true)}
                     aria-label="发送到邮箱"
                     title="发送到邮箱"
-                    className="rounded-lg p-1.5 text-muted-foreground/55 opacity-70 transition-[color,background-color,opacity] hover:bg-secondary hover:text-foreground group-hover/content:opacity-100"
                   >
                     <Mail className="h-3.5 w-3.5" />
                   </button>
@@ -129,7 +116,6 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                   type="button"
                   onClick={handleCopy}
                   aria-label="复制回答"
-                  className="rounded-lg p-1.5 text-muted-foreground/55 opacity-70 transition-[color,background-color,opacity] hover:bg-secondary hover:text-foreground group-hover/content:opacity-100"
                 >
                   {isCopied ? (
                     <Check className="w-3.5 h-3.5 text-primary" />
@@ -140,17 +126,18 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
               </div>
             </div>
 
-            <div className="prose-ai text-[15px] leading-[1.8] text-foreground/90">
+            <div className="prose-ai text-foreground">
               {message.thinkingSteps && message.thinkingSteps.length > 0 && (
                 <div className="mb-3">
                   <button
                     type="button"
                     onClick={() => setIsThinkingExpanded(!isThinkingExpanded)}
-                    className="warm-inset -ml-1 flex items-center gap-2 rounded-xl px-2.5 py-1.5 transition-opacity hover:opacity-80"
+                    aria-expanded={isThinkingExpanded}
+                    className="assistant-stage"
                   >
                     {message.isThinking ? (
                       <div className="flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                        <BookSoulMark active />
                         <span className="text-[13px] font-medium text-primary">
                           正在检索已读内容
                         </span>
@@ -223,7 +210,7 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                   (!message.thinkingSteps ||
                     message.thinkingSteps.length === 0) ? (
                     <div className="flex gap-2 items-center h-6 px-1 text-muted-foreground">
-                      <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                      <BookSoulMark active />
                       <span className="text-[13px]">正在组织回答</span>
                     </div>
                   ) : (
@@ -233,7 +220,7 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                           <p className="mb-3 last:mb-0">{children}</p>
                         ),
                         strong: ({ children }) => (
-                          <strong className="font-semibold text-foreground bg-primary/8 px-1 py-0.5 rounded-sm">
+                          <strong className="font-semibold text-foreground">
                             {children}
                           </strong>
                         ),
@@ -248,7 +235,7 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                           </ol>
                         ),
                         blockquote: ({ children }) => (
-                          <blockquote className="font-reading my-4 flex gap-3 rounded-r-xl border-l-4 border-primary/30 bg-muted/30 p-4 pl-0 italic text-muted-foreground">
+                          <blockquote className="font-reading my-5 flex gap-3 border-l-2 border-accent bg-transparent pl-4 text-foreground">
                             <Quote className="w-5 h-5 text-primary/40 flex-shrink-0 rotate-180 mt-0.5" />
                             <div className="flex-1">{children}</div>
                           </blockquote>
@@ -348,7 +335,7 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
         )}
 
         {!isUser && message.createdAt != null && (
-          <div className="mt-1.5 text-[11px] text-muted-foreground/45 px-1">
+          <div className="mt-1.5 px-1 text-[11px] text-muted-foreground">
             {new Date(message.createdAt).toLocaleTimeString("zh-CN", {
               hour: "2-digit",
               minute: "2-digit",
@@ -356,9 +343,9 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
           </div>
         )}
       </div>
-      {!isUser && isEmailComposerOpen && (
+      {!isUser && (
         <EmailComposerDialog
-          draft={emailDraft}
+          draft={isEmailComposerOpen ? emailDraft : null}
           onClose={() => setIsEmailComposerOpen(false)}
         />
       )}

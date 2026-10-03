@@ -19,6 +19,26 @@ describe("useAuthStore", () => {
     expect(normalizeGuestUserId("anonymous")).toMatch(/^guest_/);
     expect(normalizeGuestUserId("../anonymous")).toMatch(/^guest_/);
   });
+  it("normalizes legacy metadata and does not persist authentication generations", () => {
+    const user = {
+      id: "fixture",
+      email: "reader@example.invalid",
+      name: "Reader",
+    };
+    const before = useAuthStore.getState().authGeneration;
+    useAuthStore.getState().signIn({ user, accessToken: "access" });
+    expect(useAuthStore.getState().user?.emailVerifiedAt).toBeNull();
+    expect(useAuthStore.getState().authGeneration).toBe(before + 1);
+    useAuthStore.getState().updateCurrentUser({
+      ...user,
+      id: "other",
+      emailVerifiedAt: "2026-10-02T00:00:00Z",
+    });
+    expect(useAuthStore.getState().user?.id).toBe("fixture");
+    expect(localStorage.getItem("booksoul-auth")).not.toContain(
+      "authGeneration",
+    );
+  });
 
   it("moves atomically from guest to authenticated user", () => {
     useAuthStore.getState().signIn({

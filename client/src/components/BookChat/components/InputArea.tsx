@@ -1,13 +1,26 @@
-import { useRef, useEffect, useState } from "react";
-import { Globe2, Send, ShieldAlert, Square } from "lucide-react";
+import { useRef, useEffect, useId, useState } from "react";
+import {
+  ArrowUp,
+  Globe2,
+  ShieldAlert,
+  ShieldCheck,
+  SlidersHorizontal,
+  Square,
+} from "lucide-react";
 import { useChatStore } from "@/store/useChatStore";
 import { useBooksStore } from "@/store/useBooksStore";
 import { motion, AnimatePresence } from "framer-motion";
+import { Dialog } from "@/components/ui/Dialog";
 
 export const InputArea = () => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const optionsButtonRef = useRef<HTMLButtonElement>(null);
+  const optionsId = useId();
+  const [optionsOpen, setOptionsOpen] = useState(false);
   const [spoilerOverride, setSpoilerOverride] = useState(false);
   const [externalResearch, setExternalResearch] = useState(false);
+  const [pendingSpoilers, setPendingSpoilers] = useState(false);
+  const [pendingResearch, setPendingResearch] = useState(false);
   const bookTitle = useBooksStore((state) => state.currentBook?.title);
   const readingProgress = useBooksStore((state) => state.readingProgress);
   const {
@@ -23,11 +36,13 @@ export const InputArea = () => {
   useEffect(() => {
     if (!inputRef.current) return;
     inputRef.current.style.height = "auto";
-    inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 200)}px`;
+    inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 160)}px`;
   }, [draftInput]);
 
   useEffect(() => {
-    inputRef.current?.focus();
+    // Keep the software keyboard closed until a phone reader chooses to write.
+    if (window.matchMedia("(min-width: 768px) and (pointer: fine)").matches)
+      inputRef.current?.focus();
   }, []);
 
   useEffect(() => {
@@ -44,127 +59,158 @@ export const InputArea = () => {
     void sendMessage(text, spoilerOverride, externalResearch);
     setSpoilerOverride(false);
     setExternalResearch(false);
-    if (inputRef.current) inputRef.current.style.height = "auto";
+    setOptionsOpen(false);
   };
-
-  const canSend = draftInput.trim().length > 0 && !isLoading;
   const visibleRange =
     readingProgress?.mode === "FINISHED"
-      ? "回答范围 · 全书"
-      : readingProgress?.mode === "IN_PROGRESS"
-        ? `回答范围 · 第 1—${readingProgress.spoilerCeiling} 节`
-        : "回答范围 · 第一节";
+      ? "回答范围：全书"
+      : `回答范围：第 1—${readingProgress?.spoilerCeiling ?? 1} 节`;
 
   return (
-    <div className="relative z-20">
-      <div className="mx-auto max-w-[58rem] px-4 pb-4 sm:px-6 sm:pb-5 lg:px-8">
-        <AnimatePresence>
-          {lastStopNotice && (
-            <motion.div
-              role="status"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              className="warm-card mb-3 rounded-xl px-3.5 py-2 text-center text-xs text-muted-foreground"
-            >
-              {lastStopNotice}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <form
-          onSubmit={handleSubmit}
-          className="warm-card-raised rounded-[24px] p-3 sm:p-4"
+    <div className="chat-composer-shell">
+      <AnimatePresence>
+        {lastStopNotice && (
+          <motion.div
+            role="status"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="composer-notice"
+          >
+            {lastStopNotice}
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <form onSubmit={handleSubmit} className="chat-composer input-glow">
+        <textarea
+          id="chat-input"
+          ref={inputRef}
+          placeholder={`向${bookTitle ? `《${bookTitle}》` : "这本书"}提问…`}
+          value={draftInput}
+          onChange={(event) => setDraftInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (
+              event.nativeEvent.isComposing ||
+              event.nativeEvent.keyCode === 229
+            )
+              return;
+            if (event.key === "Enter" && !event.shiftKey) handleSubmit(event);
+          }}
+          disabled={isLoading}
+          rows={1}
+          aria-label="输入关于当前书籍的问题"
+        />
+        {isLoading ? (
+          <button
+            type="button"
+            onClick={stopGenerating}
+            className="composer-send composer-stop tap-spring"
+            aria-label="停止生成"
+          >
+            <Square className="h-4 w-4 fill-current" />
+          </button>
+        ) : (
+          <button
+            type="submit"
+            disabled={!draftInput.trim()}
+            className="composer-send tap-spring"
+            aria-label="发送"
+          >
+            <ArrowUp className="h-5 w-5" />
+          </button>
+        )}
+      </form>
+      <div className="composer-toolbar">
+        <span
+          className={`composer-scope ${spoilerOverride ? "text-destructive" : ""}`}
         >
-          <textarea
-            id="chat-input"
-            ref={inputRef}
-            placeholder={`向${bookTitle ? `《${bookTitle}》` : "这本书"}提问`}
-            value={draftInput}
-            onChange={(event) => setDraftInput(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                handleSubmit(event);
-              }
+          {spoilerOverride ? (
+            <ShieldAlert size={14} />
+          ) : (
+            <ShieldCheck size={14} />
+          )}
+          {spoilerOverride ? "本次可包含后文" : visibleRange}
+          {externalResearch && <Globe2 size={14} aria-label="本次允许联网" />}
+        </span>
+        <div className="relative">
+          <button
+            ref={optionsButtonRef}
+            type="button"
+            aria-expanded={optionsOpen}
+            aria-controls={optionsId}
+            onClick={() => {
+              optionsButtonRef.current?.focus({ preventScroll: true });
+              setPendingSpoilers(spoilerOverride);
+              setPendingResearch(externalResearch);
+              setOptionsOpen(true);
             }}
-            disabled={isLoading}
-            rows={1}
-            aria-label="输入关于当前书籍的问题"
-            className="min-h-12 max-h-[200px] w-full resize-none border-0 bg-transparent px-2 py-2 text-[16px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/70 focus-visible:shadow-none disabled:opacity-50"
-          />
-
-          <div className="mt-2 flex items-center justify-between gap-3 border-t border-border/75 pt-3">
-            <div className="flex min-w-0 items-center gap-2 overflow-x-auto pb-0.5">
-              <label
-                className={`tap-spring flex min-w-0 shrink-0 cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-colors focus-within:ring-2 focus-within:ring-inset focus-within:ring-primary/30 ${
-                  spoilerOverride
-                    ? "bg-primary/12 text-primary"
-                    : "warm-inset text-muted-foreground hover:text-foreground"
-                }`}
-                title="开启后，这一次问题可以越过当前阅读进度检索全书"
-              >
-                <input
-                  type="checkbox"
-                  checked={spoilerOverride}
-                  onChange={(event) => setSpoilerOverride(event.target.checked)}
-                  className="sr-only"
-                />
-                <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">
-                  {spoilerOverride ? "本次允许检索全书" : visibleRange}
+            className="composer-options-button"
+          >
+            <SlidersHorizontal size={14} /> 本次选项
+            {(spoilerOverride || externalResearch) && (
+              <span className="options-active-dot" />
+            )}
+          </button>
+          <Dialog
+            open={optionsOpen}
+            id={optionsId}
+            title="本次提问选项"
+            onClose={() => setOptionsOpen(false)}
+          >
+            <p className="dialog-intro mb-4">
+              只用于下一次提问，发送后自动恢复默认范围。
+            </p>
+            <label className="composer-option">
+              <input
+                type="checkbox"
+                checked={pendingSpoilers}
+                disabled={isLoading}
+                onChange={(event) => setPendingSpoilers(event.target.checked)}
+              />
+              <span>
+                <span className="block font-medium">本次允许检索全书</span>
+                <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+                  回答可能包含当前阅读进度之后的情节。
                 </span>
-              </label>
-
-              <label
-                className={`tap-spring flex shrink-0 cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-colors focus-within:ring-2 focus-within:ring-inset focus-within:ring-primary/30 ${
-                  externalResearch
-                    ? "bg-primary/12 text-primary"
-                    : "warm-inset text-muted-foreground hover:text-foreground"
-                }`}
-                title="开启后，Agent 可自行判断是否搜索；仅搜索时发送必要书名和当前问题，不会发送小说正文、笔记或账号信息"
-              >
-                <input
-                  type="checkbox"
-                  checked={externalResearch}
-                  onChange={(event) =>
-                    setExternalResearch(event.target.checked)
-                  }
-                  className="sr-only"
-                />
-                <Globe2 className="h-3.5 w-3.5 shrink-0" />
-                <span>
-                  {externalResearch ? "已允许 Agent 联网" : "允许 Agent 联网"}
+              </span>
+            </label>
+            <label className="composer-option">
+              <input
+                type="checkbox"
+                checked={pendingResearch}
+                disabled={isLoading}
+                onChange={(event) => setPendingResearch(event.target.checked)}
+              />
+              <span>
+                <span className="block font-medium">允许助手联网</span>
+                <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+                  每轮最多搜索一次，只发送必要书名和当前问题，不发送小说正文或账号信息。
                 </span>
-              </label>
-            </div>
-
-            {isLoading ? (
+              </span>
+            </label>
+            <div className="dialog-actions">
               <button
                 type="button"
-                onClick={stopGenerating}
-                className="tap-spring flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-secondary text-muted-foreground"
-                aria-label="停止生成"
+                className="dialog-secondary"
+                onClick={() => setOptionsOpen(false)}
               >
-                <Square className="h-3.5 w-3.5 fill-current" />
+                取消
               </button>
-            ) : (
               <button
-                type="submit"
-                disabled={!canSend}
-                className="tap-spring flex h-10 items-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-[0_10px_24px_-16px_rgb(var(--primary)/0.9)] disabled:cursor-not-allowed disabled:opacity-40"
+                type="button"
+                className="dialog-primary"
+                disabled={isLoading}
+                onClick={() => {
+                  setSpoilerOverride(pendingSpoilers);
+                  setExternalResearch(pendingResearch);
+                  setOptionsOpen(false);
+                }}
               >
-                发送
-                <Send className="h-4 w-4" />
+                应用到本次提问
               </button>
-            )}
-          </div>
-        </form>
-        <p className="mt-2 text-center text-[11px] text-muted-foreground/75">
-          {externalResearch
-            ? "Agent 将自行判断是否搜索；每轮最多一次，只发送必要书名和当前问题"
-            : "小说事实以已读引用为准 · 也可输入“把……发到 xxx@example.com”"}
-        </p>
+            </div>
+          </Dialog>
+        </div>
       </div>
     </div>
   );

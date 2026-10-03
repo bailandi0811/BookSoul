@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuthStore } from "@/store/useAuthStore";
-import { apiFetch, apiUpload } from "./api";
+import { apiFetch, apiUpload, refreshAuthentication } from "./api";
 
 class FakeXMLHttpRequest {
   static instances: FakeXMLHttpRequest[] = [];
@@ -106,6 +106,76 @@ describe("apiFetch", () => {
     expect(headers.has("Authorization")).toBe(false);
     expect(headers.has("X-Guest-User-Id")).toBe(false);
   });
+  it("never refreshes or retries a request under a newly signed-in account", async () => {
+    const user = { id: "old", email: "reader@example.invalid", name: "Reader" };
+    useAuthStore.getState().signIn({ accessToken: "old", user });
+    let finish!: (response: Response) => void;
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const request = apiFetch("/api/books");
+    useAuthStore
+      .getState()
+      .signIn({ accessToken: "new", user: { ...user, id: "new" } });
+    finish(new Response("{}", { status: 401 }));
+    expect((await request).status).toBe(401);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(useAuthStore.getState().user?.id).toBe("new");
+  });
+  it("does not let a late failed refresh clear a new session", async () => {
+    const user = { id: "old", email: "reader@example.invalid", name: "Reader" };
+    useAuthStore.getState().signIn({ accessToken: "old", user });
+    let finish!: (response: Response) => void;
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const pending = refreshAuthentication();
+    await vi.waitFor(() => expect(finish).toBeDefined());
+    useAuthStore
+      .getState()
+      .signIn({ accessToken: "new", user: { ...user, id: "new" } });
+    finish(new Response("{}", { status: 401 }));
+    expect(await pending).toBe("superseded");
+    expect(useAuthStore.getState().accessToken).toBe("new");
+  });
+  it("does not cancel a shared refresh when one waiter aborts", async () => {
+    let finish!: (response: Response) => void;
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const controller = new AbortController();
+    const canceled = refreshAuthentication({ signal: controller.signal });
+    const active = refreshAuthentication();
+    await vi.waitFor(() => expect(finish).toBeDefined());
+    controller.abort();
+    finish(
+      new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            accessToken: "new",
+            user: {
+              id: "fixture",
+              email: "reader@example.invalid",
+              name: "Reader",
+            },
+          },
+        }),
+      ),
+    );
+    expect(await canceled).toBe("superseded");
+    expect(await active).toBe("authenticated");
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
 
   it("uses one refresh for concurrent 401 responses and replays each once", async () => {
     useAuthStore.getState().signIn({
@@ -116,7 +186,7 @@ describe("apiFetch", () => {
     let refreshRequest: RequestInit | undefined;
     const businessCalls = new Map<string, number>();
     const lockRequest = vi.fn(
-      async (_name: string, callback: () => Promise<unknown>) => callback(),
+      async (_name: string, _options: LockOptions, callback: () => Promise<unknown>) => callback(),
     );
     vi.stubGlobal("navigator", { locks: { request: lockRequest } });
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
@@ -152,6 +222,7 @@ describe("apiFetch", () => {
     expect(refreshCalls).toBe(1);
     expect(lockRequest).toHaveBeenCalledWith(
       "booksoul:refresh-token",
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
       expect.any(Function),
     );
     expect(refreshRequest).toMatchObject({
@@ -213,5 +284,119 @@ describe("apiFetch", () => {
       accessToken: "old-access",
       user: { id: "user-1" },
     });
+  });
+});
+
+describe("bounded authentication refresh", () => {
+  const user = {
+    id: "fixture",
+    email: "reader@example.invalid",
+    name: "Reader",
+    emailVerifiedAt: null,
+  };
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.useFakeTimers();
+    useAuthStore.getState().clearAuthentication();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("times out a stalled refresh, keeps credentials, and allows a fresh attempt", async () => {
+    useAuthStore.getState().signIn({ accessToken: "original", user });
+    let finish!: (response: Response) => void;
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(
+      () => new Promise<Response>((resolve) => { finish = resolve; }),
+    );
+    let status = "pending";
+    const pending = refreshAuthentication().then((result) => { status = result; });
+    try {
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(status).toBe("unavailable");
+      expect(fetch.mock.calls[0][1]?.signal?.aborted).toBe(true);
+      expect(useAuthStore.getState().accessToken).toBe("original");
+
+      fetch.mockResolvedValue(new Response(JSON.stringify({
+        success: true,
+        data: { accessToken: "recovered", user },
+      })));
+      expect(await refreshAuthentication()).toBe("authenticated");
+      finish(new Response(JSON.stringify({
+        success: true,
+        data: { accessToken: "late", user },
+      })));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(useAuthStore.getState().accessToken).toBe("recovered");
+    } finally {
+      finish(new Response("{}", { status: 401 }));
+      await pending;
+    }
+  });
+
+  it("stops waiting for an occupied tab lock without starting a late refresh", async () => {
+    let release!: () => void;
+    const request = vi.fn((
+      _name: string,
+      optionsOrRun: LockOptions | (() => Promise<unknown>),
+      callback?: () => Promise<unknown>,
+    ) => new Promise<unknown>((resolve) => {
+      const run = typeof optionsOrRun === "function" ? optionsOrRun : callback!;
+      let released = false;
+      release = () => {
+        if (released) return;
+        released = true;
+        resolve(run());
+      };
+    }));
+    vi.stubGlobal("navigator", { locks: { request } });
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("{}", { status: 401 }),
+    );
+    let status = "pending";
+    const pending = refreshAuthentication().then((result) => { status = result; });
+    try {
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(status).toBe("unavailable");
+      release();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      release();
+      await pending;
+    }
+  });
+
+  it("settles a canceled waiter immediately while another caller can finish the shared refresh", async () => {
+    let finish!: (response: Response) => void;
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(
+      () => new Promise<Response>((resolve) => { finish = resolve; }),
+    );
+    const controller = new AbortController();
+    let canceledStatus = "pending";
+    const canceled = refreshAuthentication({ signal: controller.signal })
+      .then((result) => { canceledStatus = result; });
+    const active = refreshAuthentication();
+    try {
+      await vi.advanceTimersByTimeAsync(0);
+      controller.abort();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(canceledStatus).toBe("superseded");
+      expect(fetch.mock.calls[0][1]?.signal?.aborted).toBe(false);
+      finish(new Response(JSON.stringify({
+        success: true,
+        data: { accessToken: "restored", user },
+      })));
+      expect(await active).toBe("authenticated");
+      expect(useAuthStore.getState().accessToken).toBe("restored");
+    } finally {
+      finish(new Response("{}", { status: 401 }));
+      await Promise.all([canceled, active]);
+    }
   });
 });

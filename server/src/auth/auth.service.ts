@@ -10,11 +10,15 @@ import { Prisma, User } from '@prisma/client';
 import { compare, hash } from 'bcryptjs';
 import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
-import { PublicUser, UsersService } from '../users/users.service';
+import { PublicUser, toPublicUser, UsersService } from '../users/users.service';
 import { getAccessTokenSecret } from './access-token.config';
 import { AccessTokenPayload, AuthData } from './auth.types';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { AuthChallengesService } from './auth-challenges.service';
+import { assertNewPasswordPolicy, normalizeEmail } from './auth-input.policy';
+import { invalidVerificationCode } from './auth-email-verification.service';
+import { lockAuthUser } from './auth-user-lock';
 
 const PASSWORD_HASH_COST = 10;
 const INVALID_PASSWORD_HASH =
@@ -42,28 +46,72 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly challenges: AuthChallengesService,
   ) {}
 
   async register(dto: RegisterDto): Promise<AuthData> {
-    const email = this.normalizeEmail(dto.email);
-    const existingUser = await this.usersService.findByEmail(email);
-
-    if (existingUser) {
-      throw new ConflictException('该邮箱已被注册');
-    }
-
+    assertNewPasswordPolicy(dto.password);
+    const email = normalizeEmail(dto.email);
     const passwordHash = await hash(dto.password, PASSWORD_HASH_COST);
-    const user = await this.usersService.create(
-      email,
-      dto.name.trim(),
-      passwordHash,
-    );
-
-    return this.issueTokens(user);
+    try {
+      const result = await this.prisma.$transaction(async (tx) => {
+        const proof = await this.challenges.verify(
+          tx,
+          {
+            email,
+            purpose: 'REGISTRATION',
+            userId: null,
+            verificationId: dto.verificationId,
+            secret: dto.code,
+          },
+          () => new Date(),
+        );
+        if (proof.status === 'invalid') return null;
+        if (await tx.user.findUnique({ where: { email } }))
+          throw new ConflictException({
+            code: 'EMAIL_ALREADY_REGISTERED',
+            message: '该邮箱已被注册',
+          });
+        const user = await tx.user.create({
+          data: {
+            email,
+            name: dto.name.trim(),
+            passwordHash,
+            emailVerifiedAt: new Date(),
+          },
+        });
+        const refreshToken = await this.storeRefreshToken(tx, user.id);
+        if (
+          !(await this.challenges.consume(
+            tx,
+            proof.challenge,
+            () => new Date(),
+          ))
+        )
+          throw invalidVerificationCode();
+        return { user, refreshToken };
+      });
+      if (!result) throw invalidVerificationCode();
+      return {
+        accessToken: await this.signAccessToken(result.user),
+        refreshToken: result.refreshToken,
+        user: toPublicUser(result.user),
+      };
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      )
+        throw new ConflictException({
+          code: 'EMAIL_ALREADY_REGISTERED',
+          message: '该邮箱已被注册',
+        });
+      throw error;
+    }
   }
 
   async login(dto: LoginDto): Promise<AuthData> {
-    const email = this.normalizeEmail(dto.email);
+    const email = normalizeEmail(dto.email);
     const user = await this.usersService.findByEmail(email);
     const passwordMatches = await compare(
       dto.password,
@@ -79,16 +127,24 @@ export class AuthService {
 
   async refresh(refreshToken: string): Promise<AuthData> {
     const tokenHash = this.hashRefreshToken(refreshToken);
-    const now = new Date();
+    const located = await this.prisma.refreshToken.findUnique({
+      where: { tokenHash },
+      select: { userId: true },
+    });
+    if (!located)
+      throw new UnauthorizedException(INVALID_REFRESH_TOKEN_MESSAGE);
 
     const result = await this.prisma.$transaction(
       async (transaction): Promise<RefreshTransactionResult> => {
+        const user = await lockAuthUser(transaction, located.userId);
+        if (!user) return { status: 'invalid' };
+        const now = new Date();
         const storedToken = await transaction.refreshToken.findUnique({
           where: { tokenHash },
           include: { user: true },
         });
 
-        if (!storedToken) {
+        if (!storedToken || storedToken.userId !== user.id) {
           return { status: 'invalid' };
         }
 
@@ -144,7 +200,7 @@ export class AuthService {
         return {
           status: 'rotated',
           refreshToken: replacement.value,
-          user: storedToken.user,
+          user,
         };
       },
     );
@@ -181,22 +237,35 @@ export class AuthService {
   }
 
   private async issueTokens(user: User): Promise<AuthData> {
-    const accessToken = await this.signAccessToken(user);
-    const refreshToken = this.generateRefreshToken();
-
-    await this.prisma.refreshToken.create({
-      data: {
-        userId: user.id,
-        tokenHash: refreshToken.hash,
-        expiresAt: refreshToken.expiresAt,
-      },
+    const result = await this.prisma.$transaction(async (tx) => {
+      const current = await lockAuthUser(tx, user.id);
+      if (
+        !current ||
+        current.passwordHash !== user.passwordHash ||
+        current.authVersion !== user.authVersion
+      )
+        throw new UnauthorizedException('邮箱或密码错误');
+      return {
+        user: current,
+        refreshToken: await this.storeRefreshToken(tx, current.id),
+      };
     });
-
     return {
-      accessToken,
-      refreshToken: refreshToken.value,
-      user: this.toPublicUser(user),
+      accessToken: await this.signAccessToken(result.user),
+      refreshToken: result.refreshToken,
+      user: this.toPublicUser(result.user),
     };
+  }
+
+  private async storeRefreshToken(
+    tx: Prisma.TransactionClient,
+    userId: string,
+  ): Promise<string> {
+    const token = this.generateRefreshToken();
+    await tx.refreshToken.create({
+      data: { userId, tokenHash: token.hash, expiresAt: token.expiresAt },
+    });
+    return token.value;
   }
 
   private async signAccessToken(user: User): Promise<string> {
@@ -204,6 +273,7 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       type: 'access',
+      authVersion: user.authVersion,
     };
     const secret = getAccessTokenSecret(this.configService);
     const expiresIn = (this.configService.get<string>('auth.accessExpires') ??
@@ -276,15 +346,7 @@ export class AuthService {
     return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
   }
 
-  private normalizeEmail(email: string): string {
-    return email.trim().toLowerCase();
-  }
-
   private toPublicUser(user: User): PublicUser {
-    return {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-    };
+    return toPublicUser(user);
   }
 }

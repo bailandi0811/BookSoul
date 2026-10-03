@@ -17,13 +17,22 @@ npm run check
 默认的 `npm test` 和 `npm run check` 不加载真实数据库集成测试。需要验证 Prisma 约束时，先创建独立测试数据库和测试 schema，再显式运行：
 
 ```powershell
+$env:DATABASE_URL='postgresql://USER:PASSWORD@127.0.0.1:5432/booksoul?schema=public' # 只用于和测试目标比较，不运行应用库操作
 $env:TEST_DATABASE_URL='postgresql://USER:PASSWORD@127.0.0.1:5432/booksoul_test?schema=test_prisma'
 npm run test:db
 ```
 
-门禁会拒绝缺失或非法的 `TEST_DATABASE_URL`，并强制数据库名以 `_test` 结尾、schema 以 `test_` 开头；测试清理也只作用于固定 fixture 账号，禁止全表清理。
+门禁会拒绝缺失或非法的任一 URL，并完整比对 host、port、database、schema；只允许独立 `_test` 库和 `test_` schema，禁止 fallback 到应用库。测试仅清理已记录 ID / 邮箱或固定 allowlist，禁止全表清理。
 
 ## 认证与作用域
+
+新注册须先申请邮箱验证码，再提交 6 位码和 verificationId；验证成功后才创建账号。旧账号尚未验证邮箱仍可正常登录，补验证只更新当前用户状态。找回密码使用邮件中的一次性链接，成功后要求普通登录，并让旧 Access / Refresh Token 在后续请求失效。现有 logout-all 语义不扩展。
+
+邮件配置增加独立的 `AUTH_CHALLENGE_SECRET` 和受信任的 `AUTH_PUBLIC_BASE_URL`，继续复用现有 SMTP。接口、策略及本地 / 外部验收边界见[认证设计基线](../docs/superpowers/specs/2026-10-02-jwt-email-verification-password-reset-design.md)与[验收记录](../docs/auth-email-acceptance.md)。真实环境必须先扩展迁移并同一窗口升级前后端；当前未执行发布验收。
+
+验证码、重置链接、改密通知与用户确认发送的阅读笔记使用统一“AI 藏书室”品牌 HTML 邮件，同时保留纯文本版本。共享外观位于 `src/mail/mail-template.ts`，认证文案位于 `src/auth/auth-mail.templates.ts`；书本 Logo 以 PNG 随邮件内嵌，不依赖公开图片地址或客户端构建。重置按钮及备用链接沿用受信任地址，动态内容做 HTML 转义，认证服务不接受调用方提供任意 HTML。修改模板后须重启认证验收服务，重新收件检查实际邮箱客户端的显示。
+
+本机真实收件验收使用 `npm run start:auth:acceptance`，入口位于 `test/start-auth-acceptance.ts`，复用实际 AuthModule / MailModule。它在创建服务前要求两个显式数据库 URL，并仅接受 `127.0.0.1:5432 / booksoul_test / test_auth`；要求临时邮件认证配置、受控收件人 `AUTH_ACCEPTANCE_RECIPIENT` 及明确发信许可 `AUTH_ACCEPTANCE_SEND_MAIL=yes`。入口只在本机 3000 端口提供认证 API，邮件禁止其他收件人及抄送，不加载书籍、记忆、向量库或索引 worker。操作顺序和限制见[收件验收步骤](../docs/auth-email-acceptance.md#本机认证服务与收件步骤)。
 
 - 登录和注册返回 `{ accessToken, user }`，同时设置 `booksoul_refresh` HttpOnly Cookie。
 - `POST /api/auth/refresh` 与 `POST /api/auth/logout` 从 Cookie 读取刷新令牌。
@@ -37,6 +46,10 @@ npm run test:db
 上传只保存文件并创建持久任务。worker 依次执行解析、分节、切块、批量 Embedding、Milvus 写入和一致性核对，成功后书籍进入 `READY`。失败会保留稳定错误码并支持重试；进程重启后会回收超时租约。
 
 删除先把书籍置为 `DELETING`，再可靠清理向量、源文件和 PostgreSQL 记录。部分失败不会误报完成，后台会继续重试。
+
+公共书库使用现有 `SYSTEM` 类型，由管理侧维护。书籍接口继续要求 JWT 登录，未登录用户停留在登录页；所有登录用户可见共享书籍，普通用户不能删除或重新处理共享原文。每位用户的助手、进度、会话与记忆仍按 owner/book 隔离，不随书籍迁移公开。
+
+将已有 `READY` 私人书籍迁入公共书库时，保留 book id、章节和片段 id，备份数据库、原文及对应 owner/book/version 的向量，停止 API 和 worker 后再迁移。需同步把向量 `owner_scope` 改为 `__system__`，完成逐条校验后在事务内把书籍改为 `visibility=SYSTEM, ownerId=null`；既有个人数据保持原关联。复用已有向量无需再次调用 Embedding。仅修改数据库可见性会造成检索范围与向量归属不一致。
 
 ## 配置
 
@@ -56,6 +69,8 @@ npm run test:db
 
 `AGENT_ADMISSION_MODE=local` 仅供单个 API 实例开发或部署，计数不跨进程。多个 API 实例必须使用 `redis`，并配置仅服务端可访问的 `REDIS_URL`。Redis 中只保存带 TTL 的 `ownerId`、`sessionId` 和 `runId` 租约键，不保存问题、回答、原文或邮箱；PostgreSQL `AgentRun` 只保存运行作用域、状态和时间。Redis 不可用时请求默认失败，不会绕过并发门禁。
 
+Redis 模式启动时最多等待 5 秒，包含客户端重连；连接失败后关闭客户端并返回脱敏错误，终止启动。出现 `Redis admission store connection error` 时先检查现有 Redis 服务是否运行及配置端口是否可达；使用 WSL 内 Redis 时先启动对应发行版，并保持 WSL 会话运行，避免发行版退出后本机端口转发消失。重启 API 前确认 3000 端口没有遗留后端进程占用。运行期间 Redis 断开仍拒绝并发准入，不自动切换本地模式。
+
 默认每用户最多 2 个、全局最多 20 个活动 Run。`AGENT_MAX_CONCURRENT_PER_USER`、`AGENT_MAX_CONCURRENT_GLOBAL`、`AGENT_RUN_LEASE_TTL_MS`、`AGENT_RUN_HEARTBEAT_MS` 和 `AGENT_RETRY_AFTER_SECONDS` 可按模型 RPM/TPM 与压测结果调整；心跳间隔必须小于租约时长的一半。修改真实部署配置前先核对模型配额、数据库连接池和预期峰值，不要把 `REDIS_URL` 写入日志或提交仓库。
 
 ### 可选联网资料检索
@@ -71,6 +86,10 @@ npm run test:db
 聊天模型仅在当前用户消息明确要求发送邮件时获得 `prepare_email` 工具。模型负责生成结构化的收件人、主题和纯文本正文，工具只通过 SSE 返回可编辑草稿；小说正文、外部资料、记忆和历史消息不能授予工具权限，显式收件人在进入检索前会被脱敏。
 
 `POST /api/tools/email` 只接受 JWT 登录用户，要求请求体携带 `confirmed: true`，并限制为每来源每分钟 5 次。无论草稿来自回复邮件按钮还是模型工具，只有用户点击“确认并发送”后才调用该接口；模型不能直接执行 SMTP 投递。
+
+阅读笔记的收件人、主题和纯文本正文仍来自用户确认的草稿。服务端仅对主题和正文做 HTML 转义并套用共享邮件外观，不解析用户 HTML，也不向邮件模板加入其他书籍或账号数据。
+
+阅读笔记、注册验证码、邮箱验证、找回密码和改密通知共用黑白灰纸面模板与“AI 藏书室”品牌。模板使用内联样式、表格和嵌入式标识，保留纯文本备选，不加载远程字体或背景图片。
 
 ## 迁移
 

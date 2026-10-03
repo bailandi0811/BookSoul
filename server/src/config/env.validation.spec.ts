@@ -10,6 +10,36 @@ describe('validateEnvironment optional integrations', () => {
     expect(validateEnvironment({ ...validBase })).toEqual(validBase);
   });
 
+  it('requires independent challenge keys while keeping blank examples optional', () => {
+    expect(() =>
+      validateEnvironment({ ...validBase, AUTH_CHALLENGE_SECRET: '' }),
+    ).not.toThrow();
+    expect(() =>
+      validateEnvironment({ ...validBase, AUTH_CHALLENGE_SECRET: 'short' }),
+    ).toThrow('AUTH_CHALLENGE_SECRET');
+    expect(() =>
+      validateEnvironment({
+        ...validBase,
+        JWT_ACCESS_SECRET: 'ab'.repeat(32),
+        AUTH_CHALLENGE_SECRET: 'ab'.repeat(32),
+      }),
+    ).toThrow('AUTH_CHALLENGE_SECRET');
+    expect(() =>
+      validateEnvironment({
+        ...validBase,
+        AUTH_CHALLENGE_SECRET: 'ab'.repeat(32),
+        AUTH_PUBLIC_BASE_URL: 'http://localhost:5173/app/',
+      }),
+    ).not.toThrow();
+    expect(() =>
+      validateEnvironment({
+        ...validBase,
+        NODE_ENV: 'production',
+        AUTH_PUBLIC_BASE_URL: 'http://localhost:5173',
+      }),
+    ).toThrow('AUTH_PUBLIC_BASE_URL');
+  });
+
   it('rejects invalid SMTP booleans', () => {
     expect(() =>
       validateEnvironment({ ...validBase, SMTP_SECURE: 'sometimes' }),

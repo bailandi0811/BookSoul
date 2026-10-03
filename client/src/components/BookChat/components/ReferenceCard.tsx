@@ -1,82 +1,58 @@
-import { Reference } from "@/store/useChatStore";
-import { BookOpen, ChevronDown, ChevronUp, FileText } from "lucide-react";
+import type { Reference } from "@/store/useChatStore";
+import { BookOpen, ArrowRight } from "lucide-react";
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Dialog } from "@/components/ui/Dialog";
 
-interface ReferenceCardProps {
-  references: Reference[];
-}
-
-export const ReferenceCard = ({ references }: ReferenceCardProps) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  if (!references || references.length === 0) return null;
-
+export const ReferenceCard = ({ references }: { references: Reference[] }) => {
+  const [open, setOpen] = useState(false);
+  if (!references.length) return null;
+  const first = references[0];
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2 }}
-      className="w-full"
-    >
-      <motion.button
-        type="button"
-        whileHover={{ y: -1 }}
-        whileTap={{ scale: 0.98 }}
-        onClick={() => setIsExpanded(!isExpanded)}
-        className={`warm-inset flex w-full items-center gap-2 rounded-[14px] px-3.5 py-2.5 text-left text-xs font-medium transition-colors ${
-          isExpanded
-            ? "text-foreground"
-            : "text-muted-foreground hover:text-foreground"
-        }`}
-      >
-        <BookOpen className="w-3.5 h-3.5" />
+    <div className="reference-preview">
+      <div className="reference-label">
+        <BookOpen size={14} />
         <span>
-          引用第 {references[0]?.sectionOrder} 节「{references[0]?.sectionTitle}
-          」{references.length > 1 ? `等 ${references.length} 处` : ""}
+          引用第 {first.sectionOrder} 节「{first.sectionTitle}」
+          {references.length > 1 ? `等 ${references.length} 处` : ""}
         </span>
-        <div className="ml-auto shrink-0">
-          {isExpanded ? (
-            <ChevronUp className="w-4 h-4" />
-          ) : (
-            <ChevronDown className="w-4 h-4" />
-          )}
+      </div>
+      <blockquote className="font-reading reference-excerpt line-clamp-3">
+        {first.excerpt}
+      </blockquote>
+      <button
+        type="button"
+        className="reference-open"
+        onClick={() => setOpen(true)}
+      >
+        查看原文引用 <ArrowRight size={13} />
+      </button>
+      <Dialog open={open} title="原文引用" wide onClose={() => setOpen(false)}>
+        <p className="dialog-intro mb-5">仅展示本次回答所引用的可见原文。</p>
+        <div className="space-y-4">
+          {references.map((reference, index) => (
+            <article
+              key={`${reference.sectionId}-${index}`}
+              className="source-paper"
+            >
+              <p className="mb-3 text-xs text-muted-foreground">
+                第 {reference.sectionOrder} 节 · {reference.sectionTitle}
+              </p>
+              <blockquote className="font-reading reference-excerpt">
+                {reference.excerpt}
+              </blockquote>
+            </article>
+          ))}
         </div>
-      </motion.button>
-
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ opacity: 0, height: 0, marginTop: 0 }}
-            animate={{ opacity: 1, height: "auto", marginTop: 8 }}
-            exit={{ opacity: 0, height: 0, marginTop: 0 }}
-            transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-            className="overflow-hidden"
+        <div className="dialog-actions">
+          <button
+            type="button"
+            className="dialog-primary"
+            onClick={() => setOpen(false)}
           >
-            <div className="grid gap-2">
-              {references.map((ref, idx) => (
-                <motion.div
-                  key={idx}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.05 }}
-                  className="warm-inset rounded-[14px] p-3.5"
-                >
-                  <div className="mb-2 flex items-center gap-1.5 text-muted-foreground">
-                    <FileText className="w-3.5 h-3.5" />
-                    <span className="text-xs font-medium">
-                      第 {ref.sectionOrder} 节 · {ref.sectionTitle}
-                    </span>
-                  </div>
-                  <p className="font-reading line-clamp-4 text-[13px] leading-relaxed text-foreground/75">
-                    {ref.excerpt}
-                  </p>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+            返回对话
+          </button>
+        </div>
+      </Dialog>
+    </div>
   );
 };

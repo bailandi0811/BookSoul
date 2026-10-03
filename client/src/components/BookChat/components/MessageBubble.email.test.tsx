@@ -75,6 +75,27 @@ describe("MessageBubble email action", () => {
     ).toBeNull();
   });
 
+  it("关闭邮件草稿后恢复发送按钮焦点", () => {
+    act(() =>
+      root.render(
+        <MessageBubble message={{ role: "assistant", content: "测试笔记" }} />,
+      ),
+    );
+    const trigger = container.querySelector<HTMLButtonElement>(
+      '[aria-label="发送到邮箱"]',
+    )!;
+    trigger.focus();
+    act(() => trigger.click());
+    act(() =>
+      document
+        .querySelector<HTMLButtonElement>(
+          '[role="dialog"] [aria-label="关闭"]',
+        )!
+        .click(),
+    );
+    expect(document.activeElement).toBe(trigger);
+  });
+
   it("只展示安全的联网来源链接", () => {
     act(() => {
       root.render(

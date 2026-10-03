@@ -10,6 +10,8 @@ import { UsersService } from '../users/users.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
+import { AuthEmailVerificationService } from './auth-email-verification.service';
+import { AuthPasswordResetService } from './auth-password-reset.service';
 
 describe('AuthController', () => {
   const secret = 'controller-test-access-secret';
@@ -17,6 +19,7 @@ describe('AuthController', () => {
     id: 'user-1',
     email: 'reader@example.com',
     name: 'Reader',
+    emailVerifiedAt: null,
   };
   const authData = {
     accessToken: 'access-token',
@@ -39,7 +42,24 @@ describe('AuthController', () => {
     logoutAll: jest.Mock;
   };
   let usersService: {
-    findPublicById: jest.Mock;
+    findAuthStateById: jest.Mock;
+  };
+  const receipt = {
+    verificationId: 'a593eb6a-04ca-4db9-b5aa-676636dd9bab',
+    expiresInSeconds: 600,
+    resendAfterSeconds: 60,
+  };
+  const verification = {
+    requestRegistrationCode: jest.fn().mockResolvedValue(receipt),
+    requestCurrentUserCode: jest.fn().mockResolvedValue(receipt),
+    confirmCurrentUserEmail: jest.fn().mockResolvedValue(publicUser),
+  };
+  const recovery = {
+    requestReset: jest.fn().mockResolvedValue({
+      message: '如果该邮箱已注册，将收到重置邮件，请检查邮箱或稍后重试。',
+      resendAfterSeconds: 60,
+    }),
+    resetPassword: jest.fn().mockResolvedValue(undefined),
   };
 
   beforeAll(async () => {
@@ -51,7 +71,9 @@ describe('AuthController', () => {
       logoutAll: jest.fn().mockResolvedValue(undefined),
     };
     usersService = {
-      findPublicById: jest.fn().mockResolvedValue(publicUser),
+      findAuthStateById: jest
+        .fn()
+        .mockResolvedValue({ user: publicUser, authVersion: 0 }),
     };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -62,6 +84,8 @@ describe('AuthController', () => {
       controllers: [AuthController],
       providers: [
         JwtStrategy,
+        { provide: AuthEmailVerificationService, useValue: verification },
+        { provide: AuthPasswordResetService, useValue: recovery },
         {
           provide: AuthService,
           useValue: authService,
@@ -108,13 +132,18 @@ describe('AuthController', () => {
     authService.refresh.mockResolvedValue(authData);
     authService.logout.mockResolvedValue(undefined);
     authService.logoutAll.mockResolvedValue(undefined);
-    usersService.findPublicById.mockResolvedValue(publicUser);
+    usersService.findAuthStateById.mockResolvedValue({
+      user: publicUser,
+      authVersion: 0,
+    });
   });
 
   it('normalizes a valid registration and returns the response envelope', async () => {
     const response = await request(httpServer)
       .post('/api/auth/register')
       .send({
+        verificationId: receipt.verificationId,
+        code: '000123',
         email: '  Reader@Example.COM ',
         password: 'password123',
         name: ' Reader ',
@@ -132,6 +161,8 @@ describe('AuthController', () => {
     expect(response.headers['set-cookie']?.[0]).toContain('SameSite=Lax');
 
     expect(authService.register).toHaveBeenCalledWith({
+      verificationId: receipt.verificationId,
+      code: '000123',
       email: 'reader@example.com',
       password: 'password123',
       name: 'Reader',
@@ -172,7 +203,7 @@ describe('AuthController', () => {
           user: publicUser,
         },
       });
-    expect(usersService.findPublicById).toHaveBeenCalledWith(publicUser.id);
+    expect(usersService.findAuthStateById).toHaveBeenCalledWith(publicUser.id);
   });
 
   it('refreshes tokens through the response envelope', async () => {
@@ -191,9 +222,7 @@ describe('AuthController', () => {
   });
 
   it('rejects refresh without the HttpOnly cookie', async () => {
-    await request(httpServer)
-      .post('/api/auth/refresh')
-      .expect(401);
+    await request(httpServer).post('/api/auth/refresh').expect(401);
 
     expect(authService.refresh).not.toHaveBeenCalled();
   });
@@ -232,6 +261,81 @@ describe('AuthController', () => {
   it('requires an access token for logout-all', async () => {
     await request(httpServer).post('/api/auth/logout-all').expect(401);
     expect(authService.logoutAll).not.toHaveBeenCalled();
+  });
+
+  it('requires a registration proof even when calling the API directly', async () => {
+    await request(httpServer)
+      .post('/api/auth/register')
+      .send({
+        email: publicUser.email,
+        password: 'password123',
+        name: 'Reader',
+      })
+      .expect(400);
+    expect(authService.register).not.toHaveBeenCalled();
+  });
+  it('accepts a validated code request with no credentials in the receipt', async () => {
+    await request(httpServer)
+      .post('/api/auth/registration-code')
+      .send({ email: ' READER@example.com ' })
+      .expect(202)
+      .expect({ success: true, data: receipt });
+    expect(verification.requestRegistrationCode).toHaveBeenCalledWith(
+      publicUser.email,
+    );
+    await request(httpServer)
+      .post('/api/auth/registration-code')
+      .send({ email: 'bad' })
+      .expect(400);
+  });
+  it('requires authentication and rejects body ownership overrides for verification', async () => {
+    await request(httpServer)
+      .post('/api/auth/email-verification/code')
+      .send({})
+      .expect(401);
+    const token = await jwtService.signAsync({
+      sub: publicUser.id,
+      email: publicUser.email,
+      type: 'access',
+    });
+    await request(httpServer)
+      .post('/api/auth/email-verification/code')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ email: 'other@example.com' })
+      .expect(400);
+    await request(httpServer)
+      .post('/api/auth/email-verification/code')
+      .set('Authorization', `Bearer ${token}`)
+      .send({})
+      .expect(202);
+    expect(verification.requestCurrentUserCode).toHaveBeenCalledWith(
+      publicUser.id,
+    );
+    await request(httpServer)
+      .post('/api/auth/email-verification/confirm')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ verificationId: receipt.verificationId, code: '000123' })
+      .expect(200);
+    expect(verification.confirmCurrentUserEmail).toHaveBeenCalledWith(
+      publicUser.id,
+      { verificationId: receipt.verificationId, code: '000123' },
+    );
+  });
+  it('accepts reset requests and clears the refresh cookie only after a valid POST reset', async () => {
+    await request(httpServer)
+      .post('/api/auth/forgot-password')
+      .send({ email: publicUser.email })
+      .expect(202);
+    await request(httpServer).get('/api/auth/reset-password').expect(404);
+    expect(recovery.resetPassword).not.toHaveBeenCalled();
+    const response = await request(httpServer)
+      .post('/api/auth/reset-password')
+      .send({ token: 'r'.repeat(43), newPassword: 'new-password' })
+      .expect(200)
+      .expect({ success: true, data: { message: '密码已重置，请重新登录。' } });
+    expect(response.headers['set-cookie']).toEqual(
+      expect.arrayContaining([expect.stringContaining('booksoul_refresh=;')]),
+    );
   });
 
   it.each([

@@ -101,14 +101,33 @@ describe("private bookshelf state", () => {
     expect(useBooksStore.getState().books[0]).toEqual(queued);
   });
 
+  it("keeps surviving cover bindings after deletion and polling, then clears them with private state", async () => {
+    const books = Array.from({ length: 4 }, (_, index) => ({
+      ...readyBook,
+      id: `binding-${index}`,
+      createdAt: `2026-09-0${index + 1}T00:00:00Z`,
+    }));
+    apiMocks.listBooks.mockResolvedValue(books);
+    await useBooksStore.getState().fetchBooks();
+    const initial = useBooksStore.getState().coverBindings;
+    expect(new Set(Object.values(initial)).size).toBe(4);
+    apiMocks.deleteBook.mockResolvedValue(undefined);
+    await useBooksStore.getState().deleteBook(books[0].id);
+    apiMocks.listBooks.mockResolvedValue([...books.slice(1)].reverse());
+    await useBooksStore.getState().fetchBooks();
+    const surviving = useBooksStore.getState().coverBindings;
+    for (const book of books.slice(1))
+      expect(surviving[book.id]).toBe(initial[book.id]);
+    expect(surviving[books[0].id]).toBeUndefined();
+    useBooksStore.getState().clearPrivateState();
+    expect(useBooksStore.getState().coverBindings).toEqual({});
+  });
+
   it("exposes byte progress while a file is uploading", async () => {
     const queued = { ...readyBook, id: "book-new", status: "QUEUED" as const };
     let finishUpload: ((book: BookView) => void) | undefined;
     apiMocks.uploadBook.mockImplementation(
-      (
-        _file: File,
-        onProgress?: (progress: BookUploadProgress) => void,
-      ) => {
+      (_file: File, onProgress?: (progress: BookUploadProgress) => void) => {
         onProgress?.({
           loadedBytes: 512,
           totalBytes: 1024,

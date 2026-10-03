@@ -33,6 +33,8 @@ export default () => ({
     deletionRetryMs: Number(process.env.BOOK_DELETION_RETRY_MS || 30_000),
   },
   auth: {
+    challengeSecret: process.env.AUTH_CHALLENGE_SECRET?.trim() || undefined,
+    publicBaseUrl: process.env.AUTH_PUBLIC_BASE_URL?.trim() || undefined,
     accessSecret: process.env.JWT_ACCESS_SECRET,
     accessExpires: process.env.JWT_ACCESS_EXPIRES || '15m',
     refreshExpiresDays: Number(process.env.REFRESH_TOKEN_EXPIRES_DAYS || 7),

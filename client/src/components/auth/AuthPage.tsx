@@ -1,7 +1,18 @@
-import { useState, type FormEvent } from "react";
-import { motion } from "framer-motion";
-import { BookOpenText } from "lucide-react";
-import { authenticate } from "@/lib/auth-api";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  ArrowRight,
+  Eye,
+  EyeOff,
+  LockKeyhole,
+  Mail,
+  UserRound,
+} from "lucide-react";
+import { AuthShell } from "./AuthShell";
+import { authenticate, requestRegistrationCode } from "@/lib/auth-api";
+import { validateNewPassword } from "@/lib/auth-password-policy";
+import { ForgotPasswordForm } from "./ForgotPasswordForm";
+import { VerificationCodeField } from "./VerificationCodeField";
+import { useVerificationChallenge } from "./useVerificationChallenge";
 
 interface AuthPageProps {
   onAuthenticated: () => void;
@@ -23,6 +34,14 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [editableFields, setEditableFields] = useState(LOCKED_FIELDS);
+  const [forgot, setForgot] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const controller = useRef<AbortController | null>(null);
+  useEffect(() => () => controller.current?.abort(), []);
+  const challenge = useVerificationChallenge(
+    mode === "register" ? email.trim().toLowerCase() : "",
+    requestRegistrationCode,
+  );
 
   const unlockField = (field: EditableField) => {
     setEditableFields((current) =>
@@ -32,16 +51,21 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
 
   const changeMode = (nextMode: "login" | "register") => {
     if (nextMode === mode) return;
+    challenge.clear();
+    controller.current?.abort();
+    setSubmitting(false);
     setMode(nextMode);
     setName("");
     setEmail("");
     setPassword("");
     setEditableFields(LOCKED_FIELDS);
     setError(null);
+    setShowPassword(false);
   };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (submitting) return;
     setError(null);
     if (!email.trim() || !password) {
       setError("请填写邮箱和密码");
@@ -51,77 +75,90 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
       setError("请填写名称");
       return;
     }
+    if (mode === "register") {
+      const policy = validateNewPassword(password);
+      if (policy) {
+        setError(policy);
+        return;
+      }
+      if (!challenge.receipt || !/^[0-9]{6}$/.test(challenge.code)) {
+        setError("请先申请并输入 6 位邮箱验证码");
+        return;
+      }
+    }
 
     setSubmitting(true);
+    const pending = new AbortController();
+    controller.current = pending;
     try {
-      await authenticate(mode, {
-        email: email.trim().toLowerCase(),
-        password,
-        ...(mode === "register" ? { name: name.trim() } : {}),
-      });
+      const input = { email: email.trim().toLowerCase(), password };
+      if (mode === "register" && challenge.receipt)
+        await authenticate(
+          "register",
+          {
+            ...input,
+            name: name.trim(),
+            verificationId: challenge.receipt.verificationId,
+            code: challenge.code,
+          },
+          { signal: pending.signal },
+        );
+      else await authenticate("login", input, { signal: pending.signal });
 
+      // authenticate checks cancellation before committing the session.
+      // That commit may unmount this page and abort the completed request.
       onAuthenticated();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "认证失败，请稍后重试");
+      if (!pending.signal.aborted)
+        setError(
+          cause instanceof Error ? cause.message : "认证失败，请稍后重试",
+        );
     } finally {
-      setSubmitting(false);
+      if (!pending.signal.aborted) setSubmitting(false);
     }
   };
 
   return (
-    <main className="paper-bg relative grid min-h-[100dvh] place-items-center overflow-hidden bg-background px-5 py-10 text-foreground">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -left-24 top-[-7rem] h-80 w-80 rounded-full bg-primary/[0.08] blur-3xl"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -bottom-32 -right-24 h-96 w-96 rounded-full bg-amber-500/[0.07] blur-3xl"
-      />
-
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ type: "spring", stiffness: 260, damping: 28 }}
-        className="relative z-10 w-full max-w-[430px]"
-      >
-        <header className="mb-7 text-center">
-          <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/20 bg-card text-primary shadow-sm">
-            <BookOpenText className="h-5 w-5" />
-          </span>
-          <h1 className="text-3xl font-bold tracking-tight">BookSoul</h1>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            登录后进入你的私人书架
-          </p>
-        </header>
-
-        <section
-          aria-labelledby="auth-title"
-          className="rounded-3xl border border-border/80 bg-card/95 p-6 shadow-[0_28px_90px_-42px_rgb(var(--foreground)/0.45)] backdrop-blur sm:p-7"
+    <AuthShell
+      action={
+        <button
+          type="button"
+          className="header-action"
+          onClick={() => {
+            setForgot(false);
+            changeMode(mode === "login" ? "register" : "login");
+          }}
         >
+          {mode === "login" ? "注册" : "登录"}
+        </button>
+      }
+    >
+      {forgot ? (
+        <ForgotPasswordForm
+          initialEmail={email}
+          onBack={() => setForgot(false)}
+        />
+      ) : (
+        <>
           <div className="mb-6">
-            <h2
-              id="auth-title"
-              className="text-xl font-semibold tracking-tight"
-            >
-              {mode === "login" ? "登录账号" : "创建账号"}
+            <h2 id="auth-title" className="font-display auth-title">
+              {mode === "login" ? "回到你的书房" : "开启你的书房"}
             </h2>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">
-              对话、记忆和阅读轨迹将安全保存在你的账号下。
+              {mode === "login"
+                ? "你的书签与对话，都在这里等你。"
+                : "为你的书籍，留一处安静的地方。"}
             </p>
           </div>
 
-          <div className="mb-5 grid grid-cols-2 rounded-xl bg-secondary p-1">
+          <div className="auth-tabs">
             {(["login", "register"] as const).map((item) => (
               <button
                 key={item}
                 type="button"
                 onClick={() => changeMode(item)}
-                className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                  mode === item
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
+                className={mode === item ? "active" : ""}
+                aria-pressed={mode === item}
               >
                 {item === "login" ? "登录" : "注册"}
               </button>
@@ -130,61 +167,109 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
 
           <form className="space-y-4" autoComplete="off" onSubmit={submit}>
             {mode === "register" && (
-              <label className="block space-y-2 text-sm font-medium">
+              <label className="form-field">
                 <span>名称</span>
+                <span className="field-control">
+                  <UserRound size={16} />
+                  <input
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    onFocus={() => unlockField("name")}
+                    onPointerDown={() => unlockField("name")}
+                    name="booksoul-display-name"
+                    maxLength={50}
+                    autoComplete="off"
+                    readOnly={!editableFields.name}
+                    data-1p-ignore
+                    data-lpignore="true"
+                    className="w-full rounded-xl border border-input bg-background px-3.5 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary"
+                    placeholder="你的称呼"
+                  />
+                </span>
+              </label>
+            )}
+            <label className="form-field">
+              <span>邮箱</span>
+              <span className="field-control">
+                <Mail size={16} />
                 <input
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  onFocus={() => unlockField("name")}
-                  onPointerDown={() => unlockField("name")}
-                  name="booksoul-display-name"
-                  maxLength={50}
+                  value={email}
+                  onChange={(event) => {
+                    controller.current?.abort();
+                    setSubmitting(false);
+                    challenge.clear();
+                    setEmail(event.target.value);
+                    setError(null);
+                  }}
+                  onFocus={() => unlockField("email")}
+                  onPointerDown={() => unlockField("email")}
+                  name="booksoul-account-email"
+                  type="email"
                   autoComplete="off"
-                  readOnly={!editableFields.name}
+                  maxLength={254}
+                  readOnly={!editableFields.email}
                   data-1p-ignore
                   data-lpignore="true"
                   className="w-full rounded-xl border border-input bg-background px-3.5 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary"
-                  placeholder="你的称呼"
+                  placeholder="reader@example.com"
                 />
-              </label>
-            )}
-            <label className="block space-y-2 text-sm font-medium">
-              <span>邮箱</span>
-              <input
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                onFocus={() => unlockField("email")}
-                onPointerDown={() => unlockField("email")}
-                name="booksoul-account-email"
-                type="email"
-                autoComplete="off"
-                maxLength={254}
-                readOnly={!editableFields.email}
-                data-1p-ignore
-                data-lpignore="true"
-                className="w-full rounded-xl border border-input bg-background px-3.5 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary"
-                placeholder="reader@example.com"
-              />
+              </span>
             </label>
-            <label className="block space-y-2 text-sm font-medium">
+            <label className="form-field">
               <span>密码</span>
-              <input
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                onFocus={() => unlockField("password")}
-                onPointerDown={() => unlockField("password")}
-                name="booksoul-account-secret"
-                type="password"
-                autoComplete="new-password"
-                minLength={mode === "register" ? 8 : 1}
-                maxLength={72}
-                readOnly={!editableFields.password}
-                data-1p-ignore
-                data-lpignore="true"
-                className="w-full rounded-xl border border-input bg-background px-3.5 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary"
-                placeholder={mode === "register" ? "至少 8 个字符" : "输入密码"}
-              />
+              <span className="field-control">
+                <LockKeyhole size={16} />
+                <input
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  onFocus={() => unlockField("password")}
+                  onPointerDown={() => unlockField("password")}
+                  name="booksoul-account-secret"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  minLength={mode === "register" ? 8 : 1}
+                  maxLength={72}
+                  readOnly={!editableFields.password}
+                  data-1p-ignore
+                  data-lpignore="true"
+                  className="w-full rounded-xl border border-input bg-background px-3.5 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary"
+                  placeholder={
+                    mode === "register" ? "至少 8 个字符" : "输入密码"
+                  }
+                />
+                <button
+                  type="button"
+                  aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                  onClick={() => setShowPassword((visible) => !visible)}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </span>
             </label>
+            {mode === "register" && (
+              <>
+                <VerificationCodeField
+                  code={challenge.code}
+                  onCodeChange={challenge.onCodeChange}
+                  sending={challenge.sending}
+                  resendAfterSeconds={challenge.resendAfterSeconds}
+                  onRequestCode={() => {
+                    setError(null);
+                    void challenge.requestCode();
+                  }}
+                />
+                {challenge.receipt && (
+                  <p role="status" className="text-xs text-muted-foreground">
+                    申请已受理，请查收邮件；验证码 10 分钟内有效。
+                  </p>
+                )}
+                {(challenge.error || challenge.expired) && (
+                  <p role="alert" className="text-sm text-destructive">
+                    {challenge.error || "验证码已过期，请重新申请"}
+                  </p>
+                )}
+              </>
+            )}
             {error && (
               <p
                 role="alert"
@@ -196,17 +281,34 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
             <button
               type="submit"
               disabled={submitting}
-              className="tap-spring w-full whitespace-nowrap rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="auth-submit tap-spring"
             >
               {submitting
                 ? "请稍候"
                 : mode === "login"
                   ? "登录并继续"
                   : "创建账号并继续"}
+              {!submitting && <ArrowRight size={15} />}
             </button>
           </form>
-        </section>
-      </motion.div>
-    </main>
+          {mode === "login" && (
+            <button
+              type="button"
+              onClick={() => {
+                controller.current?.abort();
+                setSubmitting(false);
+                setForgot(true);
+              }}
+              className="mt-4 text-sm text-primary"
+            >
+              忘记密码
+            </button>
+          )}
+        </>
+      )}
+      {!forgot && (
+        <div className="auth-bottom">每本书，拥有一个独立的私人助手。</div>
+      )}
+    </AuthShell>
   );
 }
