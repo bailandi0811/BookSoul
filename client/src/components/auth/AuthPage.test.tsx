@@ -6,7 +6,7 @@ describe("AuthPage", () => {
   it("renders empty, autofill-resistant credential fields", () => {
     const container = document.createElement("div");
     container.innerHTML = renderToStaticMarkup(
-      <AuthPage onAuthenticated={vi.fn()} />,
+      <AuthPage onAuthenticated={vi.fn()} onBackHome={() => {}} />,
     );
 
     const form = container.querySelector("form");

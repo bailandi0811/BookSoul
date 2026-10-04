@@ -4,7 +4,7 @@
 
 **Goal:** 首页点击图书进入“本书空间”，由该页提供阅读与聊天两个入口；复用全站背景、主题与封面，保留现有聊天模块，新增独立阅读模块，支持按需加载正文、连续阅读、自动续读、助手面板与引用回原文。
 
-**Architecture:** 直接读取 PostgreSQL 中规范化的 BookSection 正文，按有界文字窗口返回和展示；独立 BookReadingPosition 记录续读位置。新增 BookReader 与 useReaderStore，保留 BookChat 原页面结构；阅读助手面板复用已有消息、输入组件和 useChatStore，引用通过服务端验证过的片段偏移定位。
+**Architecture:** BookOverview 提供同书阅读/聊天入口，复用全站外观；BookReader 直接读取 PostgreSQL 中规范化的 BookSection 正文，按有界文字窗口返回和展示，独立 BookReadingPosition 记录续读位置。新增 useReaderStore，保留 BookChat 原页面结构；阅读助手面板复用已有消息、输入组件和 useChatStore，引用通过服务端验证过的片段偏移定位。
 
 **Tech Stack:** 现有 Node.js 22.19.x、npm 10、React 19、TypeScript、Zustand、NestJS 11、Prisma、Vitest/happy-dom、Jest；不新增生产依赖。
 

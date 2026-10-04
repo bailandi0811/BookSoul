@@ -7,6 +7,9 @@ import { BookAssistantsController } from './book-assistants.controller';
 import { BookAssistantsService } from './book-assistants.service';
 import { BookReadingController } from './book-reading.controller';
 import { BookReadingService } from './book-reading.service';
+import { BookReaderService } from './book-reader.service';
+import { BookReaderController } from './book-reader.controller';
+import { BookReaderPositionService } from './book-reader-position.service';
 import { BooksController } from './books.controller';
 import { BooksService } from './books.service';
 import { SystemBookMigrationService } from './system-book-migration.service';
@@ -29,6 +32,7 @@ import { SystemBookMigrationService } from './system-book-migration.service';
     BooksController,
     BookAssistantsController,
     BookReadingController,
+    BookReaderController,
   ],
   providers: [
     BooksService,
@@ -36,6 +40,8 @@ import { SystemBookMigrationService } from './system-book-migration.service';
     BookAssistantsService,
     BookAssistantPromptService,
     BookReadingService,
+    BookReaderService,
+    BookReaderPositionService,
     SystemBookMigrationService,
   ],
   exports: [

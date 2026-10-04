@@ -21,6 +21,7 @@ model User {
   books           Book[]
   bookAssistants  BookAssistant[]
   readingProgress ReadingProgress[]
+  readingPositions BookReadingPosition[]
   agentRuns       AgentRun[]
 }
 
@@ -202,6 +203,7 @@ model Book {
   chunks           BookChunk[]
   assistants       BookAssistant[]
   readingProgress  ReadingProgress[]
+  readingPositions BookReadingPosition[]
   ingestionJob     IngestionJob?
   memories         MemoryRecord[]
   agentRuns        AgentRun[]
@@ -244,6 +246,7 @@ model BookSection {
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
   chunks    BookChunk[]
+  readingPositions BookReadingPosition[]
 
   @@unique([bookId, order])
   @@index([bookId])
@@ -298,6 +301,23 @@ model ReadingProgress {
 
   @@id([ownerId, bookId])
   @@index([bookId])
+}
+
+model BookReadingPosition {
+  ownerId     String
+  owner       User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  bookId      String
+  book        Book        @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  sectionId   String
+  section     BookSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  offset      Int
+  contentHash String
+  revision    Int         @default(1)
+  updatedAt   DateTime    @updatedAt
+
+  @@id([ownerId, bookId])
+  @@index([bookId])
+  @@index([sectionId])
 }
 
 model IngestionJob {

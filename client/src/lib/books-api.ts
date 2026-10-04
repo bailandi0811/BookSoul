@@ -112,17 +112,18 @@ export async function deleteBook(bookId: string): Promise<void> {
   );
 }
 
-export async function listSections(bookId: string): Promise<BookSection[]> {
+export async function listSections(bookId: string, signal?: AbortSignal): Promise<BookSection[]> {
   return readData<BookSection[]>(
-    await apiFetch(`/api/books/${bookId}/sections`),
+    await apiFetch(`/api/books/${bookId}/sections`, { signal }),
   );
 }
 
 export async function getReadingProgress(
   bookId: string,
+  signal?: AbortSignal,
 ): Promise<ReadingProgress> {
   return readData<ReadingProgress>(
-    await apiFetch(`/api/books/${bookId}/reading-progress`),
+    await apiFetch(`/api/books/${bookId}/reading-progress`, { signal }),
   );
 }
 
@@ -142,9 +143,9 @@ export async function updateReadingProgress(
   );
 }
 
-export async function getBookAssistant(bookId: string): Promise<BookAssistant> {
+export async function getBookAssistant(bookId: string, signal?: AbortSignal): Promise<BookAssistant> {
   return readData<BookAssistant>(
-    await apiFetch(`/api/books/${bookId}/assistant`),
+    await apiFetch(`/api/books/${bookId}/assistant`, { signal }),
   );
 }
 

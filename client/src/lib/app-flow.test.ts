@@ -2,6 +2,52 @@ import { describe, expect, it } from "vitest";
 import { resolveAppScreen } from "./app-flow";
 
 describe("app authentication flow", () => {
+  it("shows the public landing page before the reader chooses to enter", () => {
+    expect(
+      resolveAppScreen({
+        authReady: false,
+        isAuthenticated: false,
+        view: "library",
+        hasEnteredApp: false,
+      }),
+    ).toBe("landing");
+    expect(
+      resolveAppScreen({
+        authReady: true,
+        isAuthenticated: true,
+        view: "library",
+        hasEnteredApp: false,
+      }),
+    ).toBe("landing");
+  });
+
+  it("chooses the authenticated flow after entering from the landing page", () => {
+    expect(
+      resolveAppScreen({
+        authReady: false,
+        isAuthenticated: false,
+        view: "library",
+        hasEnteredApp: true,
+      }),
+    ).toBe("loading");
+    expect(
+      resolveAppScreen({
+        authReady: true,
+        isAuthenticated: false,
+        view: "library",
+        hasEnteredApp: true,
+      }),
+    ).toBe("auth");
+    expect(
+      resolveAppScreen({
+        authReady: true,
+        isAuthenticated: true,
+        view: "library",
+        hasEnteredApp: true,
+      }),
+    ).toBe("library");
+  });
+
   it("opens the account page only after successful authentication restoration", () => {
     expect(
       resolveAppScreen({
@@ -9,6 +55,7 @@ describe("app authentication flow", () => {
         isAuthenticated: true,
         view: "library",
         isAccountRoute: true,
+        hasEnteredApp: false,
       }),
     ).toBe("loading");
     expect(
@@ -17,6 +64,7 @@ describe("app authentication flow", () => {
         isAuthenticated: false,
         view: "library",
         isAccountRoute: true,
+        hasEnteredApp: false,
       }),
     ).toBe("auth");
     expect(
@@ -25,6 +73,7 @@ describe("app authentication flow", () => {
         isAuthenticated: true,
         view: "workspace",
         isAccountRoute: true,
+        hasEnteredApp: false,
       }),
     ).toBe("account");
     expect(
@@ -34,6 +83,7 @@ describe("app authentication flow", () => {
         view: "library",
         isAccountRoute: true,
         isResetRoute: true,
+        hasEnteredApp: false,
       }),
     ).toBe("reset-password");
   });
@@ -43,6 +93,7 @@ describe("app authentication flow", () => {
         authReady: false,
         isAuthenticated: true,
         view: "workspace",
+        hasEnteredApp: true,
       }),
     ).toBe("loading");
   });
@@ -53,6 +104,7 @@ describe("app authentication flow", () => {
         authReady: true,
         isAuthenticated: false,
         view: "workspace",
+        hasEnteredApp: true,
       }),
     ).toBe("auth");
   });
@@ -63,6 +115,7 @@ describe("app authentication flow", () => {
         authReady: true,
         isAuthenticated: true,
         view: "library",
+        hasEnteredApp: true,
       }),
     ).toBe("library");
   });
@@ -73,6 +126,7 @@ describe("app authentication flow", () => {
         authReady: true,
         isAuthenticated: true,
         view: "workspace",
+        hasEnteredApp: true,
       }),
     ).toBe("workspace");
   });

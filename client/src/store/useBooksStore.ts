@@ -18,8 +18,13 @@ import {
 } from "@/lib/books-api";
 import { useChatStore } from "@/store/useChatStore";
 import { assignBookCoverBindings, type CoverVariant } from "@/lib/book-cover";
+import { ensureBookChat } from "@/lib/book-workspace-navigation";
+import { useReaderStore } from "./useReaderStore";
+import { useAuthStore } from "./useAuthStore";
 
-export type BooksView = "library" | "workspace";
+export type BooksView = "library" | "book" | "reader" | "workspace";
+let navigationGeneration = 0;
+let metadataAbort = new AbortController();
 
 interface BooksState {
   view: BooksView;
@@ -41,7 +46,8 @@ interface BooksState {
   uploadBook: (file: File) => Promise<boolean>;
   retryBook: (bookId: string) => Promise<void>;
   deleteBook: (bookId: string) => Promise<void>;
-  openBook: (bookId: string) => Promise<void>;
+  openBook: (bookId: string, target?: Exclude<BooksView, "library">) => Promise<void>;
+  switchBookView: (target: Exclude<BooksView, "library">) => Promise<void>;
   backToLibrary: () => void;
   updateProgress: (
     mode: ReadingMode,
@@ -156,6 +162,11 @@ export const useBooksStore = create<BooksState>((set, get) => ({
     }));
     try {
       await deleteBookRequest(bookId);
+      if (get().currentBook?.id === bookId) {
+        metadataAbort.abort(); navigationGeneration++;
+        useReaderStore.getState().clearPrivateState(); useChatStore.getState().resetBookChat();
+        set({ view: "library", currentBook: null, sections: [], readingProgress: null, assistant: null });
+      }
       set((state) => {
         const books = state.books.filter((book) => book.id !== bookId);
         return {
@@ -172,11 +183,20 @@ export const useBooksStore = create<BooksState>((set, get) => ({
     }
   },
 
-  openBook: async (bookId) => {
+  openBook: async (bookId, target = "workspace") => {
     const book = get().books.find((item) => item.id === bookId);
     if (!book || book.status !== "READY") return;
+    if (get().currentBook?.id === bookId && get().sections.length && !get().isWorkspaceLoading && !get().workspaceError) {
+      await get().switchBookView(target); return;
+    }
+    const generation = ++navigationGeneration;
+    const authGeneration = useAuthStore.getState().authGeneration;
+    metadataAbort.abort(); metadataAbort = new AbortController();
+    const valid = () => generation === navigationGeneration && authGeneration === useAuthStore.getState().authGeneration && get().currentBook?.id === bookId;
+    useChatStore.getState().stopGenerating();
+    if (useReaderStore.getState().bookId !== bookId) useReaderStore.getState().clearPrivateState();
     set({
-      view: "workspace",
+      view: target,
       currentBook: book,
       sections: [],
       readingProgress: null,
@@ -186,40 +206,48 @@ export const useBooksStore = create<BooksState>((set, get) => ({
     });
     try {
       const [sections, readingProgress, assistant] = await Promise.all([
-        listSections(bookId),
-        getReadingProgress(bookId),
-        getBookAssistant(bookId),
+        listSections(bookId, metadataAbort.signal),
+        getReadingProgress(bookId, metadataAbort.signal),
+        getBookAssistant(bookId, metadataAbort.signal),
       ]);
-      set({ sections, readingProgress, assistant });
-      await useChatStore.getState().prepareBook(bookId);
+      if (!valid()) return;
+      set({ sections, readingProgress, assistant, isWorkspaceLoading: false });
+      if (get().view === "workspace") await ensureBookChat(bookId);
+      else if (get().view === "reader") await useReaderStore.getState().openReader(bookId, sections);
     } catch (error) {
-      set({ workspaceError: errorMessage(error) });
+      if (valid()) set({ workspaceError: errorMessage(error) });
     } finally {
-      set({ isWorkspaceLoading: false });
+      if (valid()) set({ isWorkspaceLoading: false });
     }
   },
 
+  switchBookView: async target => {
+    const book = get().currentBook; if (!book) return;
+    useChatStore.getState().stopGenerating(); void useReaderStore.getState().flushSave();
+    set({ view: target });
+    if (get().isWorkspaceLoading) return;
+    if (target === "workspace") await ensureBookChat(book.id);
+    else if (target === "reader") await useReaderStore.getState().openReader(book.id, get().sections);
+  },
+
   backToLibrary: () => {
-    useChatStore.getState().resetBookChat();
+    useChatStore.getState().stopGenerating(); void useReaderStore.getState().flushSave();
     set({
       view: "library",
-      currentBook: null,
-      sections: [],
-      readingProgress: null,
-      assistant: null,
-      workspaceError: null,
     });
   },
 
   updateProgress: async (mode, currentSectionOrder) => {
     const book = get().currentBook;
     if (!book) return;
+    const generation = navigationGeneration;
     set({ workspaceError: null });
     try {
       const readingProgress = await updateReadingProgressRequest(book.id, {
         mode,
         ...(currentSectionOrder == null ? {} : { currentSectionOrder }),
       });
+      if (generation !== navigationGeneration || get().currentBook?.id !== book.id) return;
       set((state) => ({
         readingProgress,
         currentBook: state.currentBook
@@ -227,25 +255,33 @@ export const useBooksStore = create<BooksState>((set, get) => ({
           : null,
       }));
     } catch (error) {
-      set({ workspaceError: errorMessage(error) });
+      if (generation === navigationGeneration && get().currentBook?.id === book.id) {
+        set({ workspaceError: errorMessage(error) });
+      }
     }
   },
 
   updateAssistant: async (input) => {
     const book = get().currentBook;
     if (!book) return false;
+    const generation = navigationGeneration;
     set({ workspaceError: null });
     try {
       const assistant = await updateBookAssistantRequest(book.id, input);
+      if (generation !== navigationGeneration || get().currentBook?.id !== book.id) return false;
       set({ assistant });
       return true;
     } catch (error) {
-      set({ workspaceError: errorMessage(error) });
+      if (generation === navigationGeneration && get().currentBook?.id === book.id) {
+        set({ workspaceError: errorMessage(error) });
+      }
       return false;
     }
   },
 
   clearPrivateState: () => {
+    navigationGeneration++; metadataAbort.abort();
+    useReaderStore.getState().clearPrivateState();
     useChatStore.getState().resetBookChat();
     set({
       view: "library",

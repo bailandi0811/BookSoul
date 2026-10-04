@@ -8,6 +8,7 @@ import {
 import type { BookStatus, BookView } from "@/lib/books-api";
 import { useBooksStore } from "@/store/useBooksStore";
 import {
+  ArrowLeft,
   ArrowRight,
   BookOpen,
   RefreshCw,
@@ -18,6 +19,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
+import { preloadOverview, preloadReader } from "@/lib/book-page-loaders";
 
 const PROCESSING_STATUSES: BookStatus[] = [
   "QUEUED",
@@ -60,7 +62,7 @@ function readingPercent(book: BookView): number {
   );
 }
 
-export function Entrance() {
+export function Entrance({ onBackHome }: { onBackHome: () => void }) {
   const {
     books,
     isLoading,
@@ -123,6 +125,14 @@ export function Entrance() {
       <AppHeader />
 
       <div className="library-main">
+        <button
+          type="button"
+          className="library-back-home tap-spring"
+          onClick={onBackHome}
+        >
+          <ArrowLeft size={16} strokeWidth={1.7} />
+          返回首页
+        </button>
         <div className="library-intro">
           <div>
             <h1 className="font-display text-3xl leading-snug sm:text-4xl">
@@ -143,7 +153,7 @@ export function Entrance() {
         <aside className="library-sidebar" aria-label="阅读工作台">
           {featuredBook && (
             <section className="library-feature" aria-label="继续阅读">
-              <div className="library-book-stage">
+              <button type="button" className="library-book-stage" disabled={featuredBook.status !== "READY"} aria-label={`打开《${featuredBook.title}》本书空间`} onPointerEnter={preloadOverview} onFocus={preloadOverview} onClick={() => void openBook(featuredBook.id, "book")}>
                 <BookCover
                   bookId={featuredBook.id}
                   title={featuredBook.title}
@@ -151,14 +161,14 @@ export function Entrance() {
                     featuredBook.readingProgress?.mode === "IN_PROGRESS"
                   }
                 />
-              </div>
+              </button>
               <div className="library-feature-copy">
                 <p className="library-feature-heading">
                   {featuredBook.status === "READY" ? "继续阅读" : "正在整理"}
                   <BookOpen size={15} strokeWidth={1.4} />
                 </p>
                 <h2 className="font-reading line-clamp-2">
-                  {featuredBook.title}
+                  <button type="button" disabled={featuredBook.status !== "READY"} onPointerEnter={preloadOverview} onFocus={preloadOverview} onClick={() => void openBook(featuredBook.id, "book")}>{featuredBook.title}</button>
                 </h2>
                 <p className="library-feature-meta">
                   <span>
@@ -203,13 +213,21 @@ export function Entrance() {
                   </p>
                   <div className="feature-action">
                     {featuredBook.status === "READY" && (
-                      <button
+                      <><button
+                        type="button"
+                        onPointerEnter={preloadReader}
+                        onFocus={preloadReader}
+                        onClick={() => void openBook(featuredBook.id, "reader")}
+                        className="tap-spring inline-flex items-center justify-between gap-3 rounded-xl border border-border bg-background px-4 text-xs font-medium text-foreground hover:bg-secondary"
+                      >
+                        <BookOpen size={16} strokeWidth={1.5} /> 继续阅读
+                      </button><button
                         type="button"
                         onClick={() => void openBook(featuredBook.id)}
                         className="tap-spring inline-flex items-center justify-between gap-3 rounded-xl bg-primary px-4 text-xs font-medium text-primary-foreground"
                       >
                         继续对话 <ArrowRight size={16} />
-                      </button>
+                      </button></>
                     )}
                   </div>
                 </div>
@@ -373,8 +391,10 @@ export function Entrance() {
                       type="button"
                       className="bookshelf-open"
                       disabled={book.status !== "READY"}
-                      onClick={() => void openBook(book.id)}
-                      aria-label={`进入《${book.title}》阅读助手`}
+                      onPointerEnter={preloadOverview}
+                      onFocus={preloadOverview}
+                      onClick={() => void openBook(book.id, "book")}
+                      aria-label={`打开《${book.title}》本书空间`}
                     >
                       <span className="bookshelf-display">
                         <BookCover

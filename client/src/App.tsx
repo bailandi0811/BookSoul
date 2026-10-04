@@ -9,14 +9,22 @@ import { readResetRoute } from "@/lib/reset-password-route";
 import { ResetPasswordPage } from "@/components/auth/ResetPasswordPage";
 import { Button } from "@/components/ui/button";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
+import { loadBookChat, loadBookOverview, loadBookReader } from "@/lib/book-page-loaders";
 
-const BookChat = lazy(() => import("@/components/BookChat"));
+const BookChat = lazy(loadBookChat);
+const BookOverview = lazy(loadBookOverview);
+const BookReader = lazy(loadBookReader);
 const AccountPage = lazy(() =>
   import("@/components/auth/AccountPage").then((module) => ({ default: module.AccountPage })),
 );
 const Entrance = lazy(() =>
   import("@/components/Entrance").then((module) => ({
     default: module.Entrance,
+  })),
+);
+const LandingPage = lazy(() =>
+  import("@/components/LandingPage").then((module) => ({
+    default: module.LandingPage,
   })),
 );
 
@@ -29,6 +37,7 @@ function App() {
   const [restorationFailed, setRestorationFailed] = useState(false);
   const [restorationAttempt, setRestorationAttempt] = useState(0);
   const [showLogin, setShowLogin] = useState(false);
+  const [hasEnteredApp, setHasEnteredApp] = useState(false);
   const [resetRoute, setResetRoute] = useState(() => ({
     ...readResetRoute(window.location.hash),
     entry: 0,
@@ -38,9 +47,18 @@ function App() {
     authReady,
     isAuthenticated: isAuthenticated && !showLogin,
     view,
+    hasEnteredApp,
     isResetRoute: resetRoute.isResetRoute,
     isAccountRoute: accountRoute,
   });
+  const backToHomepage = () => {
+    useBooksStore.getState().backToLibrary();
+    setAccountRoute(false);
+    setShowLogin(false);
+    setHasEnteredApp(false);
+    if (window.location.hash === "#account")
+      history.replaceState(history.state, "", window.location.pathname + window.location.search);
+  };
 
   useEffect(() => {
     const captureResetLink = () => {
@@ -117,6 +135,7 @@ function App() {
         }}
         onExit={() => {
           setShowLogin(true);
+          setHasEnteredApp(true);
           setAuthReady(true);
           setResetRoute((current) => ({
             ...current,
@@ -147,8 +166,10 @@ function App() {
   if (screen === "auth") {
     return (
       <AuthPage
+        onBackHome={backToHomepage}
         onAuthenticated={() => {
           setShowLogin(false);
+          setHasEnteredApp(true);
           setAccountRoute(false);
           if (window.location.hash === "#account") history.replaceState(history.state, "", window.location.pathname + window.location.search);
           useBooksStore.getState().backToLibrary();
@@ -169,13 +190,15 @@ function App() {
         <LayoutGroup id="booksoul-library">
           <AnimatePresence initial={false} mode="popLayout">
             <motion.div key={screen} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
-              {screen === "account" ? (
+              {screen === "landing" ? (
+                <LandingPage onEnter={() => setHasEnteredApp(true)} />
+              ) : screen === "account" ? (
                 <AccountPage key={userId} onBack={() => {
                   useBooksStore.getState().backToLibrary();
                   setAccountRoute(false);
                   history.replaceState(history.state, "", window.location.pathname + window.location.search);
                 }} />
-              ) : screen === "library" ? <Entrance /> : <BookChat />}
+              ) : screen === "library" ? <Entrance onBackHome={backToHomepage} /> : screen === "book" ? <BookOverview /> : screen === "reader" ? <BookReader /> : <BookChat />}
             </motion.div>
           </AnimatePresence>
         </LayoutGroup>

@@ -82,7 +82,7 @@ describe("authentication page flows with real API wrappers", () => {
               { status: 400 },
             ),
       );
-    await act(async () => root.render(<AuthPage onAuthenticated={vi.fn()} />));
+    await act(async () => root.render(<AuthPage onAuthenticated={vi.fn()} onBackHome={() => {}} />));
     await click("注册");
     await input('input[name="booksoul-display-name"]', "Reader");
     await input('input[type="email"]', user.email);
@@ -113,7 +113,7 @@ describe("authentication page flows with real API wrappers", () => {
         { status: 429 },
       ),
     );
-    await act(async () => root.render(<AuthPage onAuthenticated={vi.fn()} />));
+    await act(async () => root.render(<AuthPage onAuthenticated={vi.fn()} onBackHome={() => {}} />));
     await click("注册");
     await input('input[type="email"]', user.email);
     await click("发送验证码");
@@ -153,7 +153,7 @@ describe("authentication page flows with real API wrappers", () => {
             ),
       );
     const done = vi.fn();
-    await act(async () => root.render(<AuthPage onAuthenticated={done} />));
+    await act(async () => root.render(<AuthPage onAuthenticated={done} onBackHome={() => {}} />));
     await click("注册");
     await input('input[name="booksoul-display-name"]', "Reader");
     await input('input[type="email"]', user.email);
@@ -232,7 +232,7 @@ describe("authentication page flows with real API wrappers", () => {
             : json({ accessToken: "access", user }, 201),
         );
       await act(async () =>
-        root.render(<AuthPage onAuthenticated={vi.fn()} />),
+        root.render(<AuthPage onAuthenticated={vi.fn()} onBackHome={() => {}} />),
       );
       await click("注册");
       await input('input[name="booksoul-display-name"]', "Reader");
@@ -271,7 +271,7 @@ describe("authentication page flows with real API wrappers", () => {
         202,
       ),
     );
-    await act(async () => root.render(<AuthPage onAuthenticated={vi.fn()} />));
+    await act(async () => root.render(<AuthPage onAuthenticated={vi.fn()} onBackHome={() => {}} />));
     await click("忘记密码");
     await input('input[type="email"]', user.email);
     await submit();

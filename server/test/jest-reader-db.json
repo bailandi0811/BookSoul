@@ -1,0 +1,7 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": "../src",
+  "testRegex": "books[/\\\\]book-reader-position\\.db\\.spec\\.ts$",
+  "transform": { "^.+\\.(t|j)s$": "ts-jest" },
+  "testEnvironment": "node"
+}

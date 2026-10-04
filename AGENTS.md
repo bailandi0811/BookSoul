@@ -11,8 +11,8 @@ BookSoul（书魂）是一个私人小说阅读助手。用户登录后上传 EP
 核心闭环：
 
 ```text
-登录 → 上传小说 → 异步解析与索引 → 设置阅读进度
-     → 进入单书助手 → 提问 / 获取原文引用 → 更新进度或删除书籍
+登录 → 上传小说 → 异步解析与索引 → 书库 → 本书空间
+     → 阅读正文 / 进入单书助手 → 提问 / 获取原文引用 → 更新进度或删除书籍
 ```
 
 当前产品原则：
@@ -21,7 +21,7 @@ BookSoul（书魂）是一个私人小说阅读助手。用户登录后上传 EP
 - 一本书对应一个可配置的私人助手；原著事实优先基于当前可见原文回答。
 - 防剧透是检索和引用的数据边界，不只是 Prompt 中的语气承诺。
 - 上传、Embedding、索引、失败恢复和删除是异步、持久、可重试的后台流程。
-- 当前不做公开 Agent 市场、用户间分享、跨书联合问答、完整正文阅读器、OCR 或扫描 PDF 解析。
+- 当前不做公开 Agent 市场、用户间分享、跨书联合问答、OCR 或扫描 PDF 解析。完整正文阅读器按[新增设计](docs/superpowers/specs/2026-10-03-novel-reader-design.md)实施，历史 MVP 文档中的“不做阅读器”只描述当时的范围。
 
 详细产品范围和架构决策见 [`docs/superpowers/specs/2026-08-29-private-reading-assistant-mvp-design.md`](docs/superpowers/specs/2026-08-29-private-reading-assistant-mvp-design.md)。
 
@@ -75,11 +75,12 @@ NestJS Server
 | 路径 | 职责与优先查看场景 |
 | --- | --- |
 | `client/src/components/` | 页面和交互组件；书架、上传、聊天、引用、助手设置与认证 UI |
+| `client/src/components/BookOverview/`、`client/src/components/BookReader/` | 本书空间、按需加载的正文页、阅读助手面板与排版 |
 | `client/src/lib/` | API 客户端、应用流程和客户端输入策略；前后端契约变化先看这里 |
 | `client/src/store/` | 认证、书籍、聊天和记忆状态；重点检查并发请求、取消和陈旧响应隔离 |
 | `client/src/theme/`、`client/src/index.css` | 主题 token、全局样式和响应式/可访问性基础 |
 | `server/src/auth/`、`server/src/users/` | JWT、刷新令牌、可信 AuthContext 和账号能力 |
-| `server/src/books/` | 书籍、源文件、助手设置、阅读进度和 owner 校验 |
+| `server/src/books/` | 书籍、源文件、助手设置、助手讨论范围、独立续读位置、按范围读取正文和 owner 校验 |
 | `server/src/chat/` | 单书会话、聊天入口、作用域解析、SSE 和书籍片段检索 |
 | `server/src/agent/`、`server/src/rag/` | Agent 图、节点、Prompt、路由、生成与 RAG 编排 |
 | `server/src/memory/` | 记忆门控、用户画像、书籍/会话作用域和持久化 |

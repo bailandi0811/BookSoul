@@ -25,6 +25,7 @@ vi.mock("@/lib/books-api", async (importOriginal) => ({
 
 import { useBooksStore } from "./useBooksStore";
 import { useChatStore } from "./useChatStore";
+import { useReaderStore } from "./useReaderStore";
 
 const readyBook: BookView = {
   id: "book-a",
@@ -86,6 +87,51 @@ describe("private bookshelf state", () => {
 
     expect(useBooksStore.getState().books).toEqual([readyBook]);
     expect(useBooksStore.getState().error).toBeNull();
+  });
+
+  it("opens book space without preparing chat and preserves same-book metadata", async () => {
+    useBooksStore.setState({ books: [readyBook] });
+    await useBooksStore.getState().openBook(readyBook.id, "book");
+    expect(useBooksStore.getState().view).toBe("book");
+    expect(useChatStore.getState().prepareBook).not.toHaveBeenCalled();
+    useBooksStore.getState().backToLibrary();
+    await useBooksStore.getState().openBook(readyBook.id, "book");
+    expect(apiMocks.listSections).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not let a late book response overwrite the selected book", async () => {
+    let finish!: (value: unknown[]) => void;
+    apiMocks.listSections.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    useBooksStore.setState({ books: [readyBook, { ...readyBook, id: "book-b" }] });
+    const first = useBooksStore.getState().openBook("book-a", "book");
+    await useBooksStore.getState().openBook("book-b", "book");
+    finish([{ id: "old-section", order: 1, title: "旧书", charCount: 20 }]);
+    await first;
+    expect(useBooksStore.getState().currentBook?.id).toBe("book-b");
+    expect(useBooksStore.getState().sections[0].id).not.toBe("old-section");
+  });
+
+  it("prepares chat when the user changes from a still-loading reader", async () => {
+    let finish!: () => void;
+    const opening = vi.spyOn(useReaderStore.getState(), "openReader").mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    useBooksStore.setState({ books: [readyBook] });
+    const first = useBooksStore.getState().openBook("book-a", "reader");
+    await vi.waitFor(() => expect(opening).toHaveBeenCalledOnce());
+    await useBooksStore.getState().switchBookView("book");
+    await useBooksStore.getState().switchBookView("workspace");
+    expect(useChatStore.getState().prepareBook).toHaveBeenCalledWith("book-a");
+    finish(); await first;
+    expect(useBooksStore.getState().view).toBe("workspace");
+  });
+  it("ignores an old progress failure after switching books", async () => {
+    let reject!: (error: Error) => void;
+    apiMocks.updateReadingProgress.mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail; }));
+    useBooksStore.setState({ books: [readyBook, { ...readyBook, id: "book-b" }] });
+    await useBooksStore.getState().openBook("book-a", "book");
+    const pending = useBooksStore.getState().updateProgress("IN_PROGRESS", 1);
+    await useBooksStore.getState().openBook("book-b", "book");
+    reject(new Error("旧书请求失败")); await pending;
+    expect(useBooksStore.getState().workspaceError).toBeNull();
   });
 
   it("adds an accepted upload to the shelf immediately", async () => {

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
+  ArrowLeft,
   ArrowRight,
   Eye,
   EyeOff,
@@ -16,6 +17,7 @@ import { useVerificationChallenge } from "./useVerificationChallenge";
 
 interface AuthPageProps {
   onAuthenticated: () => void;
+  onBackHome: () => void;
 }
 
 type EditableField = "name" | "email" | "password";
@@ -26,7 +28,7 @@ const LOCKED_FIELDS: Record<EditableField, boolean> = {
   password: false,
 };
 
-export function AuthPage({ onAuthenticated }: AuthPageProps) {
+export function AuthPage({ onAuthenticated, onBackHome }: AuthPageProps) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -140,6 +142,10 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
         />
       ) : (
         <>
+          <button type="button" className="account-return" onClick={onBackHome}>
+            <ArrowLeft size={16} />
+            返回首页
+          </button>
           <div className="mb-6">
             <h2 id="auth-title" className="font-display auth-title">
               {mode === "login" ? "回到你的书房" : "开启你的书房"}

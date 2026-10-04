@@ -14,6 +14,10 @@ npm run check
 
 `npm run check` 依次执行 lint、TypeScript 检查、单元测试和生产构建。`npm run lint` 不修改文件；需要自动修复时显式执行 `npm run lint:fix`。
 
+阅读模块新增鉴权正文窗口 `GET /api/books/:bookId/sections/:sectionId/content?offset&limit`、引用定位 `GET /api/books/:bookId/chunks/:chunkId/location`，以及独立续读位置 `GET/PUT /api/books/:bookId/reading-position`。正文、定位和位置都由服务端核验当前身份与书籍权限；引用定位只针对当前索引版本。续读位置采用 revision CAS，409 时客户端须显式选择是否覆盖本窗口位置；原有 `reading-progress` 仍只表示助手讨论范围，正文阅读不会修改它。接口细节见[阅读器设计](../docs/superpowers/specs/2026-10-03-novel-reader-design.md)。
+
+首次启用须在核对数据库目标与备份后单独部署新增的 `20261003090000_book_reading_position` 迁移。它只新增位置表及外键，不重写现有书籍、会话或聊天数据；代码或测试运行不代表迁移已部署。独立测试库完成迁移且 `TEST_DATABASE_URL` 通过现有隔离门禁后，可显式运行 `npm run test:db:reader` 检查并发 CAS 和级联。不要对开发库或生产库运行此测试。
+
 默认的 `npm test` 和 `npm run check` 不加载真实数据库集成测试。需要验证 Prisma 约束时，先创建独立测试数据库和测试 schema，再显式运行：
 
 ```powershell

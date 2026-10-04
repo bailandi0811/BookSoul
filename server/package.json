@@ -23,6 +23,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.build.json",
     "test": "jest",
     "test:db": "jest --config ./test/jest-db.json --runInBand",
+    "test:db:reader": "jest --config ./test/jest-reader-db.json --runInBand",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",

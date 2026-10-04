@@ -10,7 +10,7 @@ it("preserves a selected scene and independent theme when moving between authent
   document.body.append(container);
   const root = createRoot(container);
   try {
-    await act(async () => root.render(<AuthPage onAuthenticated={() => {}} />));
+    await act(async () => root.render(<AuthPage onAuthenticated={() => {}} onBackHome={() => {}} />));
     const background = container.querySelector<HTMLElement>(
       '[aria-label="选择背景"]',
     );
