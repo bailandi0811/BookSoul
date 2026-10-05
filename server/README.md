@@ -2,6 +2,14 @@
 
 NestJS 11 API，提供账号认证、私人书架、EPUB/TXT 持久化处理、版本化向量检索、按书会话、阅读进度、防剧透、原文引用和隔离记忆。
 
+新增 `CommunityModule` 提供一个显式加入的公共房间 `readers-lobby`，不调用私人 Chat/RAG/Memory。REST 位于 `/api/community`，原生 WS 位于同端口 `/api/community/ws`；协议及错误契约见[聊天室设计](../docs/superpowers/specs/2026-10-04-community-chat-design.md)。当前按单实例运行：票据和在线连接只在本进程，持久消息与事件由 PostgreSQL 保存；多实例广播不在本期范围。
+
+首次启用前须核对数据库目标、备份和待部署迁移，单独部署 `20261004113000_community_chat`。本次仅生成新增表迁移，未运行真实迁移。`prisma migrate deploy` 会执行全部待应用迁移，包含工作区其他功能的迁移；不能把它当成只执行聊天室迁移的命令。若 Windows Prisma engine DLL 被既有进程占用，请正常停止占用进程后重新运行 `npm run prisma:generate`，不要覆盖或删除 DLL。
+
+专用数据库回归命令为 `npm run test:db:community`，只接受显式 `TEST_DATABASE_URL`，并与 `DATABASE_URL` 完整比对；必须为独立 `*_test` 数据库及 `test_*` schema，不加载 `.env`，默认测试排除此组。管理员初始化命令 `npm run community:moderator -- --member-id=<公共成员UUID>` 默认只读预览，`--apply` 才授予指定房间一个成员权限；脚本要求进程显式提供 `DATABASE_URL`，不加载 `.env`。真实授予须单独核对目标指纹和影响后确认，不因代码已实现自动执行。
+
+部署代理须保留 Origin、子协议和 Upgrade，公开站点使用 WSS，空闲超时需覆盖心跳；沿用现有 `CORS_ORIGINS`，缺失或不允许的 Origin 在 101 前拒绝，URL 不得带票据，日志不得记录票据/消息正文。客户端本地 Vite `/api` 代理已增加 `ws:true`，生产配置未改。发布前检查[验收记录](../docs/community-chat-acceptance.md)中的待验证项。
+
 ## 命令
 
 ```bash
@@ -14,9 +22,9 @@ npm run check
 
 `npm run check` 依次执行 lint、TypeScript 检查、单元测试和生产构建。`npm run lint` 不修改文件；需要自动修复时显式执行 `npm run lint:fix`。
 
-阅读模块新增鉴权正文窗口 `GET /api/books/:bookId/sections/:sectionId/content?offset&limit`、引用定位 `GET /api/books/:bookId/chunks/:chunkId/location`，以及独立续读位置 `GET/PUT /api/books/:bookId/reading-position`。正文、定位和位置都由服务端核验当前身份与书籍权限；引用定位只针对当前索引版本。续读位置采用 revision CAS，409 时客户端须显式选择是否覆盖本窗口位置；原有 `reading-progress` 仍只表示助手讨论范围，正文阅读不会修改它。接口细节见[阅读器设计](../docs/superpowers/specs/2026-10-03-novel-reader-design.md)。
+阅读模块新增鉴权正文窗口 `GET /api/books/:bookId/sections/:sectionId/content?offset&limit`、引用定位 `GET /api/books/:bookId/chunks/:chunkId/location`，以及独立续读位置 `GET/PUT /api/books/:bookId/reading-position`。正文、定位和位置都由服务端核验当前身份与书籍权限；引用定位只针对当前索引版本。续读位置采用 revision CAS，409 时客户端须显式选择是否覆盖本窗口位置。确认保存到更后的章节时，同一事务会把阅读进度单调抬高到该章，并在响应里返回进度摘要；读取位置、临时浏览和 409 冲突都不改进度。已读完不会被回看改回。接口细节见[阅读器设计](../docs/superpowers/specs/2026-10-03-novel-reader-design.md)。
 
-首次启用须在核对数据库目标与备份后单独部署新增的 `20261003090000_book_reading_position` 迁移。它只新增位置表及外键，不重写现有书籍、会话或聊天数据；代码或测试运行不代表迁移已部署。独立测试库完成迁移且 `TEST_DATABASE_URL` 通过现有隔离门禁后，可显式运行 `npm run test:db:reader` 检查并发 CAS 和级联。不要对开发库或生产库运行此测试。
+首次启用须在核对数据库目标与备份后单独部署新增的 `20261003090000_book_reading_position` 迁移。它只新增位置表及外键，不重写现有书籍、会话或聊天数据；代码或测试运行不代表迁移已部署。回填已有阅读位置的 `20261004183000_raise_reading_progress_from_position` 同样须单独核对目标后再部署：它只把进度向上抬到已保存的续读章节，不降低已有进度，也不改已读完的书。独立测试库完成迁移且 `TEST_DATABASE_URL` 通过现有隔离门禁后，可显式运行 `npm run test:db:reader` 检查并发 CAS、进度抬高和级联。不要对开发库或生产库运行此测试。
 
 默认的 `npm test` 和 `npm run check` 不加载真实数据库集成测试。需要验证 Prisma 约束时，先创建独立测试数据库和测试 schema，再显式运行：
 
@@ -96,6 +104,16 @@ Redis 模式启动时最多等待 5 秒，包含客户端重连；连接失败�
 阅读笔记、注册验证码、邮箱验证、找回密码和改密通知共用黑白灰纸面模板与“AI 藏书室”品牌。模板使用内联样式、表格和嵌入式标识，保留纯文本备选，不加载远程字体或背景图片。
 
 ## 迁移
+
+### 用户资料与私人图片
+
+账号资料接口位于 `/api/users/me`，只允许 JWT 用户操作本人名称、头像、壁纸图库和随机/固定偏好。上传采用 OSS POST 直传临时对象，再经服务端真实解码、静态图片校验和 WebP 规范化后提交；原图不经应用 multipart 接口。正式对象保持私有，仅向本人提供 15 分钟读取链接。图库、上传配额和资料 revision 在用户行锁下维护，重复确认不恢复旧头像。
+
+OSS 配置是可选且须整组填写的 `OSS_REGION`、`OSS_BUCKET`、`OSS_ACCESS_KEY_ID`、`OSS_ACCESS_KEY_SECRET`，可选 `OSS_ENDPOINT` 仅接受匹配地域的阿里云 HTTPS 地址。完全留空时仍可修改名称和系统壁纸，部分填写会阻止启动。真实密钥、私有 Bucket/RAM 权限、浏览器 CORS、暂存生命周期与收费说明以[实施方案](../docs/superpowers/plans/2026-10-04-user-profile-oss-media.md)为准；不要公开 Bucket 或将凭据发送到客户端。
+
+新增迁移 `20261004100000_user_profile_media` 为加法迁移，部署前须核对目标、备份和所有待部署迁移，确认后再执行 `npm run prisma:migrate:deploy` 与 `npm run prisma:generate`；本机后续授权部署结果见[验收记录](../docs/user-profile-media-acceptance.md)，不代表其他环境已部署。媒体 owner 外键限制删除账号，避免丢失待清理对象记录；当前不扩展账号删除功能。
+
+`npm run profile-media:cleanup` 默认为只读 dry-run；`-- --execute` 才会删除经过归属、状态、引用与保留期限复查的精确对象。READY 只清理签发过期的暂存图，并记录 `stagingCleanedAt`，从不删除正式对象；其他失败、过期或退役对象保留 24 小时后才可清理。真实删除须另行确认，不运行默认定时任务。专用数据库测试 `npm run test:db:profile` 要求显式且隔离的 `TEST_DATABASE_URL`，不加载 `.env` 或进入默认 Jest 范围。实际验收与未验证项见[验收记录](../docs/user-profile-media-acceptance.md)。
 
 `npm run migrate:file-data` 可幂等复制旧 JSON 数据，不删除源文件。
 

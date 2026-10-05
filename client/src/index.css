@@ -200,6 +200,39 @@
     transform: translateY(0) scale(0.985);
   }
 
+  .community-entry {
+    transition:
+      transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 0.22s ease,
+      background-color 0.22s ease;
+  }
+
+  .community-entry:hover {
+    transform: translateY(-2px);
+    border-color: rgb(var(--accent) / 0.55);
+    background: rgb(var(--card) / 0.92);
+  }
+
+  .community-entry:active {
+    transform: translateY(0) scale(0.97);
+  }
+
+  .community-unread-badge {
+    transform-origin: center;
+    animation: community-unread-pop 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  @keyframes community-unread-pop {
+    from {
+      opacity: 0;
+      transform: scale(0.55);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
   /* Custom Scrollbar */
   .scrollbar-thin {
     scrollbar-width: thin;
@@ -653,4 +686,22 @@
   right: 10px;
   width: 8px;
   height: 23px;
+}
+.book-cover.book-cover-flyer {
+  position: fixed;
+  z-index: 40;
+  margin: 0;
+  pointer-events: none;
+  isolation: isolate;
+  aspect-ratio: auto;
+  transform-origin: center center;
+  transition: none !important;
+  visibility: visible !important;
+  will-change: transform;
+  box-shadow:
+    inset -1px 0 0 rgb(255 255 255 / 0.16),
+    0 14px 24px -16px rgb(0 0 0 / 0.42);
+}
+.book-cover-flight-hidden {
+  visibility: hidden !important;
 }

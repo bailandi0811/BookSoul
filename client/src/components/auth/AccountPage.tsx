@@ -4,7 +4,6 @@ import {
   LockKeyhole,
   RefreshCw,
   ShieldCheck,
-  UserRound,
 } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { Dialog } from "@/components/ui/Dialog";
@@ -13,6 +12,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { useChatStore } from "@/store/useChatStore";
 import { EmailVerificationForm } from "./EmailVerificationForm";
 import { ForgotPasswordForm } from "./ForgotPasswordForm";
+import { AccountProfileForm } from "./AccountProfileForm";
 
 export function AccountPage({ onBack }: { onBack: () => void }) {
   const user = useAuthStore((state) => state.user);
@@ -38,11 +38,15 @@ export function AccountPage({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <main className="account-page min-h-[100dvh] text-foreground">
+    <main className="account-page min-h-full text-foreground">
       <AppHeader caption="账号设置" appearanceRequest={appearanceRequest} />
       <div className="account-layout">
-        <button type="button" className="account-return" onClick={onBack}>
-          <ArrowLeft size={16} />
+        <button
+          type="button"
+          className="account-return tap-spring"
+          onClick={onBack}
+        >
+          <ArrowLeft size={16} strokeWidth={1.7} />
           返回书库
         </button>
         <h1 className="font-display">你的账号</h1>
@@ -55,15 +59,7 @@ export function AccountPage({ onBack }: { onBack: () => void }) {
             <h2 id="account-profile-title" className="font-display">
               个人信息
             </h2>
-            <div className="account-profile">
-              <span className="account-profile-avatar" aria-hidden="true">
-                {Array.from(user.name)[0] || <UserRound size={22} />}
-              </span>
-              <div>
-                <strong className="font-display">{user.name}</strong>
-                <p>你的私人阅读空间</p>
-              </div>
-            </div>
+            <AccountProfileForm />
             <div className="account-detail">
               <p className="account-detail-label">邮箱</p>
               <div className="account-email-row">

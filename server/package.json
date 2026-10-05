@@ -24,6 +24,10 @@
     "test": "jest",
     "test:db": "jest --config ./test/jest-db.json --runInBand",
     "test:db:reader": "jest --config ./test/jest-reader-db.json --runInBand",
+    "test:db:profile": "jest --config ./test/jest-profile-db.json --runInBand",
+    "test:db:community": "jest --config ./test/jest-community-db.json --runInBand",
+    "community:moderator": "ts-node src/scripts/community-moderator.ts",
+    "profile-media:cleanup": "ts-node src/scripts/cleanup-profile-media.ts",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
@@ -52,11 +56,14 @@
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/platform-ws": "11.1.17",
     "@nestjs/throttler": "^6.4.0",
+    "@nestjs/websockets": "11.1.17",
     "@prisma/client": "^6.19.3",
     "@types/nodemailer": "^7.0.11",
     "@zilliz/milvus2-sdk-node": "^2.6.12",
     "adm-zip": "^0.5.16",
+    "ali-oss": "^6.23.0",
     "bcryptjs": "^3.0.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
@@ -73,6 +80,8 @@
     "redis": "^6.2.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "sharp": "^0.35.5",
+    "ws": "8.21.3",
     "zod": "^4.3.6"
   },
   "devDependencies": {
@@ -81,12 +90,14 @@
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.1",
+    "@types/ali-oss": "^6.23.3",
     "@types/express": "^5.0.0",
     "@types/cookie-parser": "^1.4.9",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.10.7",
     "@types/passport-jwt": "^4.0.1",
     "@types/supertest": "^6.0.2",
+    "@types/ws": "8.18.2",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.2",
@@ -123,5 +134,10 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
+  },
+  "overrides": {
+    "@nestjs/platform-ws": {
+      "ws": "8.21.3"
+    }
   }
 }

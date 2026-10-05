@@ -14,6 +14,8 @@ it("reuses same-book chat messages and draft, and cancels on close", async () =>
   try {
     await act(async () => root.render(<ReaderAssistantPanel bookId="a" onClose={() => {}} />));
     expect(document.body.textContent).toContain("已有问题");
+    expect(document.body.textContent).toContain("可讨论到第 1 节，按整章计算");
+    expect(document.body.textContent).not.toContain("续读位置独立保存");
     expect(document.body.querySelector("textarea")?.value).toBe("保留的草稿");
     await act(async () => root.unmount());
     expect(stop).toHaveBeenCalled(); expect(useChatStore.getState().draftInput).toBe("保留的草稿");

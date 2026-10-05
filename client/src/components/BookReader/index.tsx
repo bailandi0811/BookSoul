@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowLeft, Bookmark, ShieldCheck, CloudCheck } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
+import { beginCoverFlightFrom } from "@/lib/book-cover-flight";
 import { PAPER_EASE, PANEL_DURATION } from "@/lib/ui-motion";
 import { useBooksStore } from "@/store/useBooksStore";
 import { useReaderStore } from "@/store/useReaderStore";
@@ -15,7 +16,8 @@ const ReaderAssistantPanel = lazy(() => import("./components/ReaderAssistantPane
 export default function BookReader() {
   const book = useBooksStore(s => s.currentBook), sections = useBooksStore(s => s.sections);
   const loading = useBooksStore(s => s.isWorkspaceLoading), workspaceError = useBooksStore(s => s.workspaceError);
-  const ceiling = useBooksStore(s => s.readingProgress?.spoilerCeiling ?? 1);
+  const progress = useBooksStore(s => s.readingProgress);
+  const scope = progress?.mode === "FINISHED" ? "助手可讨论全书" : `助手可讨论到第 ${progress?.spoilerCeiling ?? 1} 节，按整章计算`;
   const preview = useReaderStore(s => s.preview), notice = useReaderStore(s => s.notice);
   const readerError = useReaderStore(s => s.error);
   const status = useReaderStore(s => s.saveStatus), error = useReaderStore(s => s.saveError);
@@ -62,11 +64,11 @@ export default function BookReader() {
         {desktop && <ReaderSidebar book={book} contentsOpen={contents} onToggleContents={toggleContents} onCloseContents={closeContents} />}
         <div className="reader-column">
           <div className="reader-topbar">
-            <div className="reader-mobile-book-info"><button className="reader-back" aria-label="返回本书空间" onClick={() => void useBooksStore.getState().switchBookView("book")}><ArrowLeft size={16} /></button><p className="reader-book-title font-reading">{book.title}</p></div>
+            <div className="reader-mobile-book-info"><button className="reader-back" aria-label="返回本书空间" onClick={() => { beginCoverFlightFrom(book.id, "reader"); void useBooksStore.getState().switchBookView("book"); }}><ArrowLeft size={16} /></button><p className="reader-book-title font-reading">{book.title}</p></div>
             <ReaderChapterNavigation /><Bookmark size={20} strokeWidth={1.5} className="reader-navigation-mark" aria-hidden="true" />
           </div>
       {(notice || error || readerError || workspaceError || preview) && <div className="reader-status-row">
-        {preview && <p>正在临时预览 <button onClick={() => void useReaderStore.getState().returnToReading()}>返回续读处</button><button onClick={() => useReaderStore.getState().continueFromPreview()}>从这里继续阅读</button></p>}
+        {preview && <p>正在临时预览，进度和助手范围保持不变 <button onClick={() => void useReaderStore.getState().returnToReading()}>返回续读处</button><button onClick={() => useReaderStore.getState().continueFromPreview()}>从这里继续阅读</button></p>}
         {notice && <p role="status">{notice}</p>}
         {workspaceError && <p role="alert">{workspaceError}</p>}
         {readerError && <p role="alert">{readerError} <button onClick={() => void useReaderStore.getState().retryWindow()}>重试加载</button></p>}
@@ -77,7 +79,7 @@ export default function BookReader() {
         </div>
         <footer className="reader-footer">
           <span className="reader-save-status" role="status"><CloudCheck size={16} strokeWidth={1.5} />{({ saved: position ? "续读位置已同步" : "尚未保存续读位置", dirty: "等待保存…", saving: "保存中…", error: "续读位置未同步", conflict: "其他窗口已更新位置" })[status]}</span>
-          <span className="reader-spoiler-scope"><ShieldCheck size={12} />助手讨论至第 {ceiling} 节</span>
+          <span className="reader-spoiler-scope"><ShieldCheck size={12} />{scope}</span>
         </footer>
         </div>
         <div className="reader-right-column">

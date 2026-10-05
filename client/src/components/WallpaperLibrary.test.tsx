@@ -1,0 +1,50 @@
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { WallpaperLibrary } from "./WallpaperLibrary";
+import { useAuthStore } from "@/store/useAuthStore";
+import { useUserProfileStore } from "@/store/useUserProfileStore";
+import { useAppearanceStore } from "@/store/useAppearanceStore";
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+const user = { id: "gallery-fixture", name: "Reader", email: "reader@example.invalid", emailVerifiedAt: null };
+const media = { id: "owned", url: "https://media.example.invalid/wallpaper", expiresAt: "2026-10-04T15:00:00Z", width: 1200, height: 900 };
+const profile = { user, revision: 0, avatar: null, wallpapers: [media], wallpaper: { mode: "RANDOM" }, mediaUploadsAvailable: false, mediaReadError: null };
+let root: Root, container: HTMLDivElement;
+beforeEach(async () => {
+  useAuthStore.getState().signIn({ user, accessToken: "fixture" });
+  vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(JSON.stringify({ success: true, data: profile })));
+  await useUserProfileStore.getState().loadProfile(); container = document.createElement("div"); root = createRoot(container);
+  await act(async () => root.render(<WallpaperLibrary />));
+});
+afterEach(async () => { await act(async () => root.unmount()); useAuthStore.getState().clearAuthentication(); vi.restoreAllMocks(); });
+it("saves fixed owned and system selections, then deletes the fixed image into random atomically", async () => {
+  vi.mocked(fetch).mockImplementation(async () => new Response(JSON.stringify({ success: true, data: { ...profile, revision: 1, wallpaper: { mode: "FIXED", kind: "USER", id: "owned" } } })));
+  await act(async () => container.querySelector<HTMLInputElement>('input[value="owned"]')!.click());
+  expect(container.querySelector<HTMLInputElement>('input[value="owned"]')!.checked).toBe(true);
+  expect(container.querySelector<HTMLButtonElement>('button[aria-label="固定壁纸"]')?.getAttribute("aria-pressed")).toBe("true");
+  const theme = useAppearanceStore.getState().theme;
+  vi.mocked(fetch).mockImplementation(async () => new Response(JSON.stringify({ success: true, data: { ...profile, revision: 2, wallpapers: [] } })));
+  await act(async () => container.querySelector<HTMLButtonElement>('button[aria-label="删除壁纸 1"]')!.click());
+  expect(container.querySelector('input[value="owned"]')).toBeNull();
+  expect(useAppearanceStore.getState().wallpaper.mode).toBe("RANDOM");
+  expect(useAppearanceStore.getState().theme).toBe(theme);
+  expect([...container.querySelectorAll<HTMLInputElement>("input")].some(item => item.value === "none")).toBe(true);
+});
+
+it("fixes the currently displayed random image exactly once and supports solid color", async () => {
+  const selected = useAppearanceStore.getState().selection!;
+  const fixed = { mode: "FIXED", ...selected };
+  vi.mocked(fetch).mockImplementation(async () => new Response(JSON.stringify({ success: true, data: { ...profile, revision: 1, wallpaper: fixed } })));
+  const before = vi.mocked(fetch).mock.calls.length;
+  await act(async () => container.querySelector<HTMLInputElement>(`input[value="${selected.id}"]`)!.click());
+  expect(fetch).toHaveBeenCalledTimes(before + 1);
+  expect(useUserProfileStore.getState().profile?.wallpaper).toEqual(fixed);
+  vi.mocked(fetch).mockImplementation(async () => new Response(JSON.stringify({ success: true, data: { ...profile, revision: 2, wallpaper: { mode: "FIXED", kind: "SYSTEM", id: "none" } } })));
+  await act(async () => container.querySelector<HTMLInputElement>('input[value="none"]')!.click());
+  expect(useAppearanceStore.getState().selection).toEqual({ kind: "SYSTEM", id: "none" });
+  const random = vi.spyOn(Math, "random").mockReturnValue(0);
+  vi.mocked(fetch).mockImplementation(async () => new Response(JSON.stringify({ success: true, data: { ...profile, revision: 3 } })));
+  await act(async () => container.querySelector<HTMLButtonElement>('button[aria-label="随机壁纸"]')!.click());
+  expect(useAppearanceStore.getState().wallpaper.mode).toBe("RANDOM");
+  expect(random).toHaveBeenCalledOnce();
+});

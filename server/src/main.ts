@@ -2,7 +2,10 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
+import type { Server } from 'node:http';
 import { AppModule } from './app.module';
+import { CommunityWsAdapter } from './community/community.ws-adapter';
+import { CommunityTicketsService } from './community/community.tickets.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -11,6 +14,11 @@ async function bootstrap() {
       .split(',')
       .map((origin) => origin.trim())
       .filter(Boolean),
+  );
+  const communityTickets = app.get(CommunityTicketsService);
+  communityTickets.setAllowedOrigins(allowedOrigins);
+  app.useWebSocketAdapter(
+    new CommunityWsAdapter(app.getHttpServer() as Server, communityTickets),
   );
   app.use(helmet());
   app.use(cookieParser());

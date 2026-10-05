@@ -123,6 +123,14 @@ describe("private bookshelf state", () => {
     finish(); await first;
     expect(useBooksStore.getState().view).toBe("workspace");
   });
+  it("keeps a newer reading mark when an older confirmed save arrives", () => {
+    const newer = { mode: "IN_PROGRESS" as const, currentSectionOrder: 30, spoilerCeiling: 30, updatedAt: "2026-10-04T02:00:00.000Z" };
+    const older = { ...newer, currentSectionOrder: 4, spoilerCeiling: 4, updatedAt: "2026-10-04T01:00:00.000Z" };
+    useBooksStore.setState({ books: [{ ...readyBook, readingProgress: newer }], currentBook: { ...readyBook, readingProgress: newer }, readingProgress: newer });
+    useBooksStore.getState().applyConfirmedProgress("book-a", older);
+    expect(useBooksStore.getState().readingProgress?.currentSectionOrder).toBe(30);
+    expect(useBooksStore.getState().books[0]?.readingProgress?.currentSectionOrder).toBe(30);
+  });
   it("ignores an old progress failure after switching books", async () => {
     let reject!: (error: Error) => void;
     apiMocks.updateReadingProgress.mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail; }));

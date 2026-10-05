@@ -19,7 +19,7 @@ import {
 import { useChatStore } from "@/store/useChatStore";
 import { assignBookCoverBindings, type CoverVariant } from "@/lib/book-cover";
 import { ensureBookChat } from "@/lib/book-workspace-navigation";
-import { useReaderStore } from "./useReaderStore";
+import { bindConfirmedReadingProgress, useReaderStore } from "./useReaderStore";
 import { useAuthStore } from "./useAuthStore";
 
 export type BooksView = "library" | "book" | "reader" | "workspace";
@@ -53,6 +53,7 @@ interface BooksState {
     mode: ReadingMode,
     currentSectionOrder?: number | null,
   ) => Promise<void>;
+  applyConfirmedProgress: (bookId: string, readingProgress: ReadingProgress) => void;
   updateAssistant: (
     input: Partial<
       Pick<
@@ -66,6 +67,12 @@ interface BooksState {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "请求失败，请稍后重试";
+}
+
+function progressStamp(value: object | null | undefined) {
+  if (!value || !("updatedAt" in value) || typeof value.updatedAt !== "string") return Number.NEGATIVE_INFINITY;
+  const time = Date.parse(value.updatedAt);
+  return Number.isFinite(time) ? time : Number.NEGATIVE_INFINITY;
 }
 
 export const useBooksStore = create<BooksState>((set, get) => ({
@@ -248,12 +255,7 @@ export const useBooksStore = create<BooksState>((set, get) => ({
         ...(currentSectionOrder == null ? {} : { currentSectionOrder }),
       });
       if (generation !== navigationGeneration || get().currentBook?.id !== book.id) return;
-      set((state) => ({
-        readingProgress,
-        currentBook: state.currentBook
-          ? { ...state.currentBook, readingProgress }
-          : null,
-      }));
+      get().applyConfirmedProgress(book.id, readingProgress);
     } catch (error) {
       if (generation === navigationGeneration && get().currentBook?.id === book.id) {
         set({ workspaceError: errorMessage(error) });
@@ -279,6 +281,24 @@ export const useBooksStore = create<BooksState>((set, get) => ({
     }
   },
 
+  applyConfirmedProgress: (bookId, readingProgress) => {
+    set((state) => ({
+      books: state.books.map((item) =>
+        item.id === bookId && progressStamp(readingProgress) >= progressStamp(item.readingProgress)
+          ? { ...item, readingProgress }
+          : item,
+      ),
+      readingProgress:
+        state.currentBook?.id === bookId && progressStamp(readingProgress) >= progressStamp(state.readingProgress)
+          ? readingProgress
+          : state.readingProgress,
+      currentBook:
+        state.currentBook?.id === bookId && progressStamp(readingProgress) >= progressStamp(state.readingProgress)
+          ? { ...state.currentBook, readingProgress }
+          : state.currentBook,
+    }));
+  },
+
   clearPrivateState: () => {
     navigationGeneration++; metadataAbort.abort();
     useReaderStore.getState().clearPrivateState();
@@ -302,3 +322,7 @@ export const useBooksStore = create<BooksState>((set, get) => ({
     });
   },
 }));
+
+bindConfirmedReadingProgress((bookId, readingProgress) => {
+  useBooksStore.getState().applyConfirmedProgress(bookId, readingProgress);
+});

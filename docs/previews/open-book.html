@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>翻开同一本书 · BookSoul 动效预览</title>
+  <style>
+    :root {
+      --ink: #242424;
+      --muted: #666661;
+      --line: #d8d8cf;
+      --paper: #f5f5f2;
+      --card: #fbfbf8;
+      --well: #eceae4;
+      --reader-paper: #ffffff;
+      --reader-card: #f8fafb;
+      --reader-well: #edf3f3;
+      --reader-accent: #527a73;
+      --ease: cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      min-height: 100dvh;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    }
+    button, input { font: inherit; color: inherit; }
+    button { border: 0; background: none; cursor: pointer; }
+    button:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+    .font-reading { font-family: "Songti SC", "STSong", SimSun, Georgia, serif; }
+
+    .preview-bar {
+      width: min(1120px, calc(100% - 32px));
+      margin: 18px auto 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 20px;
+    }
+    .preview-bar h1 {
+      margin: 0;
+      font: 400 22px/1.3 "Songti SC", "STSong", SimSun, Georgia, serif;
+    }
+    .preview-bar p { margin: 6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; max-width: 46em; }
+    .modes { display: flex; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); flex-shrink: 0; }
+    .modes button { min-height: 34px; padding: 0 14px; border-radius: 999px; font-size: 13px; color: var(--muted); }
+    .modes button[aria-pressed="true"] { background: var(--ink); color: var(--card); }
+
+    .stage {
+      width: min(1120px, calc(100% - 32px));
+      height: min(720px, calc(100dvh - 108px));
+      min-height: 580px;
+      margin: 0 auto 28px;
+      position: relative;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      overflow: hidden;
+      background: #f3f1ea;
+    }
+    .appbar {
+      height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 26px;
+      border-bottom: 1px solid var(--line);
+      background: rgb(251 251 248 / 0.92);
+      position: relative;
+      z-index: 3;
+    }
+    .brand { display: flex; align-items: baseline; gap: 10px; font-size: 14px; }
+    .brand strong { font: 500 16px/1 Georgia, "Songti SC", serif; letter-spacing: 0.01em; }
+    .brand span, .appbar small { color: var(--muted); font-size: 12px; }
+    .scenes { position: absolute; inset: 58px 0 0; }
+    .scene { position: absolute; inset: 0; }
+    .library { z-index: 2; background: #f3f1ea; }
+    .reader { z-index: 1; opacity: 0; pointer-events: none; background: #e7eeed; }
+    .stage.open .library { opacity: 0; pointer-events: none; }
+    .stage.open .reader { opacity: 1; pointer-events: auto; }
+    .mode-fade .library, .mode-fade .reader { transition: opacity 180ms linear; }
+    .mode-shared .library { transition: opacity 360ms ease 40ms; }
+    .mode-shared .reader { transition: opacity 280ms ease 90ms; }
+    .mode-shared:not(.open) .library { transition-delay: 160ms; }
+    .mode-shared:not(.open) .reader { transition-delay: 0ms; transition-duration: 220ms; }
+
+    .library-scroll { height: 100%; overflow: auto; padding: 26px 28px 32px; }
+    .feature {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 168px minmax(0, 1fr);
+      gap: 8px 22px;
+      text-align: left;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--card);
+    }
+    .feature-kicker { grid-column: 1 / -1; color: var(--muted); font-size: 13px; }
+    .feature-copy h2 { margin: 0; font: 400 32px/1.3 "Songti SC", SimSun, Georgia, serif; }
+    .feature-copy p { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
+    .feature-go { display: inline-flex; align-items: center; margin-top: 22px; min-height: 42px; padding: 0 16px; border-radius: 9px; background: var(--ink); color: var(--card); font-size: 14px; white-space: nowrap; }
+    .shelf { margin-top: 22px; padding: 20px 20px 22px; border: 1px solid var(--line); border-radius: 20px; background: var(--well); }
+    .shelf h2 { margin: 0 0 16px; font: 400 22px/1.4 "Songti SC", SimSun, Georgia, serif; }
+    .shelf-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+    .shelf-card {
+      text-align: left;
+      padding: 18px 16px 16px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: var(--card);
+    }
+    .shelf-card strong { display: block; margin-top: 12px; font-size: 16px; font-weight: 500; }
+    .shelf-card em { display: block; margin-top: 4px; font-style: normal; color: var(--muted); font-size: 12px; }
+    .book-cover.is-feature { width: 148px; transform: rotate(-5deg); transform-origin: center; }
+    .shelf-card .book-cover { width: min(100%, 148px); margin: 0 auto; }
+
+    .book-cover {
+      position: relative;
+      isolation: isolate;
+      display: block;
+      width: 100%;
+      aspect-ratio: 3 / 4;
+      border-radius: 2px 6px 6px 2px;
+      color: #f5f4ec;
+      box-shadow: inset -1px 0 0 rgb(255 255 255 / 0.16), 7px 8px 12px -6px rgb(25 25 25 / 0.4), 0 20px 24px -20px rgb(25 25 25 / 0.7);
+    }
+    .book-cover[data-cover-tone="0"] { background: #45514c; }
+    .book-cover[data-cover-tone="1"] { background: #71606d; }
+    .book-cover[data-cover-tone="2"] { background: #454b51; }
+    .book-cover[data-cover-tone="3"] { background: #b6b09c; color: #36352e; }
+    .book-cover::after {
+      content: "";
+      position: absolute;
+      inset: 14px 12px 13px 21px;
+      border: 1px solid rgb(222 211 180 / 0.46);
+      border-radius: 39% 39% 1px 1px;
+      pointer-events: none;
+    }
+    .book-cover-pages {
+      position: absolute; z-index: -1; top: 4px; bottom: -3px; right: -5px; width: 10px;
+      border-radius: 0 5px 5px 0;
+      background: repeating-linear-gradient(90deg, #dedbcf 0 1px, #f7f4e9 1px 3px);
+    }
+    .book-cover-spine {
+      position: absolute; inset: 0 auto 0 0; width: 14px;
+      background: linear-gradient(90deg, rgb(0 0 0 / 0.24), rgb(255 255 255 / 0.08) 30%, transparent 75%);
+    }
+    .book-cover-emblem { position: absolute; left: 26%; top: 18%; width: 52%; height: 30%; }
+    .book-cover-title {
+      position: absolute; left: 22px; right: 14px; bottom: 24%;
+      font-size: 20px; line-height: 1.35; text-align: center;
+    }
+    .book-cover-imprint {
+      position: absolute; left: 18px; right: 12px; bottom: 11%;
+      font: 8px/1.3 Georgia, serif; letter-spacing: 0.08em; text-align: center; color: #d4cbb7;
+    }
+    .book-cover[data-cover-tone="3"] .book-cover-imprint,
+    .book-cover[data-cover-tone="3"] .book-cover-emblem { color: #494734; }
+    .book-cover-bookmark {
+      position: absolute; top: -1px; right: 22px; width: 11px; height: 34px; background: #b6a77d;
+      clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%);
+    }
+    .is-ghost { visibility: hidden; }
+    .book-cover.flyer {
+      position: fixed; z-index: 30; margin: 0; pointer-events: none;
+      aspect-ratio: auto; transform-origin: center center;
+    }
+
+    .reader-layout { height: 100%; display: flex; gap: 16px; padding: 16px 18px 18px; min-width: 0; }
+    .reader-sidebar, .reader-tools { display: flex; flex-direction: column; gap: 12px; flex-shrink: 0; }
+    .reader-sidebar { width: 232px; }
+    .reader-tools { width: 76px; }
+    .reader-book, .toc, .tool, .paper {
+      background: var(--reader-card);
+      border: 1px solid rgb(255 255 255 / 0.7);
+      border-radius: 22px;
+    }
+    .reader-book { display: flex; gap: 12px; align-items: center; padding: 16px; }
+    .reader-book .book-cover { width: 72px; flex-shrink: 0; }
+    .book-cover.is-compact .book-cover-title { font-size: 11px; left: 12px; right: 8px; }
+    .book-cover.is-compact .book-cover-imprint { display: none; }
+    .reader-book h2 { margin: 0; font-size: 18px; font-weight: 600; line-height: 1.4; }
+    .reader-book p { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+    .back {
+      margin-top: 12px; min-height: 32px; padding: 0 10px; border-radius: 999px;
+      border: 1px solid var(--line); background: white; font-size: 12px;
+    }
+    .toc { padding: 14px 12px; min-height: 0; flex: 1; }
+    .toc h3 { margin: 2px 8px 10px; font-size: 16px; font-weight: 500; }
+    .toc button {
+      width: 100%; display: flex; gap: 8px; align-items: baseline;
+      text-align: left; min-height: 40px; padding: 8px 10px; border-radius: 12px; font-size: 13px;
+    }
+    .toc button[aria-current="true"] { background: var(--reader-well); color: var(--reader-accent); }
+    .toc button span { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+    .paper {
+      flex: 1; min-width: 0; background: var(--reader-paper); border-radius: 28px;
+      overflow: auto; padding: 42px 48px 56px;
+    }
+    .paper .chapter-no { text-align: center; color: var(--muted); font-size: 12px; }
+    .paper h2 { margin: 12px 0 28px; text-align: center; font: 600 28px/1.5 "Songti SC", SimSun, Georgia, serif; }
+    .paper h2::after { content: ""; display: block; width: 28px; height: 1px; margin: 18px auto 0; background: var(--line); }
+    .paper p { margin: 0 0 1.15em; font: 18px/1.9 "Songti SC", SimSun, Georgia, serif; }
+    .tool {
+      min-height: 74px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 6px; color: var(--muted); font-size: 11px;
+    }
+    .mode-shared .reader-sidebar, .mode-shared .paper, .mode-shared .reader-tools { opacity: 0; }
+    .mode-shared.open .reader-sidebar, .mode-shared.open .paper, .mode-shared.open .reader-tools { opacity: 1; transition: opacity 420ms var(--ease); }
+    .mode-shared.open .reader-sidebar { transition-delay: 180ms; }
+    .mode-shared.open .paper { transition-delay: 240ms; }
+    .mode-shared.open .reader-tools { transition-delay: 300ms; }
+    .mode-fade .reader-sidebar, .mode-fade .paper, .mode-fade .reader-tools { opacity: 1; }
+
+    @media (max-width: 640px) {
+      .feature { grid-template-columns: 112px minmax(0, 1fr); align-items: center; padding: 16px; }
+      .book-cover.is-feature { width: 104px; }
+      .feature-copy h2 { font-size: 26px; }
+      .feature-go { margin-top: 14px; }
+    }
+    @media (max-width: 800px) {
+      .preview-bar { flex-direction: column; align-items: flex-start; }
+      .shelf-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .reader-layout { flex-direction: column; overflow: auto; }
+      .reader-sidebar, .reader-tools { width: 100%; }
+      .reader-tools { flex-direction: row; }
+      .tool { flex: 1; }
+      .paper { min-height: 280px; padding: 28px 22px 40px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .mode-shared .library, .mode-shared .reader,
+      .mode-shared.open .reader-sidebar, .mode-shared.open .paper, .mode-shared.open .reader-tools {
+        transition-duration: 1ms; transition-delay: 0ms;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="preview-bar">
+    <div>
+      <h1>翻开同一本书</h1>
+      <p id="status">点书架或继续阅读上的书。封面会从你点的位置走到正文左侧，目录和纸页随后出现。</p>
+    </div>
+    <div class="modes" role="group" aria-label="动效对照">
+      <button type="button" data-mode="shared" aria-pressed="true">同一本书</button>
+      <button type="button" data-mode="fade" aria-pressed="false">整页淡出</button>
+    </div>
+  </div>
+
+  <div class="stage mode-shared" id="stage">
+    <header class="appbar">
+      <div class="brand"><strong>BookSoul</strong><span>书房</span></div>
+      <small id="where">书库</small>
+    </header>
+    <div class="scenes">
+      <div class="library scene" id="library"></div>
+      <div class="reader scene" id="reader"></div>
+    </div>
+  </div>
+
+  <script>
+    const BOOKS = [
+      { id: "night", title: "长夜与春", tone: 1, mark: true, meta: "第 12 节", chapter: "空山有灯", order: "12",
+        paragraphs: ["灯还在山路上。她把这一节折起来，没有往下翻。", "潮声从更远的地方过来，像有人把没说完的句子放轻了。", "她知道下一节还没到该看的时候。"] },
+      { id: "mountain", title: "山与潮汐", tone: 0, meta: "尚未开始", chapter: "潮声", order: "01",
+        paragraphs: ["山先暗下去，潮还在原来的地方。", "他把书签夹在这一页，灯芯短了一点。"] },
+      { id: "mist", title: "雾中行", tone: 2, meta: "第 3 节", chapter: "渡口", order: "03",
+        paragraphs: ["雾把渡口收短了。船还在，人要等名字被叫到。", "他在这一页停下，把已经读过的句子又看了一遍。"] },
+      { id: "spring", title: "春信", tone: 3, meta: "已读完", chapter: "末页", order: "20",
+        paragraphs: ["信是去年写的。纸还新，字已经淡了。", "他读到最后一行，把书合上，封面还是原来的那一本。"] }
+    ];
+    const EMBLEM = {
+      0: '<path d="M2 28c8-5 16-5 24 0s16 4 24-1 12-3 16-1M1 36c10-4 18-4 28 1s16 3 26-1 10-2 14-1" fill="none" stroke="currentColor" stroke-width="1.2"/>',
+      1: '<path d="M28 6a10 10 0 1 0 12 14A9 9 0 0 1 28 6ZM26 30c-8-5-16-5-24-2v16c8-3 16-1 24 3 8-4 16-6 24-3V28c-8-3-16-3-24 2Z" fill="none" stroke="currentColor" stroke-width="1.2"/>',
+      2: '<circle cx="34" cy="24" r="14" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M34 8v4M34 36v4M18 24h4M46 24h4" stroke="currentColor" stroke-width="1.2"/>',
+      3: '<path d="M34 40V18m0 14C20 32 12 22 14 14c12 0 18 8 20 16Zm0-4c14 1 20-8 18-16-12 1-17 8-18 16Z" fill="none" stroke="currentColor" stroke-width="1.2"/>'
+    };
+
+    const stage = document.getElementById("stage");
+    const library = document.getElementById("library");
+    const reader = document.getElementById("reader");
+    const status = document.getElementById("status");
+    const where = document.getElementById("where");
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let mode = "shared";
+    let busy = false;
+    let openId = null;
+    let source = null;
+    let flyer = null;
+
+    function cover(book, extra) {
+      return `<span class="book-cover ${extra || ""}" data-cover-tone="${book.tone}" data-book="${book.id}">
+        <span class="book-cover-pages"></span><span class="book-cover-spine"></span>
+        <svg class="book-cover-emblem" viewBox="0 0 68 48" aria-hidden="true">${EMBLEM[book.tone]}</svg>
+        <span class="book-cover-title font-reading">${book.title}</span>
+        <span class="book-cover-imprint">BookSoul</span>
+        ${book.mark ? '<span class="book-cover-bookmark"></span>' : ""}
+      </span>`;
+    }
+
+    function renderLibrary() {
+      const feature = BOOKS[0];
+      library.innerHTML = `<div class="library-scroll">
+        <button class="feature" type="button" data-open="${feature.id}">
+          <span class="feature-kicker">继续阅读</span>
+          ${cover(feature, "is-feature")}
+          <span class="feature-copy">
+            <h2 class="font-reading">${feature.title}</h2>
+            <p>${feature.meta} · ${feature.chapter}</p>
+            <span class="feature-go">翻开这本书</span>
+          </span>
+        </button>
+        <section class="shelf"><h2 class="font-reading">书架</h2><div class="shelf-grid">
+          ${BOOKS.map((book) => `<button class="shelf-card" type="button" data-open="${book.id}">
+            ${cover(book)}<strong class="font-reading">${book.title}</strong><em>${book.meta}</em>
+          </button>`).join("")}
+        </div></section>
+      </div>`;
+    }
+
+    function renderReader(book) {
+      const toc = ["入城", "渡口", book.chapter, "未读的一节"];
+      reader.innerHTML = `<div class="reader-layout">
+        <aside class="reader-sidebar">
+          <div class="reader-book">
+            <span id="reader-cover">${cover(book, "is-compact")}</span>
+            <div><h2 class="font-reading">${book.title}</h2><p>${book.meta}</p>
+              <button class="back" type="button" id="close">回到书房</button></div>
+          </div>
+          <nav class="toc" aria-label="目录"><h3 class="font-reading">目录</h3>
+            ${toc.map((title, index) => `<button type="button" ${title === book.chapter ? 'aria-current="true"' : ""}><span>0${index + 1}</span>${title}</button>`).join("")}
+          </nav>
+        </aside>
+        <article class="paper">
+          <div class="chapter-no">第 ${book.order} 节</div>
+          <h2>${book.chapter}</h2>
+          ${book.paragraphs.map((text) => `<p>${text}</p>`).join("")}
+        </article>
+        <div class="reader-tools" aria-hidden="true">
+          <div class="tool">目录</div><div class="tool">排版</div><div class="tool">助手</div>
+        </div>
+      </div>`;
+    }
+
+    function box(el) {
+      const rect = el.getBoundingClientRect();
+      return {
+        left: rect.left + rect.width / 2 - el.offsetWidth / 2,
+        top: rect.top + rect.height / 2 - el.offsetHeight / 2,
+        width: el.offsetWidth,
+        height: el.offsetHeight,
+        cx: rect.left + rect.width / 2,
+        cy: rect.top + rect.height / 2
+      };
+    }
+
+    function clearFlyer() {
+      flyer?.remove();
+      flyer = null;
+    }
+
+    function fly(fromEl, toEl, fromRot, toRot) {
+      const from = box(fromEl);
+      const to = box(toEl);
+      flyer = fromEl.cloneNode(true);
+      flyer.classList.remove("is-feature", "is-ghost");
+      flyer.classList.add("flyer");
+      flyer.style.left = `${from.left}px`;
+      flyer.style.top = `${from.top}px`;
+      flyer.style.width = `${from.width}px`;
+      flyer.style.height = `${from.height}px`;
+      const scale = to.width / from.width;
+      const dx = to.cx - from.cx;
+      const dy = to.cy - from.cy;
+      document.body.appendChild(flyer);
+      return flyer.animate([
+        { transform: `translate(0px, 0px) rotate(${fromRot}deg) scale(1)` },
+        { transform: `translate(${dx}px, ${dy}px) rotate(${toRot}deg) scale(${scale})` }
+      ], { duration: 680, easing: "cubic-bezier(0.22, 1, 0.36, 1)", fill: "forwards" }).finished;
+    }
+
+    function useMotion() {
+      return reduce ? "fade" : mode;
+    }
+
+    async function openBook(id, coverEl) {
+      if (busy || openId) return;
+      busy = true;
+      const book = BOOKS.find((item) => item.id === id);
+      renderReader(book);
+      const target = document.getElementById("reader-cover").firstElementChild;
+      source = coverEl;
+      openId = id;
+      where.textContent = book.title;
+      const motion = useMotion();
+      if (motion === "shared") {
+        const fromRot = coverEl.classList.contains("is-feature") ? -5 : 0;
+        coverEl.classList.add("is-ghost");
+        target.classList.add("is-ghost");
+        const done = fly(coverEl, target, fromRot, 0);
+        stage.classList.add("open");
+        status.textContent = "同一本封面正在离开书架，纸页和目录跟着出现。";
+        try { await done; } catch (error) { /* 预览被打断时直接落到正文 */ }
+        target.classList.remove("is-ghost");
+        clearFlyer();
+        status.textContent = "封面已经落在正文左侧。点「回到书房」，它会回到刚才的位置。";
+      } else {
+        stage.classList.add("open");
+        status.textContent = "整页淡出后，正文里是重新画出来的封面。";
+      }
+      busy = false;
+    }
+
+    async function closeBook() {
+      if (busy || !openId) return;
+      busy = true;
+      const target = document.getElementById("reader-cover")?.firstElementChild;
+      const motion = useMotion();
+      if (motion === "shared" && source && target) {
+        const toRot = source.classList.contains("is-feature") ? -5 : 0;
+        target.classList.add("is-ghost");
+        const done = fly(target, source, 0, toRot);
+        stage.classList.remove("open");
+        where.textContent = "书库";
+        status.textContent = "封面沿原路回到刚才那一格。";
+        try { await done; } catch (error) { /* 合上时若动画中断，封面仍回到原位 */ }
+        source.classList.remove("is-ghost");
+        clearFlyer();
+      } else {
+        stage.classList.remove("open");
+        where.textContent = "书库";
+        source?.classList.remove("is-ghost");
+        status.textContent = "点书架或继续阅读上的书。封面会从你点的位置走到正文左侧，目录和纸页随后出现。";
+      }
+      openId = null;
+      source = null;
+      busy = false;
+    }
+
+    library.addEventListener("click", (event) => {
+      const hit = event.target.closest("[data-open]");
+      if (!hit) return;
+      openBook(hit.dataset.open, hit.querySelector(".book-cover"));
+    });
+    reader.addEventListener("click", (event) => {
+      if (event.target.closest("#close")) closeBook();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") closeBook();
+    });
+    document.querySelectorAll(".modes button").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (busy) return;
+        mode = button.dataset.mode;
+        stage.classList.toggle("mode-shared", mode === "shared");
+        stage.classList.toggle("mode-fade", mode === "fade");
+        document.querySelectorAll(".modes button").forEach((item) => item.setAttribute("aria-pressed", String(item === button)));
+        status.textContent = mode === "shared"
+          ? "点书架或继续阅读上的书。封面会从你点的位置走到正文左侧，目录和纸页随后出现。"
+          : "这是现在的切换：整页淡出，再在新页面重新出现一本书。";
+      });
+    });
+
+    renderLibrary();
+    renderReader(BOOKS[0]);
+  </script>
+</body>
+</html>

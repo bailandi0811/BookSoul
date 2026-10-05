@@ -16,6 +16,15 @@ export function installReaderFixtures() {
   const control = { failNextContent: false, conflictNextSave: false, failNextSave: false, delayBook: "", delayMs: 0 };
   const hashes = new Map<string, Promise<string>>();
   let positions: Record<string, ReaderPosition> = JSON.parse(sessionStorage.getItem("reader-fixture-positions") ?? "{}");
+  const confirmed: Record<string, { mode: "IN_PROGRESS"; currentSectionOrder: number; spoilerCeiling: number; updatedAt: string }> = {};
+  const raiseConfirmed = (bookId: string, sectionId: string) => {
+    const order = Number(sectionId.slice(-1));
+    const current = confirmed[bookId]?.currentSectionOrder ?? 1;
+    const nextOrder = Math.max(current, Number.isInteger(order) ? order : 1);
+    const next = { mode: "IN_PROGRESS" as const, currentSectionOrder: nextOrder, spoilerCeiling: nextOrder, updatedAt: new Date().toISOString() };
+    confirmed[bookId] = next;
+    return next;
+  };
   const hash = (id: string) => {
     if (!hashes.has(id)) hashes.set(id, crypto.subtle.digest("SHA-256", new TextEncoder().encode(fixtureText(id))).then(bytes => [...new Uint8Array(bytes)].map(b => b.toString(16).padStart(2, "0")).join("")));
     return hashes.get(id)!;
@@ -40,7 +49,7 @@ export function installReaderFixtures() {
     if (match) {
       const [, bookId, route] = match;
       if (route === "sections") return ok(fixtureSections(bookId));
-      if (route === "reading-progress" && method === "GET") return ok({ mode: "IN_PROGRESS", currentSectionOrder: 1, spoilerCeiling: 1, updatedAt: date });
+      if (route === "reading-progress" && method === "GET") return ok(confirmed[bookId] ?? { mode: "IN_PROGRESS", currentSectionOrder: 1, spoilerCeiling: 1, updatedAt: date });
       if (route === "assistant" && method === "GET") return ok({ id: `assistant-${bookId}`, bookId, name: "本书助手", responseDepth: "BALANCED", tone: "NATURAL", customInstruction: null, createdAt: date, updatedAt: date });
       if (route === "sessions") return ok(method === "POST" ? { sessionId: `session-${bookId}`, title: "合成对话", updatedAt: date } : []);
       if (route === "reading-position") {
@@ -53,7 +62,7 @@ export function installReaderFixtures() {
             positions[bookId] = { bookId, sectionId: body.sectionId, offset: 20, contentHash: body.contentHash, revision: body.expectedRevision + 1, updatedAt: date, contentChanged: false };
             return error(409, "READER_POSITION_CONFLICT", "其他窗口已更新续读位置");
           }
-          positions[bookId] = { bookId, sectionId: body.sectionId, offset: body.offset, contentHash: body.contentHash, revision: body.expectedRevision + 1, updatedAt: new Date().toISOString(), contentChanged: false };
+          positions[bookId] = { bookId, sectionId: body.sectionId, offset: body.offset, contentHash: body.contentHash, revision: body.expectedRevision + 1, updatedAt: new Date().toISOString(), contentChanged: false, readingProgress: raiseConfirmed(bookId, body.sectionId) };
           sessionStorage.setItem("reader-fixture-positions", JSON.stringify(positions)); return ok(positions[bookId]);
         }
       }
@@ -73,5 +82,5 @@ export function installReaderFixtures() {
   };
   Object.defineProperty(globalThis, "XMLHttpRequest", { configurable: true, value: class { constructor() { throw new Error("合成验收禁止 XHR"); } } });
   navigator.sendBeacon = () => { throw new Error("合成验收禁止 beacon"); };
-  return { requests, control, text: fixtureText, positions: () => positions, reset: () => { positions = {}; sessionStorage.removeItem("reader-fixture-positions"); } };
+  return { requests, control, text: fixtureText, positions: () => positions, reset: () => { positions = {}; for (const key of Object.keys(confirmed)) delete confirmed[key]; sessionStorage.removeItem("reader-fixture-positions"); } };
 }

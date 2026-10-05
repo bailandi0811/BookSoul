@@ -23,6 +23,63 @@ model User {
   readingProgress ReadingProgress[]
   readingPositions BookReadingPosition[]
   agentRuns       AgentRun[]
+  avatarAssetId   String?
+  avatarAsset     UserMediaAsset? @relation("CurrentAvatar", fields: [avatarAssetId], references: [id], onDelete: SetNull)
+  wallpaperMode   WallpaperMode @default(RANDOM)
+  fixedWallpaperKind WallpaperKind?
+  fixedWallpaperId String?
+  profileRevision Int @default(0)
+  mediaAssets     UserMediaAsset[] @relation("OwnedMedia")
+  communityMemberships CommunityMember[]
+}
+
+enum WallpaperMode {
+  RANDOM
+  FIXED
+}
+
+enum WallpaperKind {
+  SYSTEM
+  USER
+}
+
+enum MediaPurpose {
+  AVATAR
+  WALLPAPER
+}
+
+enum MediaAssetStatus {
+  PENDING
+  READY
+  RETIRED
+  REJECTED
+  DELETED
+}
+
+model UserMediaAsset {
+  id String @id @default(uuid())
+  ownerId String
+  owner User @relation("OwnedMedia", fields: [ownerId], references: [id], onDelete: Restrict)
+  avatarUsers User[] @relation("CurrentAvatar")
+  purpose MediaPurpose
+  status MediaAssetStatus @default(PENDING)
+  uploadKey String @unique
+  objectKey String @unique
+  declaredMime String
+  declaredBytes Int
+  width Int?
+  height Int?
+  storedBytes Int?
+  uploadExpiresAt DateTime
+  commitExpiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  retiredAt DateTime?
+  stagingCleanedAt DateTime?
+
+  @@index([ownerId, purpose, status])
+  @@index([ownerId, createdAt])
+  @@index([status, commitExpiresAt])
 }
 
 enum AuthChallengePurpose {
@@ -333,4 +390,99 @@ model IngestionJob {
   updatedAt   DateTime           @updatedAt
 
   @@index([status, updatedAt])
+}
+
+model CommunityRoom {
+  id String @id
+  lastEventSeq BigInt @default(0)
+  createdAt DateTime @default(now())
+  members CommunityMember[]
+  messages CommunityMessage[]
+  events CommunityEvent[]
+}
+
+model CommunityMember {
+  id String @id @default(uuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  roomId String
+  room CommunityRoom @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  consentVersion String
+  lastReadSeq BigInt @default(0)
+  isModerator Boolean @default(false)
+  mutedUntil DateTime?
+  sendWindowStartedAt DateTime?
+  sendCount Int @default(0)
+  joinedAt DateTime @default(now())
+  messages CommunityMessage[]
+
+  @@unique([roomId, userId])
+  reads CommunityMessageRead[]
+}
+
+enum CommunityRemovalKind {
+  AUTHOR
+  MODERATOR
+}
+
+model CommunityMessage {
+  id String @id @default(uuid())
+  roomId String
+  room CommunityRoom @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  authorMemberId String
+  author CommunityMember @relation(fields: [authorMemberId], references: [id], onDelete: Restrict)
+  authorName String
+  clientMessageId String
+  requestHash String
+  content String?
+  mentions Json @default("[]")
+  replyToId String?
+  replyTo CommunityMessage? @relation("CommunityReply", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies CommunityMessage[] @relation("CommunityReply")
+  createdSeq BigInt
+  createdAt DateTime @default(now())
+  removedAt DateTime?
+  removalKind CommunityRemovalKind?
+  events CommunityEvent[]
+  reads CommunityMessageRead[]
+
+  @@unique([roomId, authorMemberId, clientMessageId])
+  @@unique([roomId, createdSeq])
+  @@index([roomId, replyToId])
+}
+
+model CommunityMessageRead {
+  memberId String
+  member CommunityMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  messageId String
+  message CommunityMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  readAt DateTime @default(now())
+
+  @@id([memberId, messageId])
+  @@index([messageId])
+}
+
+enum CommunityEventKind {
+  MESSAGE_CREATED
+  MESSAGE_REMOVED
+  MEMBER_MUTED
+}
+
+model CommunityEvent {
+  roomId String
+  room CommunityRoom @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  seq BigInt
+  kind CommunityEventKind
+  messageId String?
+  message CommunityMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  targetMemberId String?
+  actorMemberId String
+  reason String?
+  clientActionId String?
+  requestHash String?
+  mutedUntil DateTime?
+  createdAt DateTime @default(now())
+
+  @@id([roomId, seq])
+  @@unique([roomId, actorMemberId, clientActionId])
 }

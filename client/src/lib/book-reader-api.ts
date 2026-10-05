@@ -1,4 +1,5 @@
 import { apiFetch } from "./api";
+import type { ReadingProgress } from "./books-api";
 
 export interface SectionWindow {
   bookId: string; sectionId: string; sectionOrder: number; sectionTitle: string;
@@ -12,6 +13,7 @@ export interface ReferenceLocation {
 export interface ReaderPosition {
   bookId: string; sectionId: string; offset: number; contentHash: string;
   revision: number; updatedAt: string; contentChanged: boolean;
+  readingProgress?: ReadingProgress;
 }
 export interface SaveReaderPositionInput {
   sectionId: string; offset: number; contentHash: string; expectedRevision: number;
@@ -47,9 +49,20 @@ async function request<T>(path: string, parse: (data: unknown) => T, parent?: Ab
     controller.signal.removeEventListener("abort", rejectAbort);
   }
 }
+function confirmedProgress(value: unknown): ReadingProgress {
+  if (!record(value)) return invalid();
+  const { mode, currentSectionOrder, updatedAt, spoilerCeiling } = value;
+  if (mode !== "NOT_STARTED" && mode !== "IN_PROGRESS" && mode !== "FINISHED") return invalid();
+  if (!(currentSectionOrder === null || integer(currentSectionOrder, 1))) return invalid();
+  if (typeof updatedAt !== "string" || !Number.isFinite(Date.parse(updatedAt)) || !integer(spoilerCeiling, 1)) return invalid();
+  if (mode === "IN_PROGRESS" && currentSectionOrder === null) return invalid();
+  if (mode === "NOT_STARTED" && currentSectionOrder !== null) return invalid();
+  return { mode, currentSectionOrder, updatedAt, spoilerCeiling };
+}
 function position(data: unknown, bookId: string): ReaderPosition {
   if (!record(data) || data.bookId !== bookId || typeof data.sectionId !== "string" || !integer(data.offset) || !hash(data.contentHash) || !integer(data.revision, 1) || typeof data.updatedAt !== "string" || !Number.isFinite(Date.parse(data.updatedAt)) || typeof data.contentChanged !== "boolean") return invalid();
-  return data as unknown as ReaderPosition;
+  if (!("readingProgress" in data)) return data as unknown as ReaderPosition;
+  return { ...(data as unknown as ReaderPosition), readingProgress: confirmedProgress(data.readingProgress) };
 }
 const bookPath = (id: string) => `/api/books/${encodeURIComponent(id)}`;
 export function getSectionWindow(bookId: string, sectionId: string, offset = 0, signal?: AbortSignal, limit = 16000): Promise<SectionWindow> {

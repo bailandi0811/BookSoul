@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { X, ArrowUpRight } from "lucide-react";
+import { beginCoverFlightFrom } from "@/lib/book-cover-flight";
 import { ensureBookChat } from "@/lib/book-workspace-navigation";
 import { useBooksStore } from "@/store/useBooksStore";
 import { useChatStore } from "@/store/useChatStore";
@@ -12,7 +13,8 @@ export default function ReaderAssistantPanel({ bookId, onClose }: { bookId: stri
   const [mobile, setMobile] = useState(() => !window.matchMedia("(min-width: 1024px)").matches);
   const messages = useChatStore(s => s.messages), currentBookId = useChatStore(s => s.currentBookId);
   const draft = useChatStore(s => s.pendingEmailDraft);
-  const ceiling = useBooksStore(s => s.readingProgress?.spoilerCeiling ?? 1);
+  const progress = useBooksStore(s => s.readingProgress);
+  const scope = progress?.mode === "FINISHED" ? "可讨论全书" : `可讨论到第 ${progress?.spoilerCeiling ?? 1} 节，按整章计算`;
   const scroller = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -49,8 +51,8 @@ export default function ReaderAssistantPanel({ bookId, onClose }: { bookId: stri
     return () => { observer?.disconnect(); cancelAnimationFrame(frame); };
   }, [ready, bookId, currentBookId, mobile]);
   const content = <aside ref={panelRef} className="reader-assistant-panel" aria-label="阅读助手">
-    <div className="reader-panel-heading"><h2 className="font-reading">阅读助手</h2><div><button onClick={() => { onClose(); void useBooksStore.getState().switchBookView("workspace"); }}>聊天页 <ArrowUpRight size={13} className="inline" /></button><button aria-label="关闭阅读助手" onClick={onClose}><X size={17} className="inline" /></button></div></div>
-    <p className="reader-panel-scope">讨论至第 {ceiling} 节 · 续读位置独立保存</p>
+    <div className="reader-panel-heading"><h2 className="font-reading">阅读助手</h2><div><button onClick={() => { beginCoverFlightFrom(bookId, "reader"); onClose(); void useBooksStore.getState().switchBookView("workspace"); }}>聊天页 <ArrowUpRight size={13} className="inline" /></button><button aria-label="关闭阅读助手" onClick={onClose}><X size={17} className="inline" /></button></div></div>
+    <p className="reader-panel-scope">{scope}</p>
     <div className="reader-panel-messages" ref={scroller}>
       {error && <p role="alert">{error}</p>}
       {!ready && <p role="status">正在准备本书助手…</p>}

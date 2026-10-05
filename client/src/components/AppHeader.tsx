@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
   BACKGROUNDS,
-  backgroundUrl,
   useAppearanceStore,
 } from "@/store/useAppearanceStore";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -14,6 +13,8 @@ import {
 } from "@/lib/ui-motion";
 import { ThemeToggle } from "./ThemeToggle";
 import { AccountSection } from "./auth/AccountSection";
+import { WallpaperLibrary } from "./WallpaperLibrary";
+import { CommunityChatEntry } from "./CommunityChat/CommunityChatEntry";
 
 export function AppHeader({
   account = true,
@@ -27,7 +28,6 @@ export function AppHeader({
   appearanceRequest?: number;
 }) {
   const background = useAppearanceStore((state) => state.background);
-  const setBackground = useAppearanceStore((state) => state.setBackground);
   const theme = useAppearanceStore((state) => state.theme);
   const setTheme = useAppearanceStore((state) => state.setTheme);
   const [open, setOpen] = useState(false);
@@ -73,6 +73,7 @@ export function AppHeader({
           <span className="brand-caption">{caption}</span>
         </div>
         <div className="app-header-actions">
+          {account && <span className="hidden sm:contents"><CommunityChatEntry /></span>}
           <div className="appearance-capsule">
             <details
               className="background-chooser"
@@ -164,42 +165,10 @@ export function AppHeader({
                         </button>
                       ))}
                     </div>
-                    <fieldset className="background-options">
-                      <legend className="sr-only">选择书房背景</legend>
-                      {BACKGROUNDS.map((scene) => (
-                        <label
-                          className={`background-option ${background === scene.id ? "is-selected" : ""}`}
-                          key={scene.id}
-                        >
-                          <input
-                            type="radio"
-                            name="booksoul-background"
-                            value={scene.id}
-                            checked={background === scene.id}
-                            onChange={() => {
-                              setBackground(scene.id);
-                              close();
-                              chooser.current
-                                ?.querySelector("summary")
-                                ?.focus({ preventScroll: true });
-                            }}
-                          />
-                          <span
-                            className={`background-thumbnail ${scene.image ? "" : "background-plain"}`}
-                            style={
-                              scene.image
-                                ? {
-                                    backgroundImage: `url(${backgroundUrl(scene.image)})`,
-                                  }
-                                : undefined
-                            }
-                          />
-                          <span>{scene.name}</span>
-                        </label>
-                      ))}
-                    </fieldset>
-                    <p>背景与亮暗主题独立切换</p>
-                    <p>每次进入随机选择，站内切页保留当前背景。</p>
+                    <WallpaperLibrary onSelected={() => {
+                      close();
+                      chooser.current?.querySelector("summary")?.focus({ preventScroll: true });
+                    }} />
                     {BACKGROUNDS.find((scene) => scene.id === background)
                       ?.credit && (
                       <a
@@ -222,6 +191,7 @@ export function AppHeader({
           {account ? <AccountSection /> : action}
         </div>
       </div>
+      {account && <nav aria-label="书友交流" className="community-mobile-entry flex justify-end px-3 pb-2 sm:hidden"><CommunityChatEntry mobile /></nav>}
     </header>
   );
 }

@@ -33,6 +33,8 @@ export function LandingPage({ onEnter }: { onEnter: () => void }) {
         <button
           type="button"
           className="landing-nav-action tap-spring"
+          onPointerEnter={() => void import("@/components/Entrance")}
+          onFocus={() => void import("@/components/Entrance")}
           onClick={onEnter}
         >
           进入书房
@@ -59,6 +61,8 @@ export function LandingPage({ onEnter }: { onEnter: () => void }) {
             <button
               type="button"
               className="landing-primary tap-spring"
+              onPointerEnter={() => void import("@/components/Entrance")}
+              onFocus={() => void import("@/components/Entrance")}
               onClick={onEnter}
             >
               开始阅读

@@ -19,6 +19,12 @@ export interface ReferenceLocation {
   endOffset: number;
   precision: 'excerpt' | 'section';
 }
+export interface ConfirmedReadingProgress {
+  mode: 'NOT_STARTED' | 'IN_PROGRESS' | 'FINISHED';
+  currentSectionOrder: number | null;
+  updatedAt: string;
+  spoilerCeiling: number;
+}
 export interface ReaderPosition {
   bookId: string;
   sectionId: string;
@@ -27,6 +33,7 @@ export interface ReaderPosition {
   revision: number;
   updatedAt: string;
   contentChanged: boolean;
+  readingProgress?: ConfirmedReadingProgress;
 }
 export interface SaveReaderPositionInput {
   sectionId: string;

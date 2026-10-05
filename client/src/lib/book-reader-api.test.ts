@@ -16,6 +16,16 @@ describe("reader API contracts", () => {
     fetch.mockResolvedValue(respond({ ...windowData, bookId: "other" }));
     await expect(getSectionWindow("book", "section", 0)).rejects.toThrow("阅读服务响应无效");
   });
+  it("keeps a position without progress and accepts a confirmed chapter summary", async () => {
+    const saved = { bookId: "book", sectionId: "section", offset: 4, contentHash: "a".repeat(64), revision: 2, updatedAt: "2026-10-04T00:00:00.000Z", contentChanged: false };
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(respond(saved));
+    expect(await getReaderPosition("book")).toEqual(saved);
+    const readingProgress = { mode: "IN_PROGRESS", currentSectionOrder: 18, spoilerCeiling: 18, updatedAt: "2026-10-04T00:00:00.000Z" };
+    fetch.mockResolvedValue(respond({ ...saved, readingProgress }));
+    expect(await saveReaderPosition("book", { sectionId: "section", offset: 4, contentHash: saved.contentHash, expectedRevision: 1 })).toMatchObject({ readingProgress });
+    fetch.mockResolvedValue(respond({ ...saved, readingProgress: { mode: "IN_PROGRESS" } }));
+    await expect(saveReaderPosition("book", { sectionId: "section", offset: 4, contentHash: saved.contentHash, expectedRevision: 1 })).rejects.toThrow("阅读服务响应无效");
+  });
   it("reads absent position and preserves stable conflict codes", async () => {
     const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(respond(null));
     expect(await getReaderPosition("book")).toBeNull();

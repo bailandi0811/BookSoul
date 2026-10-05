@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { bookCoverVariant, type CoverVariant } from "@/lib/book-cover";
+import type { CoverSlot } from "@/lib/book-cover-flight";
 import { useBooksStore } from "@/store/useBooksStore";
 
 const COVER_COLORS = ["#45514c", "#71606d", "#454b51", "#b6b09c"];
@@ -13,6 +14,7 @@ export function BookCover({
   shared = false,
   className,
   variant,
+  slot,
 }: {
   bookId: string;
   title: string;
@@ -21,6 +23,7 @@ export function BookCover({
   shared?: boolean;
   className?: string;
   variant?: CoverVariant;
+  slot?: CoverSlot;
 }) {
   const libraryVariant = useBooksStore((state) =>
     bookCoverVariant(bookId, state.books, state.coverBindings),
@@ -31,6 +34,8 @@ export function BookCover({
       layoutId={shared ? `book-cover-${bookId}` : undefined}
       transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       className={cn("book-cover", compact && "book-cover-compact", className)}
+      data-book-cover={bookId}
+      data-cover-slot={slot}
       data-cover-tone={colorIndex}
       style={{ backgroundColor: COVER_COLORS[colorIndex] }}
       aria-hidden="true"

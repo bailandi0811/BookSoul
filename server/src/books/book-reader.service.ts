@@ -29,7 +29,7 @@ export class BookReaderService {
   ) {
     const book = await db.book.findFirst({
       where: this.accessibleBook(ownerId, bookId),
-      select: { id: true, status: true, embeddingVersion: true },
+      select: { id: true, status: true, embeddingVersion: true, sectionCount: true },
     });
     if (!book) throw new NotFoundException('书籍不存在');
     if (book.status !== BookStatus.READY)

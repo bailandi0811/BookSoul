@@ -11,6 +11,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { BookCover } from "@/components/BookCover";
+import { peekCoverFlight } from "@/lib/book-cover-flight";
 import { AppHeader } from "@/components/AppHeader";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageBubble } from "./components/MessageBubble";
@@ -218,7 +219,7 @@ export default function BookChat() {
 
   if (workspaceError && !assistant && !isWorkspaceLoading) {
     return (
-      <div className="paper-atmosphere grid min-h-[100dvh] place-items-center px-6 text-center">
+      <div className="paper-atmosphere grid min-h-full place-items-center px-6 text-center">
         <div className="warm-card-raised max-w-md rounded-[24px] p-8">
           <span className="mx-auto grid h-12 w-12 place-items-center rounded-[16px] bg-destructive/10 text-destructive">
             <BookOpen className="h-5 w-5" />
@@ -265,7 +266,7 @@ export default function BookChat() {
               role={isDesktop ? undefined : "dialog"}
               aria-modal={isDesktop ? undefined : true}
               aria-label={isDesktop ? undefined : "书籍导航"}
-              initial={isDesktop ? { width: 0, opacity: 0 } : { x: "-100%" }}
+              initial={peekCoverFlight() ? false : isDesktop ? { width: 0, opacity: 0 } : { x: "-100%" }}
               animate={
                 isDesktop ? { width: sidebarWidth, opacity: 1 } : { x: 0 }
               }
@@ -381,6 +382,7 @@ export default function BookChat() {
                             <BookCover
                               bookId={currentBook.id}
                               title={currentBook.title}
+                              slot="chat-welcome"
                             />
                           </div>
                           <div>

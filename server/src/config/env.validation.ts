@@ -1,4 +1,5 @@
 import { trustedAuthPublicUrl } from './auth-mail.config';
+import { parseProfileMediaConfig } from './profile-media.config';
 const PLACEHOLDER_SECRET = 'replace-with-a-long-random-secret';
 
 export function validateEnvironment(
@@ -157,5 +158,6 @@ export function validateEnvironment(
     );
   }
 
+  parseProfileMediaConfig(config);
   return config;
 }

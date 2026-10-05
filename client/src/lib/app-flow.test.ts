@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { resolveAppScreen } from "./app-flow";
 
 describe("app authentication flow", () => {
+  it("opens the independent community route after authentication", () => {
+    expect(resolveAppScreen({authReady:true,isAuthenticated:true,view:'library',hasEnteredApp:false,isCommunityRoute:true})).toBe('community');
+    expect(resolveAppScreen({authReady:true,isAuthenticated:false,view:'library',isCommunityRoute:true})).toBe('auth');
+    expect(resolveAppScreen({authReady:true,isAuthenticated:true,view:'library',isCommunityRoute:true,isResetRoute:true})).toBe('reset-password');
+  });
   it("shows the public landing page before the reader chooses to enter", () => {
     expect(
       resolveAppScreen({

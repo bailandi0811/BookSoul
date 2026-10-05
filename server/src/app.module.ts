@@ -16,6 +16,8 @@ import { validateEnvironment } from './config/env.validation';
 import { BooksModule } from './books/books.module';
 import { IngestionModule } from './ingestion/ingestion.module';
 import { ToolsModule } from './tools/tools.module';
+import { UserProfileModule } from './users/profile/user-profile.module';
+import { CommunityModule } from './community/community.module';
 
 @Module({
   imports: [
@@ -33,6 +35,8 @@ import { ToolsModule } from './tools/tools.module';
     PrismaModule,
     UsersModule,
     AuthModule,
+    UserProfileModule,
+    CommunityModule,
     ClaimModule,
     BooksModule,
     IngestionModule,

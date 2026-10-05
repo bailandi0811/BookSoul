@@ -2,6 +2,8 @@ import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 const api = vi.hoisted(() => ({ getSectionWindow: vi.fn(), getReaderPosition: vi.fn(), saveReaderPosition: vi.fn(), getReferenceLocation: vi.fn() }));
 vi.mock("@/lib/book-reader-api", async original => ({ ...await original<typeof import("@/lib/book-reader-api")>(), ...api }));
 import { useReaderStore } from "./useReaderStore";
+import { useBooksStore } from "./useBooksStore";
+import type { BookView } from "@/lib/books-api";
 const hash = "a".repeat(64);
 const sections = [{ id: "s", order: 1, title: "第一节", charCount: 80000 }];
 const position = { bookId: "a", sectionId: "s", offset: 0, contentHash: hash, revision: 1, contentChanged: false, updatedAt: "2026-10-03T00:00:00Z" };
@@ -22,6 +24,19 @@ describe("bounded reader state", () => {
     expect(useReaderStore.getState().anchorOffset).toBe(79000);
     expect(api.saveReaderPosition).not.toHaveBeenCalled();
     expect(api.getSectionWindow.mock.calls.filter(call => call[1] === "second")).toHaveLength(1);
+  });
+  it("records the furthest confirmed chapter from a saved position and not from a preview", async () => {
+    const readingProgress = { mode: "IN_PROGRESS" as const, currentSectionOrder: 2, spoilerCeiling: 2, updatedAt: "2026-10-04T00:00:00.000Z" };
+    api.saveReaderPosition.mockImplementation(async (b, input) => ({ ...position, bookId: b, ...input, revision: input.expectedRevision + 1, readingProgress }));
+    useBooksStore.setState({ books: [{ id: "a", title: "合成小说", readingProgress: null } as BookView], currentBook: { id: "a", title: "合成小说" } as BookView, readingProgress: { mode: "NOT_STARTED", currentSectionOrder: null, spoilerCeiling: 1, updatedAt: "2026-10-03T00:00:00.000Z" } });
+    await useReaderStore.getState().openReader("a", sections);
+    useReaderStore.getState().recordVisibleOffset(10);
+    await useReaderStore.getState().flushSave();
+    expect(useBooksStore.getState().readingProgress).toMatchObject({ currentSectionOrder: 2, spoilerCeiling: 2 });
+    expect(useBooksStore.getState().books[0]?.readingProgress).toMatchObject({ currentSectionOrder: 2 });
+    await useReaderStore.getState().previewSection("s", 50000);
+    expect(api.saveReaderPosition).toHaveBeenCalledTimes(1);
+    useBooksStore.getState().clearPrivateState();
   });
   it("saves the visible chapter using its own hash after crossing a chapter boundary", async () => {
     const two = [...sections, { id: "second", order: 2, title: "第二节", charCount: 80000 }];

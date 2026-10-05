@@ -1,12 +1,13 @@
+import { BookCover } from "@/components/BookCover";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { beginCoverFlightFrom } from "@/lib/book-cover-flight";
 import { useBooksStore } from "@/store/useBooksStore";
 import { useChatStore } from "@/store/useChatStore";
 import { ArrowLeft, History, PanelLeftClose, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { AssistantSettings } from "./AssistantSettings";
-import { BookCover } from "@/components/BookCover";
 import { ReadingProgressDialog } from "./ReadingProgressDialog";
 
 export const Sidebar = ({ onClose }: { onClose: () => void }) => {
@@ -48,7 +49,7 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
         <div className="flex items-start justify-between gap-3">
           <button
             type="button"
-            onClick={() => { if (currentBook) void useBooksStore.getState().switchBookView("book"); else backToLibrary(); }}
+            onClick={() => { if (currentBook) { beginCoverFlightFrom(currentBook.id, "chat"); void useBooksStore.getState().switchBookView("book"); } else backToLibrary(); }}
             className="workspace-back-link tap-spring"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
@@ -69,7 +70,7 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
               bookId={currentBook?.id ?? "current"}
               title={currentBook?.title ?? "当前书籍"}
               compact
-              shared
+              slot="chat"
               bookmarked={mode === "IN_PROGRESS"}
             />
           </div>
@@ -93,7 +94,7 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
           )}
 
           <section className="progress-card">
-            <button type="button" className="mb-3 text-xs underline underline-offset-4" onClick={() => void useBooksStore.getState().switchBookView("reader")}>阅读本书</button>
+            <button type="button" className="mb-3 text-xs underline underline-offset-4" onClick={() => { if (currentBook) beginCoverFlightFrom(currentBook.id, "chat"); void useBooksStore.getState().switchBookView("reader"); }}>阅读本书</button>
             <h3 className="mb-3 text-xs font-semibold text-foreground">
               阅读书签
             </h3>

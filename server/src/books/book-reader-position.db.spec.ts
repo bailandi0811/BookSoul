@@ -83,6 +83,11 @@ describe('reader CAS in an explicitly isolated PostgreSQL database', () => {
     expect(await positions.getPosition(ownerId, bookId)).toMatchObject({
       revision: 2,
     });
+    expect(
+      await db!.readingProgress.findUnique({
+        where: { ownerId_bookId: { ownerId, bookId } },
+      }),
+    ).toMatchObject({ mode: 'IN_PROGRESS', currentSectionOrder: 1 });
   });
   it('cascades section deletion only for this synthetic fixture', async () => {
     await db!.bookSection.deleteMany({ where: { id: sectionId, bookId } });

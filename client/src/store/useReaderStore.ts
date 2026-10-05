@@ -1,9 +1,13 @@
 import { create } from "zustand";
 import { useAuthStore } from "./useAuthStore";
-import type { BookSection } from "@/lib/books-api";
+import type { BookSection, ReadingProgress } from "@/lib/books-api";
 import { getReaderPosition, getReferenceLocation, getSectionWindow, saveReaderPosition, type ReaderPosition, type ReferenceLocation, type SectionWindow } from "@/lib/book-reader-api";
 
 type Anchor = { sectionId: string; offset: number; contentHash: string };
+let publishConfirmedReadingProgress: ((bookId: string, progress: ReadingProgress) => void) | null = null;
+export function bindConfirmedReadingProgress(publish: (bookId: string, progress: ReadingProgress) => void) {
+  publishConfirmedReadingProgress = publish;
+}
 interface ReaderState {
   bookId: string | null; sections: BookSection[]; sectionId: string | null;
   windows: SectionWindow[]; position: ReaderPosition | null; positionLoaded: boolean;
@@ -248,6 +252,7 @@ export const useReaderStore = create<ReaderState>((set, get) => {
             const position = await saveReaderPosition(bookId, { ...target, expectedRevision: get().position?.revision ?? 0 }, bookAbort.signal);
             if (!active(generation)) return;
             set({ position, saveStatus: queued ? "dirty" : "saved", saveError: null });
+            if (position.readingProgress) publishConfirmedReadingProgress?.(bookId, position.readingProgress);
           } catch (error) {
             if (!active(generation)) return;
             if (typeof error === "object" && error !== null && "code" in error && error.code === "READER_CONTENT_CHANGED") {

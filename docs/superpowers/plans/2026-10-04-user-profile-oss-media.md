@@ -65,7 +65,7 @@ Summer 参考文件为 `D:/summer-checkin/src/lib/oss.ts`、`src/app/api/oss/pre
 
 | 字段 | 类型 | 含义 |
 | --- | --- | --- |
-| `id / ownerId` | UUID String / String | 服务端生成 ID，owner 来自认证上下文；owner 外键关联 User。 |
+| `id / ownerId` | UUID String / String | 服务端生成 ID，owner 来自认证上下文；owner 外键 RESTRICT 关联 User，保留待清理对象的归属。 |
 | `purpose` | `AVATAR / WALLPAPER` | 用途必须来自 allowlist。 |
 | `status` | `PENDING / READY / RETIRED / REJECTED / DELETED` | 上传、可使用、已移除、校验拒绝、物理清理完成。 |
 | `uploadKey / objectKey` | unique String / unique String | 签发时分别预分配临时路径与正式路径。 |
@@ -73,6 +73,7 @@ Summer 参考文件为 `D:/summer-checkin/src/lib/oss.ts`、`src/app/api/oss/pre
 | `width / height / storedBytes` | Int? | 正式图片规格，READY 时必填。 |
 | `uploadExpiresAt / commitExpiresAt` | DateTime | 上传签名 5 分钟，提交窗口 30 分钟，均由服务器时钟决定。 |
 | `createdAt / updatedAt / retiredAt` | DateTime / DateTime / DateTime? | 持久配额、审计与清理依据。 |
+| `stagingCleanedAt` | DateTime? | 已完成暂存图清理的时间，避免 READY 记录重复占用清理批次。 |
 
 索引：`(ownerId, purpose, status)`、`(ownerId, createdAt)`、`(status, commitExpiresAt)`。迁移增加约束：RANDOM 的固定字段均为空；FIXED 两个固定字段均非空；revision 非负。既有用户默认随机、默认头像、无个人图库，无数据回填或覆盖。头像 ID 可为空外键关联资源；资源属于该用户必须额外通过 `where: { id, ownerId, purpose, status }` 证明，不能仅依赖外键。
 
@@ -338,4 +339,14 @@ OSS POST 使用独立 XHR，以便提供进度和 abort；`withCredentials=false
 
 ## 文档交付与功能交付区别
 
-本文只新增开发文档，未安装依赖、修改配置、运行迁移、连接数据库或执行 OSS 写入。文档验证应检查事实源路径、脚本名称、契约前后一致与 diff；功能交付必须另行完成各任务复选框，不能用“文档已完成”代替“功能已验证”。
+初次交付仅新增开发文档。用户随后确认按方案执行，并单独确认新增 `ali-oss`、`sharp` 和可选配置。实施过程中增加 `UserMediaAsset.stagingCleanedAt`，避免已清理 READY 暂存图重复占用清理批次；owner 外键采用 RESTRICT，避免删除用户后失去待清理对象记录，不新增账号删除能力。这些补充不改变上传或壁纸产品规则。
+
+功能实现、已运行检查与未执行的数据库/OSS 步骤分别记录在[资料与图片验收记录](../../user-profile-media-acceptance.md)。上方复选框保留原始执行清单；不能将未运行的真实集成验收视为通过。
+
+| 阶段 | 执行状态 |
+| --- | --- |
+| 任务 1–6 本地实现 | 已实现；前后端自动测试、图片真实解码、模拟 OSS 与清理验证通过 |
+| 任务 5 浏览器 | 桌面/手机模拟验收通过，重复执行脚本已纳入 client/test |
+| 任务 6 真实数据库验证 | 专用套件已编写，隔离目标和授权未提供，未运行 |
+| 任务 7 质量门及文档 | 两个包检查通过，README 和验收记录已同步 |
+| 任务 7 真实部署/OSS 联调 | 后续获授权完成本机备份、迁移、Prisma 生成、后端 CORS 与启动检查；真实 OSS 写入及专用 DB 测试未执行，详见验收记录 |
