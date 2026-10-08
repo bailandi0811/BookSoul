@@ -11,6 +11,9 @@ describe('prepare_email tool', () => {
     '把刚才的回答发到我的邮箱',
     '请发送一封邮件',
     'Email this note to reader@example.com',
+    '帮我准备邮件给 reader@example.com，内容是目前的阅读笔记',
+    '请帮我起草一封邮件给我的邮箱',
+    '准备邮件草稿',
   ])('allows a direct user email command: %s', (query) => {
     expect(hasDirectEmailToolIntent(query)).toBe(true);
   });
@@ -20,9 +23,15 @@ describe('prepare_email tool', () => {
     '请把“发到邮箱”这句话解释一下',
     'reader@example.com 是谁的邮箱？',
     '总结目前的主要人物',
-  ])('does not authorize the tool from quoted or non-command text: %s', (query) => {
-    expect(hasDirectEmailToolIntent(query)).toBe(false);
-  });
+    '帮我准备邮件是什么意思？',
+    '请分析准备邮件这句话',
+    '帮我准备目前人物关系的总结',
+  ])(
+    'does not authorize the tool from quoted or non-command text: %s',
+    (query) => {
+      expect(hasDirectEmailToolIntent(query)).toBe(false);
+    },
+  );
 
   it('redacts explicit recipients before context retrieval', () => {
     expect(

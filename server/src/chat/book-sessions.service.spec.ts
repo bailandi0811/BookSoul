@@ -59,6 +59,19 @@ describe('BookSessionsService', () => {
     );
   });
 
+  it('checks cancellation after read and before writing an exchange', async () => {
+    const controller = new AbortController();
+    const context = await service.resolve('user-a', 'session-a', false);
+    prisma.chatSessionRecord.findUnique.mockImplementation(async () => {
+      controller.abort();
+      return sessionRecord();
+    });
+    await expect(
+      service.appendExchange(context, 'question', 'answer', controller.signal),
+    ).rejects.toThrow();
+    expect(prisma.chatSessionRecord.updateMany).not.toHaveBeenCalled();
+  });
+
   it('creates an unpredictable server UUID bound to the scoped assistant', async () => {
     const created = await service.create('user-a', 'book-a');
 

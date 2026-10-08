@@ -1,4 +1,10 @@
 export default () => ({
+  tarot: {
+    apiKey: process.env.TYPESAFE_API_KEY?.trim() || undefined,
+    baseUrl: process.env.TYPESAFE_API_BASE?.trim() || 'https://api.typesafe.ai',
+    apiPath: process.env.TYPESAFE_API_PATH?.trim() || '/v1/systemone',
+    model: process.env.TYPESAFE_MODEL_NAME?.trim() || 'jev-latest',
+  },
   database: {
     url: process.env.DATABASE_URL,
   },

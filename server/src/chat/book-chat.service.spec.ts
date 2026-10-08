@@ -306,7 +306,9 @@ describe('BookChatService', () => {
   it('bounds a routing model that ignores cancellation', async () => {
     const invoke = jest.fn().mockReturnValue(new Promise(() => undefined));
     model.bindTools.mockReturnValue({ invoke });
-    Object.assign(service, { modelRequestTimeoutMs: 5 });
+    Object.assign(Reflect.get(service, 'externalAgent') as object, {
+      modelRequestTimeoutMs: 5,
+    });
     echoExternalResearchContext();
 
     const events: BookChatEvent[] = [];

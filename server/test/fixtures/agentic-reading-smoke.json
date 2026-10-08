@@ -1,0 +1,740 @@
+{
+  "version": "synthetic-agentic-reading-v1",
+  "license": "原创合成语料，仅供工程回归；无用户原文。",
+  "reviewStatus": "human-review-pending",
+  "books": [
+    {
+      "id": "synthetic-bridge",
+      "title": "纸桥",
+      "chunks": [
+        {
+          "id": "synthetic-bridge-1",
+          "sectionOrder": 1,
+          "text": "阿澄在渡口遇见陆舟，带着蓝色纸鹤。两人起初互不信任。"
+        },
+        {
+          "id": "synthetic-bridge-2",
+          "sectionOrder": 1,
+          "text": "陆舟提出同行，阿澄拒绝，因为约定尚未兑现。"
+        },
+        {
+          "id": "synthetic-bridge-3",
+          "sectionOrder": 2,
+          "text": "暴雨时，陆舟折返送来干衣并兑现约定。阿澄因此开始信任对方。"
+        },
+        {
+          "id": "synthetic-bridge-4",
+          "sectionOrder": 2,
+          "text": "阿澄交出蓝色纸鹤，答应与陆舟同行，决定先修复通路再出发。"
+        },
+        {
+          "id": "synthetic-bridge-5",
+          "sectionOrder": 3,
+          "text": "第三节揭示：陆舟真实身份是王室密使。"
+        }
+      ]
+    },
+    {
+      "id": "synthetic-bell",
+      "title": "山钟",
+      "chunks": [
+        {
+          "id": "synthetic-bell-1",
+          "sectionOrder": 1,
+          "text": "苏岚在山门遇见孟川，带着铜铃。两人起初互不信任。"
+        },
+        {
+          "id": "synthetic-bell-2",
+          "sectionOrder": 1,
+          "text": "孟川提出同行，苏岚拒绝，因为约定尚未兑现。"
+        },
+        {
+          "id": "synthetic-bell-3",
+          "sectionOrder": 2,
+          "text": "暴雨时，孟川折返送来干衣并兑现约定。苏岚因此开始信任对方。"
+        },
+        {
+          "id": "synthetic-bell-4",
+          "sectionOrder": 2,
+          "text": "苏岚交出铜铃，答应与孟川同行，决定先修复通路再出发。"
+        },
+        {
+          "id": "synthetic-bell-5",
+          "sectionOrder": 3,
+          "text": "第三节揭示：孟川真实身份是王室密使。"
+        }
+      ]
+    },
+    {
+      "id": "synthetic-map",
+      "title": "星图",
+      "chunks": [
+        {
+          "id": "synthetic-map-1",
+          "sectionOrder": 1,
+          "text": "林溪在观星台遇见周野，带着旧星图。两人起初互不信任。"
+        },
+        {
+          "id": "synthetic-map-2",
+          "sectionOrder": 1,
+          "text": "周野提出同行，林溪拒绝，因为约定尚未兑现。"
+        },
+        {
+          "id": "synthetic-map-3",
+          "sectionOrder": 2,
+          "text": "暴雨时，周野折返送来干衣并兑现约定。林溪因此开始信任对方。"
+        },
+        {
+          "id": "synthetic-map-4",
+          "sectionOrder": 2,
+          "text": "林溪交出旧星图，答应与周野同行，决定先修复通路再出发。"
+        },
+        {
+          "id": "synthetic-map-5",
+          "sectionOrder": 3,
+          "text": "第三节揭示：周野真实身份是王室密使。"
+        }
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "smoke-synthetic-bridge-simple-1",
+      "bookId": "synthetic-bridge",
+      "category": "simple",
+      "split": "acceptance",
+      "question": "主角是谁",
+      "history": [],
+      "ceiling": 2,
+      "evidenceGroups": [
+        [
+          "synthetic-bridge-1"
+        ]
+      ],
+      "expectedFacts": [
+        "阿澄",
+        "陆舟"
+      ],
+      "forbiddenFacts": [
+        "真实身份是王室密使"
+      ],
+      "expectedToolNames": [],
+      "allowedTools": [
+        "book_search",
+        "memory_recall"
+      ],
+      "maxModelCalls": 2
+    },
+    {
+      "id": "smoke-synthetic-bridge-simple-2",
+      "bookId": "synthetic-bridge",
+      "category": "simple",
+      "split": "acceptance",
+      "question": "主人公是谁",
+      "history": [],
+      "ceiling": 2,
+      "evidenceGroups": [
+        [
+          "synthetic-bridge-1"
+        ]
+      ],
+      "expectedFacts": [
+        "阿澄",
+        "陆舟"
+      ],
+      "forbiddenFacts": [
+        "真实身份是王室密使"
+      ],
+      "expectedToolNames": [],
+      "allowedTools": [
+        "book_search",
+        "memory_recall"
+      ],
+      "maxModelCalls": 2
+    },
+    {
+      "id": "smoke-synthetic-bridge-simple-3",
+      "bookId": "synthetic-bridge",
+      "category": "simple",
+      "split": "acceptance",
+      "question": "阿澄起初信任谁吗？",
+      "history": [],
+      "ceiling": 2,
+      "evidenceGroups": [
+        [
+          "synthetic-bridge-1"
+        ]
+      ],
+      "expectedFacts": [
+        "互不信任"
+      ],
+      "forbiddenFacts": [
+        "真实身份是王室密使"
+      ],
+      "expectedToolNames": [],
+      "allowedTools": [
+        "book_search",
+        "memory_recall"
+      ],
+      "maxModelCalls": 2
+    },
+    {
+      "id": "smoke-synthetic-bridge-simple-4",
+      "bookId": "synthetic-bridge",
+      "category": "simple",
+      "split": "acceptance",
+      "question": "陆舟提出了什么？",
+      "history": [],
+      "ceiling": 2,
+      "evidenceGroups": [
+        [
+          "synthetic-bridge-2"
+        ]
+      ],
+      "expectedFacts": [
+        "同行"
+      ],
+      "forbiddenFacts": [
+        "真实身份是王室密使"
+      ],
+      "expectedToolNames": [],
+      "allowedTools": [
+        "book_search",
+        "memory_recall"
+      ],
+      "maxModelCalls": 2
+    },
+    {
+      "id": "smoke-synthetic-bridge-simple-5",
+      "bookId": "synthetic-bridge",
+      "category": "simple",
+      "split": "acceptance",
+      "question": "阿澄为何拒绝同行？",
+      "history": [],
+      "ceiling": 2,
+      "evidenceGroups": [
+        [
+          "synthetic-bridge-2"
+        ]
+      ],
+      "expectedFacts": [
+        "约定尚未兑现"
+      ],
+      "forbiddenFacts": [
+        "真实身份是王室密使"
+      ],
+      "expectedToolNames": [],
+      "allowedTools": [
+        "book_search",
+        "memory_recall"
+      ],
+      "maxModelCalls": 2
+    },
+    {
+      "id": "smoke-synthetic-bridge-simple-6",
+      "bookId": "synthetic-bridge",
+      "category": "simple",
+      "split": "acceptance",
+      "question": "陆舟在暴雨时做了什么？",
+      "history": [],
+      "ceiling": 2,
+      "evidenceGroups": [
+        [
+          "synthetic-bridge-3"
+        ]
+      ],
+      "expectedFacts": [
+        "干衣"
+      ],
+      "forbiddenFacts": [
+        "真实身份是王室密使"
+      ],
+      "expectedToolNames": [],
+      "allowedTools": [
+        "book_search",
+        "memory_recall"
+      ],
+      "maxModelCalls": 2
+    },
+    {
+      "id": "smoke-synthetic-bridge-simple-7",
+      "bookId": "synthetic-bridge",
+      "category": "simple",
+      "split": "acceptance",
+      "question": "陆舟兑现约定了吗？",
+      "history": [],
+      "ceiling": 2,
+      "evidenceGroups": [
+        [
+          "synthetic-bridge-3"
+        ]
+      ],
+      "expectedFacts": [
+        "兑现约定"
+      ],
+      "forbiddenFacts": [
+        "真实身份是王室密使"
+      ],
+      "expectedToolNames": [],
+      "allowedTools": [
+        "book_search",
+        "memory_recall"
+      ],
+      "maxModelCalls": 2
+    },
+    {
+      "id": "smoke-synthetic-bridge-simple-8",
+      "bookId": "synthetic-bridge",
+      "category": "simple",
+      "split": "acceptance",
+      "question": "阿澄后来交出了什么？",
+      "history": [],
+      "ceiling": 2,
+      "evidenceGroups": [
+        [
+          "synthetic-bridge-4"
+        ]
+      ],
+      "expectedFacts": [
+        "蓝色纸鹤"
+      ],
+      "forbiddenFacts": [
+        "真实身份是王室密使"
+      ],
+      "expectedToolNames": [],
+      "allowedTools": [
+        "book_search",
+        "memory_recall"
+      ],
+      "maxModelCalls": 2
+    },
+    {
+      "id": "smoke-synthetic-bridge-complex-1",
+      "bookId": "synthetic-bridge",
+      "category": "complex",
+      "split": "acceptance",
+      "question": "比较阿澄在见面和暴雨后对陆舟的态度。请列出两处依据。",
+      "history": [],
+      "ceiling": 2,
+      "evidenceGroups": [
+        [
+          "synthetic-bridge-2"
+        ],
+        [
+          "synthetic-bridge-3"
+        ]
+      ],
+      "expectedFacts": [
+        "约定尚未兑现",
+        "兑现约定"
+      ],
+      "forbiddenFacts": [
+        "真实身份是王室密使"
+      ],
+      "expectedToolNames": [],
+      "allowedTools": [
+        "book_search",
+        "memory_recall"
+      ],
+      "maxModelCalls": 4
+    },
+    {
+      "id": "smoke-synthetic-bridge-complex-2",
+      "bookId": "synthetic-bridge",
+      "category": "complex",
+      "split": "acceptance",
+      "question": "梳理拒绝同行到答应同行的原因链。请列出两处依据。",
+      "history": [],
+      "ceiling": 2,
+      "evidenceGroups": [
+        [
+          "synthetic-bridge-2"
+        ],
+        [
+          "synthetic-bridge-3"
+        ]
+      ],
+      "expectedFacts": [
+        "约定尚未兑现",
+        "兑现约定"
+      ],
+      "forbiddenFacts": [
+        "真实身份是王室密使"
+      ],
+      "expectedToolNames": [],
+      "allowedTools": [
+        "book_search",
+        "memory_recall"
+      ],
+      "maxModelCalls": 4
+    },
+    {
+      "id": "smoke-synthetic-bridge-complex-3",
+      "bookId": "synthetic-bridge",
+      "category": "complex",
+      "split": "acceptance",
+      "question": "为何兑现约定能改变两人的关系？请列出两处依据。",
+      "history": [],
+      "ceiling": 2,
+      "evidenceGroups": [
+        [
+          "synthetic-bridge-2"
+        ],
+        [
+          "synthetic-bridge-3"
+        ]
+      ],
+      "expectedFacts": [
+        "约定尚未兑现",
+        "兑现约定"
+      ],
+      "forbiddenFacts": [
+        "真实身份是王室密使"
+      ],
+      "expectedToolNames": [],
+      "allowedTools": [
+        "book_search",
+        "memory_recall"
+      ],
+      "maxModelCalls": 4
+    },
+    {
+      "id": "smoke-synthetic-bridge-complex-4",
+      "bookId": "synthetic-bridge",
+      "category": "complex",
+      "split": "acceptance",
+      "question": "把两人的信任变化按时间先后列出。请列出两处依据。",
+      "history": [],
+      "ceiling": 2,
+      "evidenceGroups": [
+        [
+          "synthetic-bridge-2"
+        ],
+        [
+          "synthetic-bridge-3"
+        ]
+      ],
+      "expectedFacts": [
+        "约定尚未兑现",
+        "兑现约定"
+      ],
+      "forbiddenFacts": [
+        "真实身份是王室密使"
+      ],
+      "expectedToolNames": [],
+      "allowedTools": [
+        "book_search",
+        "memory_recall"
+      ],
+      "maxModelCalls": 4
+    },
+    {
+      "id": "smoke-synthetic-bridge-follow_up-1",
+      "bookId": "synthetic-bridge",
+      "category": "follow_up",
+      "split": "acceptance",
+      "question": "后来为何改变？",
+      "history": [
+        {
+          "role": "user",
+          "content": "刚才讨论阿澄和陆舟拒绝同行的原因。"
+        }
+      ],
+      "ceiling": 2,
+      "evidenceGroups": [
+        [
+          "synthetic-bridge-2"
+        ],
+        [
+          "synthetic-bridge-3"
+        ]
+      ],
+      "expectedFacts": [
+        "约定"
+      ],
+      "forbiddenFacts": [
+        "真实身份是王室密使"
+      ],
+      "expectedToolNames": [],
+      "allowedTools": [
+        "book_search",
+        "memory_recall"
+      ],
+      "maxModelCalls": 4
+    },
+    {
+      "id": "smoke-synthetic-bridge-follow_up-2",
+      "bookId": "synthetic-bridge",
+      "category": "follow_up",
+      "split": "acceptance",
+      "question": "他为什么折返？",
+      "history": [
+        {
+          "role": "user",
+          "content": "刚才讨论阿澄和陆舟拒绝同行的原因。"
+        }
+      ],
+      "ceiling": 2,
+      "evidenceGroups": [
+        [
+          "synthetic-bridge-2"
+        ],
+        [
+          "synthetic-bridge-3"
+        ]
+      ],
+      "expectedFacts": [
+        "约定"
+      ],
+      "forbiddenFacts": [
+        "真实身份是王室密使"
+      ],
+      "expectedToolNames": [],
+      "allowedTools": [
+        "book_search",
+        "memory_recall"
+      ],
+      "maxModelCalls": 4
+    },
+    {
+      "id": "smoke-synthetic-bridge-follow_up-3",
+      "bookId": "synthetic-bridge",
+      "category": "follow_up",
+      "split": "acceptance",
+      "question": "这与开始时有什么不同？",
+      "history": [
+        {
+          "role": "user",
+          "content": "刚才讨论阿澄和陆舟拒绝同行的原因。"
+        }
+      ],
+      "ceiling": 2,
+      "evidenceGroups": [
+        [
+          "synthetic-bridge-2"
+        ],
+        [
+          "synthetic-bridge-3"
+        ]
+      ],
+      "expectedFacts": [
+        "约定"
+      ],
+      "forbiddenFacts": [
+        "真实身份是王室密使"
+      ],
+      "expectedToolNames": [],
+      "allowedTools": [
+        "book_search",
+        "memory_recall"
+      ],
+      "maxModelCalls": 4
+    },
+    {
+      "id": "smoke-synthetic-bridge-missing-1",
+      "bookId": "synthetic-bridge",
+      "category": "missing",
+      "split": "acceptance",
+      "question": "书里的龙泽是谁？",
+      "history": [],
+      "ceiling": 2,
+      "evidenceGroups": [],
+      "expectedFacts": [],
+      "forbiddenFacts": [
+        "真实身份是王室密使"
+      ],
+      "expectedToolNames": [],
+      "allowedTools": [
+        "book_search",
+        "memory_recall"
+      ],
+      "maxModelCalls": 4
+    },
+    {
+      "id": "smoke-synthetic-bridge-missing-2",
+      "bookId": "synthetic-bridge",
+      "category": "missing",
+      "split": "acceptance",
+      "question": "全书最后谁离开了？",
+      "history": [],
+      "ceiling": 2,
+      "evidenceGroups": [],
+      "expectedFacts": [],
+      "forbiddenFacts": [
+        "真实身份是王室密使"
+      ],
+      "expectedToolNames": [],
+      "allowedTools": [
+        "book_search",
+        "memory_recall"
+      ],
+      "maxModelCalls": 4
+    },
+    {
+      "id": "smoke-memory-1",
+      "bookId": "synthetic-bridge",
+      "category": "memory",
+      "split": "acceptance",
+      "question": "请记住以后回答要简洁",
+      "history": [],
+      "ceiling": 2,
+      "evidenceGroups": [],
+      "expectedFacts": [],
+      "forbiddenFacts": [
+        "其他用户秘密",
+        "未来章节秘密"
+      ],
+      "expectedToolNames": [],
+      "allowedTools": [
+        "book_search",
+        "memory_recall"
+      ],
+      "maxModelCalls": 4,
+      "expectMemoryUpdate": true
+    },
+    {
+      "id": "smoke-memory-2",
+      "bookId": "synthetic-bridge",
+      "category": "memory",
+      "split": "acceptance",
+      "question": "你记得我的阅读偏好吗？",
+      "history": [],
+      "ceiling": 2,
+      "evidenceGroups": [],
+      "expectedFacts": [],
+      "forbiddenFacts": [
+        "其他用户秘密",
+        "未来章节秘密"
+      ],
+      "expectedToolNames": [
+        "memory_recall"
+      ],
+      "allowedTools": [
+        "book_search",
+        "memory_recall"
+      ],
+      "maxModelCalls": 4,
+      "memorySeed": "回答要简洁"
+    },
+    {
+      "id": "smoke-memory-3",
+      "bookId": "synthetic-bridge",
+      "category": "memory",
+      "split": "acceptance",
+      "question": "结合我的笔记，我之前怀疑谁？",
+      "history": [],
+      "ceiling": 2,
+      "evidenceGroups": [],
+      "expectedFacts": [],
+      "forbiddenFacts": [
+        "其他用户秘密",
+        "未来章节秘密"
+      ],
+      "expectedToolNames": [
+        "memory_recall"
+      ],
+      "allowedTools": [
+        "book_search",
+        "memory_recall"
+      ],
+      "maxModelCalls": 4,
+      "memorySeed": "我怀疑守塔人隐瞒了来信"
+    },
+    {
+      "id": "smoke-external-1",
+      "bookId": "synthetic-bridge",
+      "category": "external",
+      "split": "acceptance",
+      "question": "请联网查询这本书作者的背景",
+      "history": [],
+      "ceiling": 2,
+      "evidenceGroups": [],
+      "expectedFacts": [],
+      "forbiddenFacts": [
+        "其他用户秘密",
+        "未来章节秘密"
+      ],
+      "expectedToolNames": [
+        "request_external_research"
+      ],
+      "allowedTools": [
+        "book_search",
+        "memory_recall",
+        "request_external_research"
+      ],
+      "maxModelCalls": 4
+    },
+    {
+      "id": "smoke-external-2",
+      "bookId": "synthetic-bridge",
+      "category": "external",
+      "split": "acceptance",
+      "question": "请联网查证海边灯塔的现实用途",
+      "history": [],
+      "ceiling": 2,
+      "evidenceGroups": [],
+      "expectedFacts": [],
+      "forbiddenFacts": [
+        "其他用户秘密",
+        "未来章节秘密"
+      ],
+      "expectedToolNames": [
+        "request_external_research"
+      ],
+      "allowedTools": [
+        "book_search",
+        "memory_recall",
+        "request_external_research"
+      ],
+      "maxModelCalls": 4
+    },
+    {
+      "id": "smoke-email-1",
+      "bookId": "synthetic-bridge",
+      "category": "email",
+      "split": "acceptance",
+      "question": "请发邮件到我的邮箱，正文为感谢阅读",
+      "history": [],
+      "ceiling": 2,
+      "evidenceGroups": [],
+      "expectedFacts": [],
+      "forbiddenFacts": [
+        "其他用户秘密",
+        "未来章节秘密"
+      ],
+      "expectedToolNames": [
+        "prepare_email"
+      ],
+      "allowedTools": [
+        "book_search",
+        "memory_recall",
+        "prepare_email"
+      ],
+      "maxModelCalls": 4
+    },
+    {
+      "id": "smoke-email-2",
+      "bookId": "synthetic-bridge",
+      "category": "email",
+      "split": "acceptance",
+      "question": "帮我准备邮件给 reader@example.invalid，告诉他我喜欢阅读",
+      "history": [],
+      "ceiling": 2,
+      "evidenceGroups": [],
+      "expectedFacts": [],
+      "forbiddenFacts": [
+        "其他用户秘密",
+        "未来章节秘密"
+      ],
+      "expectedToolNames": [
+        "prepare_email"
+      ],
+      "allowedTools": [
+        "book_search",
+        "memory_recall",
+        "prepare_email"
+      ],
+      "maxModelCalls": 4
+    }
+  ]
+}

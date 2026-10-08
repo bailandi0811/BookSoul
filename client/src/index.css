@@ -217,6 +217,25 @@
     transform: translateY(0) scale(0.97);
   }
 
+  .tarot-entry {
+    color: rgb(var(--foreground));
+    background-color: rgb(var(--background) / 0.8);
+    transition:
+      transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 0.22s ease,
+      background-color 0.22s ease;
+  }
+
+  .tarot-entry:hover {
+    transform: translateY(-2px);
+    border-color: rgb(var(--accent) / 0.55);
+    background-color: rgb(var(--card) / 0.92);
+  }
+
+  .tarot-entry:active {
+    transform: translateY(0) scale(0.97);
+  }
+
   .community-unread-badge {
     transform-origin: center;
     animation: community-unread-pop 0.42s cubic-bezier(0.22, 1, 0.36, 1);

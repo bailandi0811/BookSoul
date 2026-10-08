@@ -70,6 +70,25 @@ describe('BookVectorStoreService', () => {
     );
   });
 
+  it('does not search after cancellation during collection initialization', async () => {
+    const controller = new AbortController();
+    client.hasCollection.mockImplementation(async () => {
+      controller.abort();
+      return { value: false };
+    });
+    await expect(
+      service.searchChunkIds(
+        { ownerScope: 'user-a', bookId: 'book-a', embeddingVersion: 'v1' },
+        [1, 0, 0],
+        2,
+        6,
+        controller.signal,
+      ),
+    ).rejects.toThrow();
+    expect(client.search).not.toHaveBeenCalled();
+    expect(client.createCollection).not.toHaveBeenCalled();
+  });
+
   it('writes only server-scoped metadata and a validated vector', async () => {
     await service.insert([
       {

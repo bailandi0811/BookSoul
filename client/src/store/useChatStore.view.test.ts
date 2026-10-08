@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useChatStore } from "./useChatStore";
+import { useMemoryStore } from "./useMemoryStore";
 
 function success(data: unknown, init?: ResponseInit): Response {
   return new Response(JSON.stringify({ success: true, data }), {
@@ -10,6 +11,104 @@ function success(data: unknown, init?: ResponseInit): Response {
 }
 
 describe("book-scoped chat state", () => {
+  it("does not apply late summary or memory events to a new book", async () => {
+    useChatStore.setState({
+      currentBookId: "fixture-old",
+      sessionId: "fixture-session",
+    });
+    let controller: ReadableStreamDefaultController<Uint8Array>;
+    const body = new ReadableStream<Uint8Array>({
+      start(value) {
+        controller = value;
+      },
+    });
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) =>
+      String(url) === "/api/chat" ? new Response(body) : success([]),
+    );
+    const memory = vi.spyOn(useMemoryStore.getState(), "handleMemoryUpdate");
+    const running = useChatStore
+      .getState()
+      .sendMessage("问题", false, false, "deep");
+    await Promise.resolve();
+    useChatStore.getState().stopGenerating();
+    useChatStore.setState({
+      currentBookId: "fixture-new",
+      sessionId: "fixture-new-session",
+      activeRequestId: "new-request",
+      messages: [{ role: "assistant", content: "new answer" }],
+    });
+    controller!.enqueue(
+      new TextEncoder().encode(
+        'data: {"runSummary":{"mode":"deep","stopReason":"no_queries","retrievalRounds":1,"incomplete":true},"memoryUpdate":{"memoryCount":1,"hasNewMemories":true},"content":"late"}\n\n',
+      ),
+    );
+    controller!.close();
+    await running;
+    expect(useChatStore.getState().messages).toEqual([
+      { role: "assistant", content: "new answer" },
+    ]);
+    expect(memory).not.toHaveBeenCalled();
+  });
+  it("keeps a deep request alive across 30 seconds when heartbeat bytes arrive", async () => {
+    vi.useFakeTimers();
+    try {
+      useChatStore.setState({
+        currentBookId: "fixture-book",
+        sessionId: "fixture-session",
+      });
+      let controller: ReadableStreamDefaultController<Uint8Array>;
+      const body = new ReadableStream<Uint8Array>({
+        start(value) {
+          controller = value;
+        },
+      });
+      vi.spyOn(globalThis, "fetch").mockImplementation(async (url) =>
+        String(url) === "/api/chat" ? new Response(body) : success([]),
+      );
+      const running = useChatStore
+        .getState()
+        .sendMessage("问题", false, false, "deep");
+      await vi.advanceTimersByTimeAsync(20000);
+      controller!.enqueue(
+        new TextEncoder().encode(
+          'data: {"thinking":"正在等待本轮处理完成…"}\n\n',
+        ),
+      );
+      await vi.advanceTimersByTimeAsync(20000);
+      expect(useChatStore.getState().abortController?.signal.aborted).toBe(
+        false,
+      );
+      controller!.enqueue(
+        new TextEncoder().encode(
+          'data: {"content":"answer"}\n\ndata: [DONE]\n\n',
+        ),
+      );
+      controller!.close();
+      await running;
+      expect(useChatStore.getState().messages.at(-1)?.content).toBe("answer");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("attaches deep summary only to current request", async () => {
+    useChatStore.setState({
+      currentBookId: "fixture-book",
+      sessionId: "fixture-session",
+      messages: [],
+      isLoading: false,
+    });
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) =>
+      String(url) === "/api/chat"
+        ? new Response(
+            'data: {"runSummary":{"mode":"deep","stopReason":"no_queries","retrievalRounds":1,"incomplete":true}}\n\ndata: {"content":"依据有限"}\n\ndata: [DONE]\n\n',
+          )
+        : success([]),
+    );
+    await useChatStore.getState().sendMessage("问题", false, false, "deep");
+    expect(useChatStore.getState().messages.at(-1)).toMatchObject({
+      runSummary: { incomplete: true },
+    });
+  });
   beforeEach(() => {
     vi.restoreAllMocks();
     useChatStore.setState({
@@ -145,9 +244,7 @@ describe("book-scoped chat state", () => {
       sessionId: "server-session",
     });
 
-    await useChatStore
-      .getState()
-      .sendMessage("把刚才的回答发到我的邮箱");
+    await useChatStore.getState().sendMessage("把刚才的回答发到我的邮箱");
 
     expect(useChatStore.getState().pendingEmailDraft).toEqual({
       to: "reader@example.com",

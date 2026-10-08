@@ -7,6 +7,7 @@ export type AppScreen =
   | "reset-password"
   | "account"
   | "community"
+  | "tarot"
   | BooksView;
 
 interface AppFlowState {
@@ -17,6 +18,7 @@ interface AppFlowState {
   isResetRoute?: boolean;
   isAccountRoute?: boolean;
   isCommunityRoute?: boolean;
+  isTarotRoute?: boolean;
 }
 
 export function resolveAppScreen({
@@ -27,12 +29,14 @@ export function resolveAppScreen({
   isResetRoute,
   isAccountRoute,
   isCommunityRoute,
+  isTarotRoute,
 }: AppFlowState): AppScreen {
   if (isResetRoute) return "reset-password";
-  if (!isAccountRoute && !isCommunityRoute && !hasEnteredApp) return "landing";
+  if (!isAccountRoute && !isCommunityRoute && !isTarotRoute && !hasEnteredApp) return "landing";
   if (!authReady) return "loading";
   if (!isAuthenticated) return "auth";
   if (isAccountRoute) return "account";
   if (isCommunityRoute) return "community";
+  if (isTarotRoute) return "tarot";
   return view;
 }

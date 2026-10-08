@@ -1,0 +1,782 @@
+[
+  {
+    "id": "major-00",
+    "name": "愚者",
+    "arcana": "major",
+    "suit": null,
+    "image": "major-00.jpg",
+    "upright": "新的起点，愿意尝试未知",
+    "reversed": "冲动冒进，忽略现实风险",
+    "sourceTitle": "File:RWS Tarot 00 Fool.jpg"
+  },
+  {
+    "id": "major-01",
+    "name": "魔术师",
+    "arcana": "major",
+    "suit": null,
+    "image": "major-01.jpg",
+    "upright": "主动运用能力，将想法付诸行动",
+    "reversed": "能力未发挥，警惕操纵与空谈",
+    "sourceTitle": "File:RWS Tarot 01 Magician.jpg"
+  },
+  {
+    "id": "major-02",
+    "name": "女祭司",
+    "arcana": "major",
+    "suit": null,
+    "image": "major-02.jpg",
+    "upright": "倾听直觉，保留观察的空间",
+    "reversed": "忽略内在声音，信息尚不清楚",
+    "sourceTitle": "File:RWS Tarot 02 High Priestess.jpg"
+  },
+  {
+    "id": "major-03",
+    "name": "皇后",
+    "arcana": "major",
+    "suit": null,
+    "image": "major-03.jpg",
+    "upright": "滋养关系，享受创造与丰盛",
+    "reversed": "过度照顾他人，忽略自身需要",
+    "sourceTitle": "File:RWS Tarot 03 Empress.jpg"
+  },
+  {
+    "id": "major-04",
+    "name": "皇帝",
+    "arcana": "major",
+    "suit": null,
+    "image": "major-04.jpg",
+    "upright": "建立秩序，承担责任与界限",
+    "reversed": "控制过度，规则缺乏弹性",
+    "sourceTitle": "File:RWS Tarot 04 Emperor.jpg"
+  },
+  {
+    "id": "major-05",
+    "name": "教皇",
+    "arcana": "major",
+    "suit": null,
+    "image": "major-05.jpg",
+    "upright": "借助传统经验，寻求共同价值",
+    "reversed": "质疑惯例，寻找自己的原则",
+    "sourceTitle": "File:RWS Tarot 05 Hierophant.jpg"
+  },
+  {
+    "id": "major-06",
+    "name": "恋人",
+    "arcana": "major",
+    "suit": null,
+    "image": "major-06.jpg",
+    "upright": "真诚连接，作出价值一致的选择",
+    "reversed": "期待不一致，关系需要沟通",
+    "sourceTitle": "File:RWS Tarot 06 Lovers.jpg"
+  },
+  {
+    "id": "major-07",
+    "name": "战车",
+    "arcana": "major",
+    "suit": null,
+    "image": "major-07.jpg",
+    "upright": "明确方向，以自律推动进展",
+    "reversed": "方向分散，急于控制结果",
+    "sourceTitle": "File:RWS Tarot 07 Chariot.jpg"
+  },
+  {
+    "id": "major-08",
+    "name": "力量",
+    "arcana": "major",
+    "suit": null,
+    "image": "major-08.jpg",
+    "upright": "以耐心和温柔面对困难",
+    "reversed": "自我怀疑，情绪需要安顿",
+    "sourceTitle": "File:RWS Tarot 08 Strength.jpg"
+  },
+  {
+    "id": "major-09",
+    "name": "隐者",
+    "arcana": "major",
+    "suit": null,
+    "image": "major-09.jpg",
+    "upright": "独处反思，寻找内在的答案",
+    "reversed": "退缩过久，难以接受支持",
+    "sourceTitle": "File:RWS Tarot 09 Hermit.jpg"
+  },
+  {
+    "id": "major-10",
+    "name": "命运之轮",
+    "arcana": "major",
+    "suit": null,
+    "image": "major-10.jpg",
+    "upright": "变化到来，把握新的转机",
+    "reversed": "局势反复，接受暂时的停滞",
+    "sourceTitle": "File:RWS Tarot 10 Wheel of Fortune.jpg"
+  },
+  {
+    "id": "major-11",
+    "name": "正义",
+    "arcana": "major",
+    "suit": null,
+    "image": "major-11.jpg",
+    "upright": "公平衡量，为选择承担后果",
+    "reversed": "判断失衡，避免逃避责任",
+    "sourceTitle": "File:RWS Tarot 11 Justice.jpg"
+  },
+  {
+    "id": "major-12",
+    "name": "倒吊人",
+    "arcana": "major",
+    "suit": null,
+    "image": "major-12.jpg",
+    "upright": "换个角度，暂停也有价值",
+    "reversed": "无谓拖延，付出缺少意义",
+    "sourceTitle": "File:RWS Tarot 12 Hanged Man.jpg"
+  },
+  {
+    "id": "major-13",
+    "name": "死神",
+    "arcana": "major",
+    "suit": null,
+    "image": "major-13.jpg",
+    "upright": "结束旧阶段，为转变留出空间",
+    "reversed": "抗拒结束，迟迟无法放手",
+    "sourceTitle": "File:RWS Tarot 13 Death.jpg"
+  },
+  {
+    "id": "major-14",
+    "name": "节制",
+    "arcana": "major",
+    "suit": null,
+    "image": "major-14.jpg",
+    "upright": "耐心协调，找到舒适的平衡",
+    "reversed": "节奏失衡，重新调整期待",
+    "sourceTitle": "File:RWS Tarot 14 Temperance.jpg"
+  },
+  {
+    "id": "major-15",
+    "name": "恶魔",
+    "arcana": "major",
+    "suit": null,
+    "image": "major-15.jpg",
+    "upright": "看见依附与欲望，辨认束缚",
+    "reversed": "意识到束缚，逐步恢复自主",
+    "sourceTitle": "File:RWS Tarot 15 Devil.jpg"
+  },
+  {
+    "id": "major-16",
+    "name": "高塔",
+    "arcana": "major",
+    "suit": null,
+    "image": "major-16.jpg",
+    "upright": "旧有结构动摇，真相突然显现",
+    "reversed": "害怕改变，问题仍需面对",
+    "sourceTitle": "File:RWS Tarot 16 Tower.jpg"
+  },
+  {
+    "id": "major-17",
+    "name": "星星",
+    "arcana": "major",
+    "suit": null,
+    "image": "major-17.jpg",
+    "upright": "希望与疗愈，逐渐恢复信任",
+    "reversed": "暂失信心，先照顾内在需要",
+    "sourceTitle": "File:RWS Tarot 17 Star.jpg"
+  },
+  {
+    "id": "major-18",
+    "name": "月亮",
+    "arcana": "major",
+    "suit": null,
+    "image": "major-18.jpg",
+    "upright": "情绪与未知交织，谨慎观察",
+    "reversed": "迷雾渐散，分清感受与事实",
+    "sourceTitle": "File:RWS Tarot 18 Moon.jpg"
+  },
+  {
+    "id": "major-19",
+    "name": "太阳",
+    "arcana": "major",
+    "suit": null,
+    "image": "major-19.jpg",
+    "upright": "清晰与喜悦，开放表达自己",
+    "reversed": "快乐受到阻碍，期待需要调整",
+    "sourceTitle": "File:RWS Tarot 19 Sun.jpg"
+  },
+  {
+    "id": "major-20",
+    "name": "审判",
+    "arcana": "major",
+    "suit": null,
+    "image": "major-20.jpg",
+    "upright": "回顾经历，回应新的召唤",
+    "reversed": "自责或犹豫，难以作出决定",
+    "sourceTitle": "File:RWS Tarot 20 Judgement.jpg"
+  },
+  {
+    "id": "major-21",
+    "name": "世界",
+    "arcana": "major",
+    "suit": null,
+    "image": "major-21.jpg",
+    "upright": "阶段完成，收获完整与连结",
+    "reversed": "尚未收尾，留意未完成的环节",
+    "sourceTitle": "File:RWS Tarot 21 World.jpg"
+  },
+  {
+    "id": "wands-01",
+    "name": "权杖一",
+    "arcana": "minor",
+    "suit": "wands",
+    "image": "wands-01.jpg",
+    "upright": "萌发热情，新的行动机会",
+    "reversed": "动力不足，计划尚未成形",
+    "sourceTitle": "File:Wands01.jpg"
+  },
+  {
+    "id": "wands-02",
+    "name": "权杖二",
+    "arcana": "minor",
+    "suit": "wands",
+    "image": "wands-02.jpg",
+    "upright": "规划方向，望向更广的可能",
+    "reversed": "畏惧未知，难以迈出下一步",
+    "sourceTitle": "File:Wands02.jpg"
+  },
+  {
+    "id": "wands-03",
+    "name": "权杖三",
+    "arcana": "minor",
+    "suit": "wands",
+    "image": "wands-03.jpg",
+    "upright": "行动初见成果，等待进一步发展",
+    "reversed": "进展延迟，调整原有预期",
+    "sourceTitle": "File:Wands03.jpg"
+  },
+  {
+    "id": "wands-04",
+    "name": "权杖四",
+    "arcana": "minor",
+    "suit": "wands",
+    "image": "wands-04.jpg",
+    "upright": "稳定与庆祝，共享归属感",
+    "reversed": "基础不稳，归属感需要重建",
+    "sourceTitle": "File:Wands04.jpg"
+  },
+  {
+    "id": "wands-05",
+    "name": "权杖五",
+    "arcana": "minor",
+    "suit": "wands",
+    "image": "wands-05.jpg",
+    "upright": "意见碰撞，在竞争中磨合",
+    "reversed": "避免争执，或矛盾尚未解决",
+    "sourceTitle": "File:Wands05.jpg"
+  },
+  {
+    "id": "wands-06",
+    "name": "权杖六",
+    "arcana": "minor",
+    "suit": "wands",
+    "image": "wands-06.jpg",
+    "upright": "获得认可，看到努力的成果",
+    "reversed": "渴望肯定，成就暂未被看见",
+    "sourceTitle": "File:Wands06.jpg"
+  },
+  {
+    "id": "wands-07",
+    "name": "权杖七",
+    "arcana": "minor",
+    "suit": "wands",
+    "image": "wands-07.jpg",
+    "upright": "坚持立场，守护自己的边界",
+    "reversed": "压力过重，重新衡量坚持",
+    "sourceTitle": "File:Wands07.jpg"
+  },
+  {
+    "id": "wands-08",
+    "name": "权杖八",
+    "arcana": "minor",
+    "suit": "wands",
+    "image": "wands-08.jpg",
+    "upright": "进展加快，及时回应变化",
+    "reversed": "节奏混乱，沟通容易延迟",
+    "sourceTitle": "File:Wands08.jpg"
+  },
+  {
+    "id": "wands-09",
+    "name": "权杖九",
+    "arcana": "minor",
+    "suit": "wands",
+    "image": "wands-09.jpg",
+    "upright": "经历考验后仍保持韧性",
+    "reversed": "疲惫与戒备，允许自己休息",
+    "sourceTitle": "File:Wands09.jpg"
+  },
+  {
+    "id": "wands-10",
+    "name": "权杖十",
+    "arcana": "minor",
+    "suit": "wands",
+    "image": "wands-10.jpg",
+    "upright": "承担较多责任，接近负荷上限",
+    "reversed": "放下多余负担，学会分担",
+    "sourceTitle": "File:Wands10.jpg"
+  },
+  {
+    "id": "wands-11",
+    "name": "权杖侍从",
+    "arcana": "minor",
+    "suit": "wands",
+    "image": "wands-11.jpg",
+    "upright": "探索兴趣，带着好奇开始",
+    "reversed": "热情不稳，先找到明确方向",
+    "sourceTitle": "File:Wands11.jpg"
+  },
+  {
+    "id": "wands-12",
+    "name": "权杖骑士",
+    "arcana": "minor",
+    "suit": "wands",
+    "image": "wands-12.jpg",
+    "upright": "大胆行动，追随热情与冒险",
+    "reversed": "急躁冲动，行动缺少持续性",
+    "sourceTitle": "File:Wands12.jpg"
+  },
+  {
+    "id": "wands-13",
+    "name": "权杖王后",
+    "arcana": "minor",
+    "suit": "wands",
+    "image": "wands-13.jpg",
+    "upright": "自信而温暖，保持独立魅力",
+    "reversed": "信心起伏，避免嫉妒与比较",
+    "sourceTitle": "File:Wands13.jpg"
+  },
+  {
+    "id": "wands-14",
+    "name": "权杖国王",
+    "arcana": "minor",
+    "suit": "wands",
+    "image": "wands-14.jpg",
+    "upright": "带领行动，拥有清楚的远见",
+    "reversed": "强势或急进，倾听不同声音",
+    "sourceTitle": "File:Wands14.jpg"
+  },
+  {
+    "id": "cups-01",
+    "name": "圣杯一",
+    "arcana": "minor",
+    "suit": "cups",
+    "image": "cups-01.jpg",
+    "upright": "情感萌芽，愿意敞开心扉",
+    "reversed": "情绪堵塞，需要照顾自己",
+    "sourceTitle": "File:Cups01.jpg"
+  },
+  {
+    "id": "cups-02",
+    "name": "圣杯二",
+    "arcana": "minor",
+    "suit": "cups",
+    "image": "cups-02.jpg",
+    "upright": "相互理解，建立平等的连接",
+    "reversed": "交流失衡，重新确认彼此需要",
+    "sourceTitle": "File:Cups02.jpg"
+  },
+  {
+    "id": "cups-03",
+    "name": "圣杯三",
+    "arcana": "minor",
+    "suit": "cups",
+    "image": "cups-03.jpg",
+    "upright": "友谊与庆祝，得到群体支持",
+    "reversed": "社交疲惫，注意关系中的界限",
+    "sourceTitle": "File:Cups03.jpg"
+  },
+  {
+    "id": "cups-04",
+    "name": "圣杯四",
+    "arcana": "minor",
+    "suit": "cups",
+    "image": "cups-04.jpg",
+    "upright": "内省与停顿，重新审视满足感",
+    "reversed": "开始看见机会，走出封闭状态",
+    "sourceTitle": "File:Cups04.jpg"
+  },
+  {
+    "id": "cups-05",
+    "name": "圣杯五",
+    "arcana": "minor",
+    "suit": "cups",
+    "image": "cups-05.jpg",
+    "upright": "面对失落，也看见仍在的支持",
+    "reversed": "逐渐接受遗憾，准备重新出发",
+    "sourceTitle": "File:Cups05.jpg"
+  },
+  {
+    "id": "cups-06",
+    "name": "圣杯六",
+    "arcana": "minor",
+    "suit": "cups",
+    "image": "cups-06.jpg",
+    "upright": "回忆与旧日的连接",
+    "reversed": "过度依恋过去，回到眼前生活",
+    "sourceTitle": "File:Cups06.jpg"
+  },
+  {
+    "id": "cups-07",
+    "name": "圣杯七",
+    "arcana": "minor",
+    "suit": "cups",
+    "image": "cups-07.jpg",
+    "upright": "多种想象并存，谨慎作出选择",
+    "reversed": "看清幻想，聚焦实际的选择",
+    "sourceTitle": "File:Cups07.jpg"
+  },
+  {
+    "id": "cups-08",
+    "name": "圣杯八",
+    "arcana": "minor",
+    "suit": "cups",
+    "image": "cups-08.jpg",
+    "upright": "离开不再满足自己的状态",
+    "reversed": "害怕离开，或重新评估去留",
+    "sourceTitle": "File:Cups08.jpg"
+  },
+  {
+    "id": "cups-09",
+    "name": "圣杯九",
+    "arcana": "minor",
+    "suit": "cups",
+    "image": "cups-09.jpg",
+    "upright": "心愿与满足，享受当下收获",
+    "reversed": "期待落空，辨认真正的满足",
+    "sourceTitle": "File:Cups09.jpg"
+  },
+  {
+    "id": "cups-10",
+    "name": "圣杯十",
+    "arcana": "minor",
+    "suit": "cups",
+    "image": "cups-10.jpg",
+    "upright": "情感和谐，共享亲密与归属",
+    "reversed": "关系理想与现实存在落差",
+    "sourceTitle": "File:Cups10.jpg"
+  },
+  {
+    "id": "cups-11",
+    "name": "圣杯侍从",
+    "arcana": "minor",
+    "suit": "cups",
+    "image": "cups-11.jpg",
+    "upright": "温柔表达，好奇地接近情感",
+    "reversed": "情绪敏感，表达尚显稚嫩",
+    "sourceTitle": "File:Cups11.jpg"
+  },
+  {
+    "id": "cups-12",
+    "name": "圣杯骑士",
+    "arcana": "minor",
+    "suit": "cups",
+    "image": "cups-12.jpg",
+    "upright": "带着诚意靠近，表达浪漫心意",
+    "reversed": "承诺不稳，留意情绪化期待",
+    "sourceTitle": "File:Cups12.jpg"
+  },
+  {
+    "id": "cups-13",
+    "name": "圣杯王后",
+    "arcana": "minor",
+    "suit": "cups",
+    "image": "cups-13.jpg",
+    "upright": "共情与关怀，理解内心感受",
+    "reversed": "付出失衡，建立情感界限",
+    "sourceTitle": "File:Cups13.jpg"
+  },
+  {
+    "id": "cups-14",
+    "name": "圣杯国王",
+    "arcana": "minor",
+    "suit": "cups",
+    "image": "cups-14.jpg",
+    "upright": "成熟地安顿情绪，温和支持",
+    "reversed": "情绪失控，避免压抑或操纵",
+    "sourceTitle": "File:Cups14.jpg"
+  },
+  {
+    "id": "swords-01",
+    "name": "宝剑一",
+    "arcana": "minor",
+    "suit": "swords",
+    "image": "swords-01.jpg",
+    "upright": "思路清晰，真诚面对事实",
+    "reversed": "判断受阻，先澄清关键信息",
+    "sourceTitle": "File:Swords01.jpg"
+  },
+  {
+    "id": "swords-02",
+    "name": "宝剑二",
+    "arcana": "minor",
+    "suit": "swords",
+    "image": "swords-02.jpg",
+    "upright": "两难与暂缓，权衡不同选择",
+    "reversed": "僵局松动，面对被回避的问题",
+    "sourceTitle": "File:Swords02.jpg"
+  },
+  {
+    "id": "swords-03",
+    "name": "宝剑三",
+    "arcana": "minor",
+    "suit": "swords",
+    "image": "swords-03.jpg",
+    "upright": "痛苦与分离，承认真实感受",
+    "reversed": "伤口渐愈，学习放下旧痛",
+    "sourceTitle": "File:Swords03.jpg"
+  },
+  {
+    "id": "swords-04",
+    "name": "宝剑四",
+    "arcana": "minor",
+    "suit": "swords",
+    "image": "swords-04.jpg",
+    "upright": "休息与恢复，为思考留白",
+    "reversed": "休息不足，或准备回到行动",
+    "sourceTitle": "File:Swords04.jpg"
+  },
+  {
+    "id": "swords-05",
+    "name": "宝剑五",
+    "arcana": "minor",
+    "suit": "swords",
+    "image": "swords-05.jpg",
+    "upright": "争执中的代价，重新看待输赢",
+    "reversed": "缓和冲突，尝试修复伤害",
+    "sourceTitle": "File:Swords05.jpg"
+  },
+  {
+    "id": "swords-06",
+    "name": "宝剑六",
+    "arcana": "minor",
+    "suit": "swords",
+    "image": "swords-06.jpg",
+    "upright": "离开困境，向较平静处过渡",
+    "reversed": "旧问题未解，过渡暂受阻碍",
+    "sourceTitle": "File:Swords06.jpg"
+  },
+  {
+    "id": "swords-07",
+    "name": "宝剑七",
+    "arcana": "minor",
+    "suit": "swords",
+    "image": "swords-07.jpg",
+    "upright": "谨慎谋划，留意隐瞒与回避",
+    "reversed": "真相浮现，坦诚承担责任",
+    "sourceTitle": "File:Swords07.jpg"
+  },
+  {
+    "id": "swords-08",
+    "name": "宝剑八",
+    "arcana": "minor",
+    "suit": "swords",
+    "image": "swords-08.jpg",
+    "upright": "感到受限，辨认自我设下的框",
+    "reversed": "看见出口，逐步恢复行动自由",
+    "sourceTitle": "File:Swords08.jpg"
+  },
+  {
+    "id": "swords-09",
+    "name": "宝剑九",
+    "arcana": "minor",
+    "suit": "swords",
+    "image": "swords-09.jpg",
+    "upright": "忧虑与失眠，别独自承担恐惧",
+    "reversed": "寻求支持，减轻内心的压力",
+    "sourceTitle": "File:Swords09.jpg"
+  },
+  {
+    "id": "swords-10",
+    "name": "宝剑十",
+    "arcana": "minor",
+    "suit": "swords",
+    "image": "swords-10.jpg",
+    "upright": "艰难阶段结束，接受新的开始",
+    "reversed": "缓慢恢复，避免反复困在旧伤",
+    "sourceTitle": "File:Swords10.jpg"
+  },
+  {
+    "id": "swords-11",
+    "name": "宝剑侍从",
+    "arcana": "minor",
+    "suit": "swords",
+    "image": "swords-11.jpg",
+    "upright": "敏锐观察，带着问题寻找事实",
+    "reversed": "信息片面，避免仓促下判断",
+    "sourceTitle": "File:Swords11.jpg"
+  },
+  {
+    "id": "swords-12",
+    "name": "宝剑骑士",
+    "arcana": "minor",
+    "suit": "swords",
+    "image": "swords-12.jpg",
+    "upright": "果断推进，迅速表达观点",
+    "reversed": "行动过急，先听清其他声音",
+    "sourceTitle": "File:Swords12.jpg"
+  },
+  {
+    "id": "swords-13",
+    "name": "宝剑王后",
+    "arcana": "minor",
+    "suit": "swords",
+    "image": "swords-13.jpg",
+    "upright": "理性与独立，清楚表达界限",
+    "reversed": "言语过冷，平衡判断与理解",
+    "sourceTitle": "File:Swords13.jpg"
+  },
+  {
+    "id": "swords-14",
+    "name": "宝剑国王",
+    "arcana": "minor",
+    "suit": "swords",
+    "image": "swords-14.jpg",
+    "upright": "公正判断，保持清晰的原则",
+    "reversed": "理性失衡，警惕苛刻与偏见",
+    "sourceTitle": "File:Swords14.jpg"
+  },
+  {
+    "id": "pentacles-01",
+    "name": "星币一",
+    "arcana": "minor",
+    "suit": "pentacles",
+    "image": "pentacles-01.jpg",
+    "upright": "现实的新机会，建立稳固基础",
+    "reversed": "机会未落实，先核对实际条件",
+    "sourceTitle": "File:Pents01.jpg"
+  },
+  {
+    "id": "pentacles-02",
+    "name": "星币二",
+    "arcana": "minor",
+    "suit": "pentacles",
+    "image": "pentacles-02.jpg",
+    "upright": "灵活平衡，协调多项事务",
+    "reversed": "负担失衡，需要明确优先顺序",
+    "sourceTitle": "File:Pents02.jpg"
+  },
+  {
+    "id": "pentacles-03",
+    "name": "星币三",
+    "arcana": "minor",
+    "suit": "pentacles",
+    "image": "pentacles-03.jpg",
+    "upright": "合作与磨练，认可彼此的技能",
+    "reversed": "协作不畅，重新划分职责",
+    "sourceTitle": "File:Pents03.jpg"
+  },
+  {
+    "id": "pentacles-04",
+    "name": "星币四",
+    "arcana": "minor",
+    "suit": "pentacles",
+    "image": "pentacles-04.jpg",
+    "upright": "守护已有资源，追求稳定",
+    "reversed": "过度紧握，或准备放松控制",
+    "sourceTitle": "File:Pents04.jpg"
+  },
+  {
+    "id": "pentacles-05",
+    "name": "星币五",
+    "arcana": "minor",
+    "suit": "pentacles",
+    "image": "pentacles-05.jpg",
+    "upright": "感到匮乏，留意可获得的援助",
+    "reversed": "处境渐好，开始接受支持",
+    "sourceTitle": "File:Pents05.jpg"
+  },
+  {
+    "id": "pentacles-06",
+    "name": "星币六",
+    "arcana": "minor",
+    "suit": "pentacles",
+    "image": "pentacles-06.jpg",
+    "upright": "给予与接受，建立公平的交换",
+    "reversed": "付出不平等，留意附带条件",
+    "sourceTitle": "File:Pents06.jpg"
+  },
+  {
+    "id": "pentacles-07",
+    "name": "星币七",
+    "arcana": "minor",
+    "suit": "pentacles",
+    "image": "pentacles-07.jpg",
+    "upright": "耐心耕耘，评估长远的回报",
+    "reversed": "等待令人疲惫，重新审视投入",
+    "sourceTitle": "File:Pents07.jpg"
+  },
+  {
+    "id": "pentacles-08",
+    "name": "星币八",
+    "arcana": "minor",
+    "suit": "pentacles",
+    "image": "pentacles-08.jpg",
+    "upright": "专注练习，逐渐积累能力",
+    "reversed": "投入不专注，重建学习节奏",
+    "sourceTitle": "File:Pents08.jpg"
+  },
+  {
+    "id": "pentacles-09",
+    "name": "星币九",
+    "arcana": "minor",
+    "suit": "pentacles",
+    "image": "pentacles-09.jpg",
+    "upright": "独立与从容，享受努力的成果",
+    "reversed": "依赖外在认可，调整生活基础",
+    "sourceTitle": "File:Pents09.jpg"
+  },
+  {
+    "id": "pentacles-10",
+    "name": "星币十",
+    "arcana": "minor",
+    "suit": "pentacles",
+    "image": "pentacles-10.jpg",
+    "upright": "长期稳定，珍惜共同的积累",
+    "reversed": "稳定受到挑战，讨论长远安排",
+    "sourceTitle": "File:Pents10.jpg"
+  },
+  {
+    "id": "pentacles-11",
+    "name": "星币侍从",
+    "arcana": "minor",
+    "suit": "pentacles",
+    "image": "pentacles-11.jpg",
+    "upright": "务实学习，认真对待新机会",
+    "reversed": "计划停留纸上，需要实际练习",
+    "sourceTitle": "File:Pents11.jpg"
+  },
+  {
+    "id": "pentacles-12",
+    "name": "星币骑士",
+    "arcana": "minor",
+    "suit": "pentacles",
+    "image": "pentacles-12.jpg",
+    "upright": "稳健坚持，通过细节推进目标",
+    "reversed": "步调僵化，或努力缺少持续",
+    "sourceTitle": "File:Pents12.jpg"
+  },
+  {
+    "id": "pentacles-13",
+    "name": "星币王后",
+    "arcana": "minor",
+    "suit": "pentacles",
+    "image": "pentacles-13.jpg",
+    "upright": "温暖照顾，兼顾实际与舒适",
+    "reversed": "照顾失衡，留意自身的资源",
+    "sourceTitle": "File:Pents13.jpg"
+  },
+  {
+    "id": "pentacles-14",
+    "name": "星币国王",
+    "arcana": "minor",
+    "suit": "pentacles",
+    "image": "pentacles-14.jpg",
+    "upright": "成熟稳固，负责地管理资源",
+    "reversed": "执着于占有，重新理解安全感",
+    "sourceTitle": "File:Pents14.jpg"
+  }
+]

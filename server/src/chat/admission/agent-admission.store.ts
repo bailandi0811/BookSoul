@@ -1,7 +1,7 @@
 import {
   Injectable,
   Logger,
-  OnModuleDestroy,
+  OnApplicationShutdown,
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -67,7 +67,7 @@ interface LocalLease {
 }
 
 @Injectable()
-export class AgentAdmissionStore implements OnModuleInit, OnModuleDestroy {
+export class AgentAdmissionStore implements OnModuleInit, OnApplicationShutdown {
   private readonly logger = new Logger(AgentAdmissionStore.name);
   private readonly mode: 'local' | 'redis';
   private readonly redisUrl?: string;
@@ -124,7 +124,8 @@ export class AgentAdmissionStore implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  onModuleDestroy(): void {
+  // HTTP runs may still need to renew/finalize leases while modules drain.
+  onApplicationShutdown(): void {
     if (this.redis?.isOpen) this.redis.destroy();
   }
 

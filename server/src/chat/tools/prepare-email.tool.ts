@@ -10,7 +10,7 @@ export interface PreparedEmailDraft {
   text: string;
 }
 
-const PrepareEmailInputSchema = z.object({
+export const PrepareEmailInputSchema = z.object({
   to: z
     .string()
     .trim()
@@ -50,6 +50,8 @@ const EMAIL_ADDRESS_PATTERN =
   /[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?(?:\.[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?)+/giu;
 const NON_DELIVERY_SUFFIX_PATTERN =
   /(?:是什么意思|什么意思|解释(?:一下)?|分析(?:一下)?|翻译(?:一下)?|改写(?:一下)?|这句话)[。！？!?\s]*$/u;
+const DIRECT_EMAIL_DRAFT_PATTERN =
+  /^(?:(?:请(?:你)?|请帮我|麻烦(?:你)?|劳烦(?:你)?|帮我|替我|能否(?:帮我)?|可以(?:帮我)?|我想(?:请你)?|我要)\s*)?(?:准备|起草|草拟|撰写)\s*(?:一封|一份|个)?\s*(?:电子)?邮件/iu;
 
 /**
  * 只决定本轮是否允许向模型暴露邮件工具，不提取收件人或正文。
@@ -57,10 +59,11 @@ const NON_DELIVERY_SUFFIX_PATTERN =
  */
 export function hasDirectEmailToolIntent(query: string): boolean {
   const normalized = query.trim();
+  if (NON_DELIVERY_SUFFIX_PATTERN.test(normalized)) return false;
+  if (DIRECT_EMAIL_DRAFT_PATTERN.test(normalized)) return true;
   if (!normalized || !DIRECT_EMAIL_PREFIX_PATTERN.test(normalized)) {
     return false;
   }
-  if (NON_DELIVERY_SUFFIX_PATTERN.test(normalized)) return false;
 
   return (
     /^(?:(?:请(?:你)?|请帮我|麻烦(?:你)?|劳烦(?:你)?|帮我|替我|能否(?:帮我)?|可以(?:帮我)?|我想(?:请你)?|我要)\s*)?(?:发送|发(?:一封)?邮件|寄(?:送)?|投递|email\b|mail\b)/iu.test(

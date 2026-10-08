@@ -194,11 +194,11 @@ describe('AgentAdmissionStore Redis startup', () => {
     ).rejects.toThrow('Agent admission store is unavailable');
   });
 
-  it('keeps a successful Redis connection until module shutdown', async () => {
+  it('keeps a successful Redis connection until application shutdown', async () => {
     redis.connect.mockResolvedValue(undefined);
     await expect(store.onModuleInit()).resolves.toBeUndefined();
     expect(redis.destroy).not.toHaveBeenCalled();
-    store.onModuleDestroy();
+    store.onApplicationShutdown();
     expect(redis.destroy).toHaveBeenCalledTimes(1);
   });
 });

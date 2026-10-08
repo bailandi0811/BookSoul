@@ -23,6 +23,7 @@ export class CommunityWsAdapter extends WsAdapter {
   constructor(
     httpServer: Server,
     private readonly tickets: CommunityTicketsService,
+    private readonly isDraining: () => boolean = () => false,
   ) {
     super(httpServer);
   }
@@ -82,6 +83,8 @@ export class CommunityWsAdapter extends WsAdapter {
     }, POLICY.handshakeMs);
     deadline.unref();
     try {
+      if (this.isDraining())
+        throw communityError(503, 'COMMUNITY_SERVER_SHUTTING_DOWN');
       const url = new URL(request.url ?? '', 'http://community.local');
       if (url.pathname !== COMMUNITY_PATH || url.search)
         throw communityError(400, 'COMMUNITY_INVALID_UPGRADE');

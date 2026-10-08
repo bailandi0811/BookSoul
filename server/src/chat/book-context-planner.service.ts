@@ -95,20 +95,33 @@ export class BookContextPlannerService {
     });
   }
 
+  planRules(input: BookContextPlanningInput): BookContextPlan {
+    const query = this.normalizeQuery(input.query);
+    const recentUserQuestions = this.recentUserQuestions(input.recentMessages);
+    return this.deterministicPlan(
+      query,
+      input.recentMessages,
+      recentUserQuestions,
+      this.resolveMode(query),
+      recentUserQuestions.length > 0 && CONTEXT_DEPENDENT_PATTERN.test(query),
+      'rule',
+    );
+  }
+
+  conversationForAgent(
+    messages: BookConversationMessage[],
+  ): BookConversationMessage[] {
+    // Agentic routing needs recent dialogue even when no retrieval is necessary.
+    return this.trimConversation(messages, 'follow_up');
+  }
+
   async plan(input: BookContextPlanningInput): Promise<BookContextPlan> {
     const query = this.normalizeQuery(input.query);
     const recentUserQuestions = this.recentUserQuestions(input.recentMessages);
     const mode = this.resolveMode(query);
     const isFollowUp =
       recentUserQuestions.length > 0 && CONTEXT_DEPENDENT_PATTERN.test(query);
-    const basePlan = this.deterministicPlan(
-      query,
-      input.recentMessages,
-      recentUserQuestions,
-      mode,
-      isFollowUp,
-      'rule',
-    );
+    const basePlan = this.planRules(input);
 
     if (mode === 'none' || (mode !== 'broad' && !isFollowUp)) {
       return basePlan;

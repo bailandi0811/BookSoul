@@ -28,6 +28,8 @@ export interface HistorySession {
 }
 
 export interface Message {
+  responseStatus?: "failed" | "cancelled";
+  runSummary?: DeepRunSummary;
   role: "user" | "assistant";
   content: string;
   references?: Reference[];
@@ -37,6 +39,13 @@ export interface Message {
   thinkingText?: string;
   thinkingSteps?: string[];
   createdAt?: number;
+}
+
+export interface DeepRunSummary {
+  mode: "deep";
+  stopReason: "satisfied" | "round_limit" | "no_progress" | "no_queries";
+  retrievalRounds: number;
+  incomplete: boolean;
 }
 
 interface SuccessResponse<T> {
@@ -81,6 +90,7 @@ interface ChatState {
     content: string,
     spoilerOverride?: boolean,
     externalResearch?: boolean,
+    retrievalMode?: "quick" | "deep",
   ) => Promise<void>;
 }
 
@@ -175,6 +185,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const { abortController, activeRequestId } = get();
     if (!abortController) return;
     abortController.abort();
+    set((state) => ({
+      messages: state.messages.map((message, index) =>
+        index === state.messages.length - 1
+          ? { ...message, responseStatus: "cancelled" as const }
+          : message,
+      ),
+    }));
     get().finishStreaming(activeRequestId ?? undefined);
     set({ lastStopNotice: "已停止生成", isLoading: false });
   },
@@ -333,6 +350,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     content,
     spoilerOverride = false,
     externalResearch = false,
+    retrievalMode = "quick",
   ) => {
     const currentBookId = get().currentBookId;
     if (!currentBookId) return;
@@ -403,6 +421,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           sessionId,
           spoilerOverride,
           externalResearch,
+          ...(retrievalMode === "deep" ? { retrievalMode } : {}),
         }),
         signal: abortController.signal,
       });
@@ -433,7 +452,41 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 content?: string;
                 emailDraft?: EmailDraft;
                 memoryUpdate?: MemoryUpdateData;
+                runSummary?: DeepRunSummary;
               };
+              if (
+                get().activeRequestId !== requestId ||
+                abortController.signal.aborted
+              )
+                continue;
+              if (data.runSummary) {
+                const summary = data.runSummary;
+                if (
+                  summary.mode !== "deep" ||
+                  ![
+                    "satisfied",
+                    "round_limit",
+                    "no_progress",
+                    "no_queries",
+                  ].includes(summary.stopReason) ||
+                  !Number.isInteger(summary.retrievalRounds) ||
+                  summary.retrievalRounds < 1 ||
+                  summary.retrievalRounds > 3 ||
+                  typeof summary.incomplete !== "boolean"
+                )
+                  throw new Error("阅读助手返回了无效的分析状态");
+                set((state) => {
+                  if (state.activeRequestId !== requestId) return state;
+                  const messages = [...state.messages];
+                  const last = messages[messages.length - 1];
+                  if (last?.role === "assistant")
+                    messages[messages.length - 1] = {
+                      ...last,
+                      runSummary: summary,
+                    };
+                  return { messages };
+                });
+              }
               if (data.error) throw new Error(data.error);
               if (data.thinking) {
                 const now = Date.now();
@@ -506,6 +559,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
         flushBufferedContent();
       }
     } catch (error) {
+      bufferedContent = "";
+      set((state) =>
+        state.activeRequestId !== requestId
+          ? state
+          : {
+              messages: state.messages.map((message, index) =>
+                index === state.messages.length - 1
+                  ? {
+                      ...message,
+                      responseStatus:
+                        abortController.signal.aborted && !inactivityTimedOut
+                          ? ("cancelled" as const)
+                          : ("failed" as const),
+                    }
+                  : message,
+              ),
+            },
+      );
       if (error instanceof Error && error.name === "AbortError") {
         if (inactivityTimedOut) {
           get().updateStreamingContent(

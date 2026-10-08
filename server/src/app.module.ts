@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { ApplicationDrainService } from './common/application-drain.service';
 import configuration from './config/configuration';
 import { MilvusModule } from './milvus/milvus.module';
 import { ChatModule } from './chat/chat.module';
@@ -18,6 +19,7 @@ import { IngestionModule } from './ingestion/ingestion.module';
 import { ToolsModule } from './tools/tools.module';
 import { UserProfileModule } from './users/profile/user-profile.module';
 import { CommunityModule } from './community/community.module';
+import { TarotModule } from './tarot/tarot.module';
 
 @Module({
   imports: [
@@ -37,6 +39,7 @@ import { CommunityModule } from './community/community.module';
     AuthModule,
     UserProfileModule,
     CommunityModule,
+    TarotModule,
     ClaimModule,
     BooksModule,
     IngestionModule,
@@ -48,6 +51,7 @@ import { CommunityModule } from './community/community.module';
   controllers: [AppController],
   providers: [
     AppService,
+    ApplicationDrainService,
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,

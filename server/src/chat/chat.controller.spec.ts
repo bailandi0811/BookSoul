@@ -1,4 +1,4 @@
-import { ConflictException, HttpException } from '@nestjs/common';
+import { ConflictException, HttpException, Logger } from '@nestjs/common';
 import { AgentRunStatus } from '@prisma/client';
 import { EventEmitter } from 'events';
 import type { Response } from 'express';
@@ -10,6 +10,7 @@ import {
   type BookChatContext,
 } from './book-sessions.service';
 import { ChatController } from './chat.controller';
+import { DeepBookError } from './deep-book.types';
 
 describe('ChatController admission', () => {
   const context: BookChatContext = {
@@ -56,6 +57,42 @@ describe('ChatController admission', () => {
       sessions as unknown as BookSessionsService,
       admission as unknown as AgentAdmissionService,
     );
+  });
+
+  it('accepts deep external research and mail intent with trusted options', async () => {
+    admission.acquire.mockResolvedValue({
+      accepted: true,
+      lease: acceptedLease(),
+    });
+    chatService.stream.mockImplementation(async function* () {
+      yield { type: 'content', data: 'answer' };
+    });
+    for (const message of ['作者背景', '发邮件给我的邮箱']) {
+      await controller.chat(
+        { ...body, message, retrievalMode: 'deep', externalResearch: true },
+        response() as unknown as Response,
+        auth,
+      );
+      expect(chatService.stream).toHaveBeenLastCalledWith(
+        context,
+        message,
+        expect.objectContaining({
+          retrievalMode: 'deep',
+          externalResearch: true,
+          accountEmail: auth.email,
+        }),
+      );
+    }
+  });
+  it('rejects invalid mode before acquiring a lease', async () => {
+    await expect(
+      controller.chat(
+        { ...body, retrievalMode: 'invalid' as 'deep' },
+        response() as unknown as Response,
+        auth,
+      ),
+    ).rejects.toThrow();
+    expect(admission.acquire).not.toHaveBeenCalled();
   });
 
   function response() {
@@ -137,6 +174,81 @@ describe('ChatController admission', () => {
     );
     expect(res.write).toHaveBeenCalledWith('data: [DONE]\n\n');
     expect(lease.finish).toHaveBeenCalledWith(AgentRunStatus.SUCCEEDED);
+  });
+  it('logs a safe failure reason while preserving the public error contract', async () => {
+    const lease = acceptedLease();
+    admission.acquire.mockResolvedValue({ accepted: true, lease });
+    chatService.stream.mockImplementation(async function* () {
+      yield { type: 'thinking', data: '正在拆解问题' };
+      throw new DeepBookError('DEEP_MODE_OUTPUT_INVALID', {
+        stage: 'plan',
+        reason: 'json_invalid',
+      });
+    });
+    const log = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
+    try {
+      const res = response();
+      await controller.chat(
+        {
+          ...body,
+          message: 'synthetic-private-question',
+          retrievalMode: 'deep',
+        },
+        res as unknown as Response,
+        auth,
+      );
+      expect(log).toHaveBeenCalledWith(
+        expect.stringContaining('stage=plan, reason=json_invalid'),
+      );
+      expect(JSON.stringify(log.mock.calls)).not.toContain(
+        'synthetic-private-question',
+      );
+      expect(JSON.stringify(log.mock.calls)).not.toContain(context.ownerId);
+      expect(res.write).toHaveBeenCalledWith(
+        expect.stringContaining('"code":"DEEP_MODE_OUTPUT_INVALID"'),
+      );
+      expect(res.write).not.toHaveBeenCalledWith('data: [DONE]\n\n');
+      expect(lease.finish).toHaveBeenCalledWith(AgentRunStatus.FAILED);
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it('sends wait heartbeats and clears timers after one deep terminal event', async () => {
+    jest.useFakeTimers();
+    try {
+      const lease = acceptedLease();
+      admission.acquire.mockResolvedValue({ accepted: true, lease });
+      let finish: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      chatService.stream.mockImplementation(async function* () {
+        await gate;
+        yield { type: 'content', data: 'answer' };
+      });
+      const res = response();
+      const running = controller.chat(
+        { ...body, retrievalMode: 'deep' },
+        res as unknown as Response,
+        auth,
+      );
+      await jest.advanceTimersByTimeAsync(10000);
+      expect(res.write).toHaveBeenCalledWith(
+        expect.stringContaining('正在等待本轮处理完成'),
+      );
+      finish();
+      await running;
+      expect(lease.finish).toHaveBeenCalledTimes(1);
+      expect(
+        res.write.mock.calls.filter((call) => call[0] === 'data: [DONE]\n\n'),
+      ).toHaveLength(1);
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('cancels and releases an accepted run when the client disconnects', async () => {

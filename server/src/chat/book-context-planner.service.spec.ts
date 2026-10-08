@@ -2,6 +2,28 @@ import { ConfigService } from '@nestjs/config';
 import { BookContextPlannerService } from './book-context-planner.service';
 
 describe('BookContextPlannerService', () => {
+  it('provides a pure rule plan without invoking the planner model', () => {
+    const service = new BookContextPlannerService({
+      get: jest.fn(),
+    } as unknown as ConfigService);
+    const invoke = jest.fn();
+    Object.assign(service, { model: { withStructuredOutput: invoke } });
+    const plan = service.planRules({
+      bookTitle: '合成',
+      query: '主角是谁',
+      recentMessages: [],
+    });
+    expect(plan.bookQueries).toEqual(['主角是谁']);
+    expect(plan.plannerSource).toBe('rule');
+    expect(invoke).not.toHaveBeenCalled();
+    expect(
+      service.planRules({
+        bookTitle: '合成',
+        query: '我之前的笔记是什么',
+        recentMessages: [],
+      }),
+    ).toMatchObject({ memoryPolicy: 'book_notes' });
+  });
   let invoke: jest.Mock;
   let withStructuredOutput: jest.Mock;
   let planner: BookContextPlannerService;

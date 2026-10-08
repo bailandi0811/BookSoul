@@ -45,6 +45,98 @@ describe("chat composer interactions", () => {
     vi.restoreAllMocks();
   });
 
+  it.each(["fixture-session", null])(
+    "keeps deep across questions with initial session %s while clearing one-time web permission",
+    async (initialSession) => {
+      useChatStore.setState({ sessionId: initialSession });
+      if (initialSession === null) {
+        vi.mocked(fetch).mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              success: true,
+              data: {
+                sessionId: "created-session",
+                title: "新会话",
+                updatedAt: "2026-10-07T00:00:00.000Z",
+              },
+            }),
+          ),
+        );
+      }
+      await act(async () => root.render(<InputArea />));
+      await act(async () =>
+        [...container.querySelectorAll("button")]
+          .find((button) => button.textContent?.includes("本次选项"))!
+          .click(),
+      );
+      const radio = document.querySelector<HTMLInputElement>(
+        'input[value="deep"]',
+      );
+      expect(radio).not.toBeNull();
+      await act(async () => radio!.click());
+      await act(async () =>
+        [
+          ...document.querySelectorAll<HTMLInputElement>(
+            'input[type="checkbox"]',
+          ),
+        ]
+          .at(1)!
+          .click(),
+      );
+      expect(
+        [
+          ...document.querySelectorAll<HTMLInputElement>(
+            'input[type="checkbox"]',
+          ),
+        ].at(1)?.disabled,
+      ).toBe(false);
+      await act(async () =>
+        [
+          ...document.querySelectorAll<HTMLButtonElement>(
+            ".paper-dialog button",
+          ),
+        ]
+          .find((button) => button.textContent === "应用到本次提问")!
+          .click(),
+      );
+      await act(async () =>
+        container
+          .querySelector("form")!
+          .dispatchEvent(
+            new Event("submit", { bubbles: true, cancelable: true }),
+          ),
+      );
+      const request = vi
+        .mocked(fetch)
+        .mock.calls.find(([url]) => url === "/api/chat")!;
+      expect(JSON.parse(String(request[1]?.body))).toMatchObject({
+        retrievalMode: "deep",
+        externalResearch: true,
+      });
+      expect(container.textContent).toContain("深度模式");
+      await act(async () => useChatStore.getState().setDraftInput("继续分析"));
+      await act(async () =>
+        container
+          .querySelector("form")!
+          .dispatchEvent(
+            new Event("submit", { bubbles: true, cancelable: true }),
+          ),
+      );
+      const requests = vi
+        .mocked(fetch)
+        .mock.calls.filter(([url]) => url === "/api/chat");
+      expect(JSON.parse(String(requests[1][1]?.body))).toMatchObject({
+        retrievalMode: "deep",
+        externalResearch: false,
+        spoilerOverride: false,
+      });
+      await act(async () =>
+        useChatStore.setState({ sessionId: "other-session" }),
+      );
+      expect(container.textContent).not.toContain("深度模式");
+    },
+  );
+
   it("keeps Chinese composition in the draft instead of sending on Enter", async () => {
     await act(async () => root.render(<InputArea />));
     await act(async () => {

@@ -14,11 +14,17 @@ import { ChatController } from './chat.controller';
 import { ExternalResearchService } from './external-research.service';
 import { AgentAdmissionService } from './admission/agent-admission.service';
 import { AgentAdmissionStore } from './admission/agent-admission.store';
+import { AgenticBookService } from './agentic-book.service';
+import { AgenticBookToolsService } from './agentic-book-tools.service';
+import { BookExternalResearchAgentService } from './book-external-research-agent.service';
 
 @Module({
   imports: [AuthModule, BooksModule, BookVectorModule, MemoryModule, McpModule],
   controllers: [ChatController, BookSessionsController],
   providers: [
+    AgenticBookService,
+    AgenticBookToolsService,
+    BookExternalResearchAgentService,
     BookSessionsService,
     BookContextPlannerService,
     BookChunkRetrieverService,

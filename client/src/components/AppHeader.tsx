@@ -16,6 +16,7 @@ import { AccountSection } from "./auth/AccountSection";
 import { WallpaperLibrary } from "./WallpaperLibrary";
 import { CommunityChatEntry } from "./CommunityChat/CommunityChatEntry";
 
+import { TarotEntry } from "./Tarot/TarotEntry";
 export function AppHeader({
   account = true,
   action,
@@ -73,7 +74,7 @@ export function AppHeader({
           <span className="brand-caption">{caption}</span>
         </div>
         <div className="app-header-actions">
-          {account && <span className="hidden sm:contents"><CommunityChatEntry /></span>}
+          {account && <span className="hidden sm:contents"><CommunityChatEntry /><TarotEntry /></span>}
           <div className="appearance-capsule">
             <details
               className="background-chooser"
@@ -191,7 +192,7 @@ export function AppHeader({
           {account ? <AccountSection /> : action}
         </div>
       </div>
-      {account && <nav aria-label="书友交流" className="community-mobile-entry flex justify-end px-3 pb-2 sm:hidden"><CommunityChatEntry mobile /></nav>}
+      {account && <nav aria-label="书房活动" className="community-mobile-entry flex justify-end gap-2 px-3 pb-2 sm:hidden"><CommunityChatEntry mobile /><TarotEntry /></nav>}
     </header>
   );
 }

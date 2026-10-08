@@ -1,15 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   AIMessage,
   type BaseMessage,
   HumanMessage,
   SystemMessage,
-  ToolMessage,
 } from '@langchain/core/messages';
 import { ChatOpenAI } from '@langchain/openai';
 import { BookAssistantPromptService } from '../books/book-assistant-prompt.service';
-import { withTimeout } from '../common/promise-timeout';
 import {
   type AgentMemoryContext,
   MemoryService,
@@ -20,10 +18,7 @@ import {
   type ExternalResearchContext,
   BookContextService,
 } from './book-context.service';
-import {
-  type ExternalSource,
-  ExternalResearchService,
-} from './external-research.service';
+import { ExternalResearchService } from './external-research.service';
 import {
   type BookChatContext,
   BookSessionsService,
@@ -37,13 +32,22 @@ import {
   redactEmailAddressesForContext,
   type PreparedEmailDraft,
 } from './tools/prepare-email.tool';
+import { AgenticBookService } from './agentic-book.service';
 import {
-  createTavilySearchTool,
-  parseTavilySearchInput,
-  TAVILY_SEARCH_TOOL_NAME,
-} from './tools/tavily-search.tool';
+  BookExternalResearchAgentService,
+  type ExternalResearchAgentResult,
+} from './book-external-research-agent.service';
+import {
+  assertDeepActive,
+  awaitDeepActive,
+  deepDeadline,
+  DeepBookError,
+  type DeepRunSummary,
+  type RetrievalMode,
+} from './deep-book.types';
 
 export type BookChatEvent =
+  | { type: 'run_summary'; data: DeepRunSummary }
   | { type: 'thinking'; data: string }
   | { type: 'references'; data: unknown[] }
   | { type: 'external_references'; data: unknown[] }
@@ -52,6 +56,9 @@ export type BookChatEvent =
   | { type: 'memory_update'; data: unknown };
 
 export interface BookChatRunOptions {
+  retrievalMode?: RetrievalMode;
+  runId?: string;
+  spoilerOverride?: boolean;
   externalResearch?: boolean;
   abortSignal?: AbortSignal;
   accountEmail?: string;
@@ -61,16 +68,12 @@ type EmailToolOutcome =
   | { kind: 'draft'; draft: PreparedEmailDraft }
   | { kind: 'message'; message: string };
 
-interface ExternalResearchAgentResult {
-  context: ExternalResearchContext;
-  messages: BaseMessage[];
-}
-
 @Injectable()
 export class BookChatService {
   private readonly logger = new Logger(BookChatService.name);
   private readonly model: ChatOpenAI;
   private readonly toolModel: ChatOpenAI;
+  private readonly externalAgent: BookExternalResearchAgentService;
   private readonly modelRequestTimeoutMs: number;
 
   constructor(
@@ -80,6 +83,8 @@ export class BookChatService {
     private readonly memory: MemoryService,
     private readonly externalResearch: ExternalResearchService,
     configService: ConfigService,
+    @Optional() private readonly agentic?: AgenticBookService,
+    @Optional() externalAgent?: BookExternalResearchAgentService,
   ) {
     this.modelRequestTimeoutMs =
       configService.get<number>('openai.requestTimeoutMs') || 20_000;
@@ -95,6 +100,12 @@ export class BookChatService {
     };
     this.model = new ChatOpenAI({ ...modelConfig, streaming: true });
     this.toolModel = new ChatOpenAI({ ...modelConfig, streaming: false });
+    this.externalAgent =
+      externalAgent ??
+      new BookExternalResearchAgentService(
+        this.externalResearch,
+        configService,
+      );
   }
 
   async *stream(
@@ -102,6 +113,10 @@ export class BookChatService {
     query: string,
     options: BookChatRunOptions = {},
   ): AsyncGenerator<BookChatEvent> {
+    if (options.retrievalMode === 'deep') {
+      yield* this.streamDeep(context, query, options);
+      return;
+    }
     const abortSignal = options.abortSignal;
     const emailToolEnabled = hasDirectEmailToolIntent(query);
     yield { type: 'thinking', data: '正在整理当前对话和可见原文...' };
@@ -253,6 +268,82 @@ export class BookChatService {
     }
   }
 
+  private async *streamDeep(
+    context: BookChatContext,
+    query: string,
+    options: BookChatRunOptions,
+  ): AsyncGenerator<BookChatEvent> {
+    if (!this.agentic) throw new DeepBookError('DEEP_MODE_UNAVAILABLE');
+    const deadline = deepDeadline(
+      options.abortSignal ?? new AbortController().signal,
+      90000,
+      'agent',
+    );
+    const signal = deadline.signal;
+    const explicitRemember =
+      /请记住|记住(?:我|这|以后)|别忘了|下次(?:请|要|记得)/i.test(query);
+    let response = '';
+    const pending: BookChatEvent[] = [];
+    try {
+      for await (const event of this.agentic.run(context, query, {
+        ...options,
+        abortSignal: signal,
+      })) {
+        assertDeepActive(signal);
+        if (event.type === 'content') response += event.data;
+        if (explicitRemember && event.type === 'content') pending.push(event);
+        else yield event;
+      }
+      assertDeepActive(signal);
+      await awaitDeepActive(
+        this.sessions.appendExchange(context, query, response, signal),
+        signal,
+      );
+      let memoryUpdate;
+      let memoryFailed = false;
+      try {
+        memoryUpdate = await awaitDeepActive(
+          this.memory.processAndStoreBookMemory(
+            context.ownerId,
+            context.sessionId,
+            context.bookId,
+            query,
+            signal,
+          ),
+          signal,
+        );
+      } catch {
+        assertDeepActive(signal);
+        memoryFailed = true;
+        this.logger.warn('Book memory commit failed (stage=memory_commit)');
+        yield {
+          type: 'thinking',
+          data: '回答已完成，但本次记忆保存未完成，请稍后重试。',
+        };
+      }
+      assertDeepActive(signal);
+      for (const event of pending) yield event;
+      if (
+        memoryUpdate &&
+        (memoryUpdate.hasNewMemories || (memoryUpdate.updatedCount ?? 0) > 0)
+      )
+        yield { type: 'memory_update', data: memoryUpdate };
+      if (explicitRemember)
+        yield {
+          type: 'content',
+          data: memoryFailed
+            ? '\n本次记忆保存未完成，请稍后重试。'
+            : memoryUpdate &&
+                (memoryUpdate.hasNewMemories ||
+                  (memoryUpdate.updatedCount ?? 0) > 0)
+              ? '\n已保存本次记忆。'
+              : '\n本次内容未通过长期记忆保存门控，没有新增记忆。',
+        };
+    } finally {
+      deadline.dispose();
+    }
+  }
+
   private emptyExternalResearchAgent(): ExternalResearchAgentResult {
     return {
       context: {
@@ -270,132 +361,12 @@ export class BookChatService {
     query: string,
     abortSignal?: AbortSignal,
   ): Promise<ExternalResearchAgentResult> {
-    const decisionInput = new HumanMessage(`<book_title>
-${this.escapeXml(bookTitle)}
-</book_title>
-<user_question>
-${this.escapeXml(query)}
-</user_question>`);
-    const searchTool = createTavilySearchTool(({ query: searchQuery }) =>
-      this.externalResearch.search(searchQuery, abortSignal),
+    return this.externalAgent.research(
+      bookTitle,
+      query,
+      abortSignal,
+      this.toolModel,
     );
-
-    let response: AIMessage;
-    try {
-      response = await this.withExternalRoutingDeadline(
-        (signal) =>
-          this.toolModel
-            .bindTools([searchTool], {
-              tool_choice: 'auto',
-              parallel_tool_calls: false,
-            })
-            .invoke(
-              [
-                new SystemMessage(`<external_research_router>
-你只负责判断当前问题是否需要一次现实世界联网搜索，不要回答问题。
-只有作者信息、历史文化典故、现实背景、时效性事实或用户明确要求联网查证时，才调用 tavily_search。
-小说人物、情节、设定、伏笔、结局、原文解释和普通阅读讨论不得联网，必须交给后续书内检索。
-搜索词只能依据当前 book_title 与 user_question 生成，保持简洁；不得猜测或添加小说原文、用户记忆、历史消息、账号信息。
-每轮最多调用一次工具；不需要联网时不要调用任何工具。
-</external_research_router>`),
-                decisionInput,
-              ],
-              { signal },
-            ),
-        abortSignal,
-      );
-    } catch (error) {
-      if (abortSignal?.aborted) throw error;
-      this.logger.warn(
-        `External research routing failed (type=${this.errorName(error)})`,
-      );
-      return {
-        context: {
-          requested: true,
-          used: false,
-          sources: [],
-          failed: true,
-        },
-        messages: [],
-      };
-    }
-
-    const toolCalls = response.tool_calls ?? [];
-    if (toolCalls.length === 0) {
-      return {
-        context: {
-          requested: true,
-          used: false,
-          sources: [],
-          failed: false,
-        },
-        messages: [],
-      };
-    }
-
-    const toolCall = toolCalls[0];
-    if (
-      toolCalls.length !== 1 ||
-      toolCall.name !== TAVILY_SEARCH_TOOL_NAME ||
-      typeof toolCall.id !== 'string' ||
-      !toolCall.id
-    ) {
-      this.logger.warn(
-        'External research routing returned an invalid tool call',
-      );
-      return {
-        context: {
-          requested: true,
-          used: false,
-          sources: [],
-          failed: true,
-        },
-        messages: [],
-      };
-    }
-
-    try {
-      const input = parseTavilySearchInput(toolCall.args);
-      const result: unknown = await searchTool.invoke(input, {
-        signal: abortSignal,
-      });
-      if (!this.isExternalSources(result)) {
-        throw new Error('External research tool returned invalid sources');
-      }
-      const toolMessage = new ToolMessage({
-        content: JSON.stringify({ sources: result }),
-        tool_call_id: toolCall.id,
-        name: TAVILY_SEARCH_TOOL_NAME,
-      });
-      return {
-        context: {
-          requested: true,
-          used: true,
-          sources: result,
-          failed: false,
-        },
-        messages: [decisionInput, response, toolMessage],
-      };
-    } catch (error) {
-      if (abortSignal?.aborted || this.isAbortError(error)) throw error;
-      this.logger.warn(
-        `External research tool failed (type=${this.errorName(error)})`,
-      );
-      const toolMessage = new ToolMessage({
-        content: JSON.stringify({ error: 'external_search_unavailable' }),
-        tool_call_id: toolCall.id,
-        name: TAVILY_SEARCH_TOOL_NAME,
-      });
-      return {
-        context: {
-          requested: true,
-          used: true,
-          sources: [],
-          failed: true,
-        },
-        messages: [decisionInput, response, toolMessage],
-      };
-    }
   }
 
   private async invokeEmailTool(
@@ -460,8 +431,8 @@ ${this.escapeXml(query)}
         context.bookId,
         query,
       );
-    } catch (error) {
-      this.logger.warn(`Book memory write skipped: ${String(error)}`);
+    } catch (_error) {
+      this.logger.warn('Book memory write skipped');
       return null;
     }
   }
@@ -593,45 +564,5 @@ ${this.escapeXml(query)}
       typeof draft.subject === 'string' &&
       typeof draft.text === 'string'
     );
-  }
-
-  private isExternalSources(value: unknown): value is ExternalSource[] {
-    return (
-      Array.isArray(value) &&
-      value.every(
-        (source) =>
-          source &&
-          typeof source === 'object' &&
-          'title' in source &&
-          typeof source.title === 'string' &&
-          'url' in source &&
-          typeof source.url === 'string' &&
-          'snippet' in source &&
-          typeof source.snippet === 'string',
-      )
-    );
-  }
-
-  private async withExternalRoutingDeadline<T>(
-    operation: (signal: AbortSignal) => Promise<T>,
-    abortSignal?: AbortSignal,
-  ): Promise<T> {
-    const timeoutController = new AbortController();
-    const signal = abortSignal
-      ? AbortSignal.any([abortSignal, timeoutController.signal])
-      : timeoutController.signal;
-    const timer = setTimeout(
-      () => timeoutController.abort(),
-      this.modelRequestTimeoutMs,
-    );
-    try {
-      return await withTimeout(
-        operation(signal),
-        this.modelRequestTimeoutMs,
-        'external research routing',
-      );
-    } finally {
-      clearTimeout(timer);
-    }
   }
 }

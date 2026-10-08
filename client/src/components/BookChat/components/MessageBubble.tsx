@@ -146,7 +146,11 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                       <div className="flex items-center gap-2">
                         <Check className="w-4 h-4 text-muted-foreground" />
                         <span className="text-[13px] font-medium text-muted-foreground">
-                          已完成检索
+                          {message.responseStatus === "failed"
+                            ? "本次处理失败"
+                            : message.responseStatus === "cancelled"
+                              ? "本次处理已停止"
+                              : "已完成本次处理"}
                         </span>
                       </div>
                     )}
@@ -197,6 +201,13 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                 </div>
               )}
 
+              {message.runSummary && !message.responseStatus && (
+                <p role="status" className="mt-2 text-xs text-muted-foreground">
+                  {message.runSummary.incomplete
+                    ? "依据有限：部分问题尚未找到充分原文"
+                    : "已完成本次检索"}
+                </p>
+              )}
               {(!message.isThinking || displayContent.trim().length > 0) && (
                 <motion.div
                   key="content"

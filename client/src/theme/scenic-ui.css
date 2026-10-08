@@ -81,7 +81,6 @@ summary {
     rgb(241 242 240 / 0.28) 42%,
     rgb(241 242 240 / 0.38)
   );
-  transition: background 0.3s;
 }
 .dark .scene-veil {
   background: linear-gradient(
@@ -97,7 +96,42 @@ summary {
 .dark #root:has(.auth-page) .scene-veil {
   background: rgb(0 0 0 / 0.56);
 }
-#root:has(.landing-page) .scene-veil {
+/* Shelf mist sits under the homepage mist. Leaving home fades the top layer off, so the photo never snaps brighter. */
+.scene-veil::before,
+.scene-veil::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+html.veil-live .scene-veil::before,
+html.veil-live .scene-veil::after {
+  transition: opacity 0.72s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.scene-veil::before {
+  background:
+    radial-gradient(circle at 16% 30%, rgb(255 255 250 / 0.64), transparent 25rem),
+    linear-gradient(
+      90deg,
+      rgb(245 245 242 / 0.78),
+      rgb(245 245 242 / 0.62) 44%,
+      rgb(245 245 242 / 0.42) 70%,
+      rgb(245 245 242 / 0.54)
+    );
+}
+.dark .scene-veil::before {
+  background:
+    radial-gradient(circle at 16% 30%, rgb(0 0 0 / 0.54), transparent 25rem),
+    linear-gradient(
+      90deg,
+      rgb(0 0 0 / 0.66),
+      rgb(0 0 0 / 0.56) 44%,
+      rgb(0 0 0 / 0.42) 70%,
+      rgb(0 0 0 / 0.52)
+    );
+}
+.scene-veil::after {
   background:
     radial-gradient(circle at 16% 30%, rgb(255 255 250 / 0.72), transparent 25rem),
     linear-gradient(
@@ -108,7 +142,7 @@ summary {
       rgb(245 245 242 / 0.5)
     );
 }
-.dark #root:has(.landing-page) .scene-veil {
+.dark .scene-veil::after {
   background:
     radial-gradient(circle at 16% 30%, rgb(0 0 0 / 0.62), transparent 25rem),
     linear-gradient(
@@ -118,6 +152,13 @@ summary {
       rgb(0 0 0 / 0.34) 70%,
       rgb(0 0 0 / 0.54)
     );
+}
+#root:has(.app-screen[data-present="true"] .landing-page) .scene-veil::before,
+#root:has(.app-screen[data-present="true"] .library-room) .scene-veil::before {
+  opacity: 1;
+}
+#root:has(.app-screen[data-present="true"] .landing-page) .scene-veil::after {
+  opacity: 1;
 }
 .scenic-background::after {
   content: "";
@@ -2591,17 +2632,33 @@ summary::-webkit-details-marker {
     gap: 16px;
   }
   .landing-copy {
-    padding-bottom: 0;
+    max-width: none;
   }
   .landing-copy h1 {
     max-width: 720px;
   }
   .landing-stage {
-    min-height: 480px;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    padding: 8px 0;
   }
   .landing-book-row {
-    left: 9%;
-    right: 9%;
+    position: relative;
+    grid-column: 1 / -1;
+    left: auto;
+    right: auto;
+    top: auto;
+    width: min(100%, 520px);
+    height: 310px;
+    margin: 0 auto 10px;
+  }
+  .landing-book-left {
+    transform: translateY(-12px) rotate(-10deg);
+  }
+  .landing-book-right {
+    transform: translateY(-8px) rotate(8deg);
   }
   .landing-book .book-cover {
     width: 148px;
@@ -2610,15 +2667,27 @@ summary::-webkit-details-marker {
     width: 212px;
   }
   .landing-read-card {
-    left: 7%;
-    right: 22%;
-    bottom: 92px;
+    grid-column: 1 / -1;
+    text-align: left;
   }
-  .landing-scope-card {
-    bottom: 178px;
-  }
+  /* Keep preview notes in flow once the desktop composition stacks. */
+  .landing-read-card,
+  .landing-scope-card,
   .landing-upload-card {
-    width: min(390px, 58vw);
+    position: relative;
+    inset: auto;
+    width: auto;
+    min-width: 0;
+    transform: none;
+    background: rgb(var(--card));
+  }
+  .landing-scope-card > svg,
+  .landing-upload-card > svg {
+    flex-shrink: 0;
+  }
+  .landing-scope-card h2,
+  .landing-upload-card h2 {
+    font-size: 15px;
   }
   .landing-promises {
     grid-template-columns: minmax(0, 1fr);
@@ -2675,13 +2744,14 @@ summary::-webkit-details-marker {
 @media (max-width: 767px) {
   .landing-page {
     width: 100%;
-    padding: 14px 14px 28px;
-    gap: 16px;
+    padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    gap: 14px;
   }
   .landing-nav {
-    min-height: 66px;
-    padding: 10px 11px;
-    border-radius: 20px;
+    min-height: 60px;
+    padding: 8px 10px;
+    gap: 8px;
+    border-radius: 18px;
   }
   .landing-brand {
     gap: 8px;
@@ -2697,93 +2767,106 @@ summary::-webkit-details-marker {
     display: none;
   }
   .landing-nav-action {
-    min-height: 42px;
-    padding: 0 14px;
+    min-height: 44px;
+    padding: 0 12px;
     font-size: 13px;
   }
   .landing-hero {
-    gap: 8px;
+    gap: 16px;
+  }
+  .landing-copy {
+    padding: 22px 20px;
+    border-radius: 22px;
   }
   .landing-kicker {
     font-size: 11px;
   }
   .landing-copy h1 {
     margin-top: 18px;
-    font-size: clamp(48px, 17vw, 74px);
-    line-height: 1.02;
+    font-size: clamp(46px, 13vw, 64px);
+    line-height: 1.08;
   }
   .landing-copy h1 span {
-    margin-top: 9px;
-    font-size: clamp(32px, 11vw, 44px);
-    line-height: 1.15;
+    margin-top: 10px;
+    font-size: clamp(24px, 6.8vw, 36px);
+    line-height: 1.4;
+    letter-spacing: -0.04em;
   }
   .landing-lead {
-    margin-top: 18px;
-    font-size: 15px;
-    line-height: 1.85;
+    margin-top: 16px;
+    font-size: 14px;
+    line-height: 1.8;
   }
   .landing-actions {
-    margin-top: 24px;
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    margin-top: 20px;
     gap: 10px;
   }
   .landing-primary,
   .landing-secondary {
     min-height: 48px;
-    flex: 1 1 138px;
+    min-width: 0;
+    padding: 0 12px;
     border-radius: 12px;
     font-size: 14px;
   }
   .landing-note {
-    margin-top: 20px;
+    margin-top: 16px;
+    padding-left: 12px;
     font-size: 12px;
+    line-height: 1.75;
   }
   .landing-stage {
-    min-height: 408px;
-    overflow: hidden;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding: 0 4px;
   }
   .landing-book-row {
-    left: 0;
-    right: 0;
-    top: 9px;
-    height: 270px;
+    width: min(100%, 360px);
+    height: 218px;
+    margin-bottom: 8px;
   }
   .landing-book .book-cover {
-    width: 104px;
+    width: clamp(80px, 24vw, 110px);
   }
   .landing-book-main {
-    left: 34%;
+    left: 50%;
+    z-index: 1;
+    transform: translateX(-50%) rotate(-1.5deg);
   }
   .landing-book-main .book-cover {
-    width: 144px;
+    width: clamp(126px, 36vw, 156px);
   }
   .landing-book-right {
-    right: 2%;
+    right: 5%;
   }
   .landing-book-left {
-    left: 3%;
+    left: 5%;
   }
   .landing-read-card {
-    left: 4%;
-    right: 4%;
-    bottom: 92px;
-    padding: 17px;
+    padding: 16px;
     border-radius: 16px;
-    transform: rotate(1deg);
+  }
+  .landing-read-card-body {
+    grid-template-columns: 44px minmax(0, 1fr) 20px;
+    gap: 12px;
+  }
+  .landing-mini-cover .book-cover {
+    width: 40px;
+  }
+  .landing-read-card h2 {
+    font-size: 19px;
   }
   .landing-scope-card {
-    right: 4%;
-    bottom: 182px;
-    width: min(292px, 78vw);
-    padding: 16px;
-    border-radius: 15px;
+    padding: 13px 16px;
+    border-radius: 14px;
+    gap: 12px;
   }
   .landing-upload-card {
-    left: 10%;
-    right: 4%;
-    bottom: 24px;
-    width: auto;
-    padding: 16px;
-    border-radius: 15px;
+    padding: 13px 16px;
+    border-radius: 14px;
+    gap: 12px;
   }
   .landing-scope-card h2,
   .landing-upload-card h2 {
@@ -2791,10 +2874,16 @@ summary::-webkit-details-marker {
   }
   .landing-promises {
     border-radius: 18px;
+    scroll-margin-top: 16px;
   }
   .landing-promises article {
     min-height: 0;
-    padding: 19px;
+    padding: 18px;
+    gap: 14px;
+  }
+  .landing-promises article > svg {
+    width: 26px;
+    flex-shrink: 0;
   }
   .landing-promises h2 {
     font-size: 19px;
@@ -3310,7 +3399,10 @@ summary::-webkit-details-marker {
 }
 @media (prefers-reduced-motion: reduce) {
   .book-cover,
-  .booksoul-mark-spark {
+  .booksoul-mark-spark,
+  .scene-veil,
+  .scene-veil::before,
+  .scene-veil::after {
     transform: none !important;
     animation: none !important;
     transition: none !important;

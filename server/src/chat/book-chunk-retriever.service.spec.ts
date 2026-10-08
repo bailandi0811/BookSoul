@@ -4,13 +4,22 @@ import { BookVectorStoreService } from '../vector/book-vector-store.service';
 import { BookChunkRetrieverService } from './book-chunk-retriever.service';
 
 describe('BookChunkRetrieverService', () => {
-  let prisma: { bookChunk: { findMany: jest.Mock } };
+  let prisma: {
+    bookChunk: { findMany: jest.Mock };
+    book: { findFirst: jest.Mock };
+    $transaction: jest.Mock;
+  };
   let embeddings: { embedBatch: jest.Mock };
   let vectorStore: { searchChunkIds: jest.Mock };
   let service: BookChunkRetrieverService;
 
   beforeEach(() => {
     prisma = {
+      book: { findFirst: jest.fn().mockResolvedValue({ id: 'book-a' }) },
+      $transaction: jest.fn(
+        async (operation: (tx: typeof prisma) => Promise<unknown>) =>
+          operation(prisma),
+      ),
       bookChunk: {
         findMany: jest
           .fn()
@@ -61,12 +70,15 @@ describe('BookChunkRetrieverService', () => {
     expect(prisma.bookChunk.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          id: {
-            in: ['chunk-a', 'chunk-overlap', 'chunk-b', 'foreign-chunk'],
-          },
           bookId: 'book-a',
           embeddingVersion: 'book-embedding-v1',
           sectionOrder: { lte: 2 },
+          book: {
+            ownerId: 'user-a',
+            visibility: 'PRIVATE',
+            status: 'READY',
+            embeddingVersion: 'book-embedding-v1',
+          },
         },
       }),
     );
@@ -101,10 +113,10 @@ describe('BookChunkRetrieverService', () => {
       },
     );
 
-    expect(embeddings.embedBatch).toHaveBeenCalledWith([
-      '他为什么这么做？',
-      '旧友交出信件的原因',
-    ]);
+    expect(embeddings.embedBatch).toHaveBeenCalledWith(
+      ['他为什么这么做？', '旧友交出信件的原因'],
+      expect.any(AbortSignal),
+    );
     expect(vectorStore.searchChunkIds).toHaveBeenCalledTimes(2);
     expect(result.map((item) => item.chunkId)).toEqual(['chunk-b', 'chunk-a']);
   });
@@ -174,6 +186,205 @@ describe('BookChunkRetrieverService', () => {
       'chunk-b',
       'chunk-d',
     ]);
+  });
+
+  it('returns lexical evidence even when vector search has no hits', async () => {
+    prisma.bookChunk.findMany.mockResolvedValue([
+      { ...chunk('rare', 1, 0, 0, 100), content: '澹台烬在河边交出信物。' },
+    ]);
+    vectorStore.searchChunkIds.mockResolvedValue([]);
+    const result = await service.retrieve(
+      {
+        ownerScope: 'user-a',
+        bookId: 'book-a',
+        embeddingVersion: 'book-embedding-v1',
+        spoilerCeiling: 1,
+      },
+      {
+        queries: ['澹台烬'],
+        limit: 4,
+        maxContextChars: 3600,
+        maxPerSection: 4,
+      },
+    );
+    expect(result.map((hit) => hit.chunkId)).toEqual(['rare']);
+  });
+
+  it('rejects an inaccessible or deleting book before reading its corpus', async () => {
+    prisma.book.findFirst.mockResolvedValue(null);
+    await expect(
+      service.retrieve(
+        {
+          ownerScope: 'user-a',
+          bookId: 'book-a',
+          embeddingVersion: 'book-embedding-v1',
+          spoilerCeiling: 1,
+        },
+        { queries: ['谁'], limit: 4, maxContextChars: 3600, maxPerSection: 4 },
+      ),
+    ).rejects.toThrow();
+    expect(prisma.bookChunk.findMany).not.toHaveBeenCalled();
+  });
+
+  it('does not downgrade when the lexical corpus cannot be loaded', async () => {
+    prisma.bookChunk.findMany.mockRejectedValue(
+      new Error('database unavailable'),
+    );
+    await expect(
+      service.retrieve(
+        {
+          ownerScope: 'user-a',
+          bookId: 'book-a',
+          embeddingVersion: 'book-embedding-v1',
+          spoilerCeiling: 1,
+        },
+        { queries: ['谁'], limit: 4, maxContextChars: 3600, maxPerSection: 4 },
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('rejects late results after the book is deleted or its version changes', async () => {
+    prisma.book.findFirst
+      .mockResolvedValueOnce({ id: 'book-a' })
+      .mockResolvedValueOnce(null);
+    await expect(
+      service.retrieve(
+        {
+          ownerScope: 'user-a',
+          bookId: 'book-a',
+          embeddingVersion: 'book-embedding-v1',
+          spoilerCeiling: 1,
+        },
+        { queries: ['谁'], limit: 4, maxContextChars: 3600, maxPerSection: 4 },
+      ),
+    ).rejects.toThrow('书籍状态已变化');
+  });
+
+  it('reads every visible page before computing lexical statistics', async () => {
+    prisma.bookChunk.findMany
+      .mockResolvedValueOnce(
+        Array.from({ length: 250 }, (_, index) => ({
+          ...chunk(`c-${index}`, 1, index, index * 100, index * 100 + 100),
+          content: '河边旧友',
+        })),
+      )
+      .mockResolvedValueOnce([
+        { ...chunk('rare', 1, 250, 25000, 25100), content: '澹台烬持有信物' },
+      ]);
+    vectorStore.searchChunkIds.mockResolvedValue([]);
+    const result = await service.retrieve(
+      {
+        ownerScope: 'user-a',
+        bookId: 'book-a',
+        embeddingVersion: 'book-embedding-v1',
+        spoilerCeiling: 1,
+      },
+      {
+        queries: ['澹台烬'],
+        limit: 4,
+        maxContextChars: 3600,
+        maxPerSection: 4,
+      },
+    );
+    expect(result.map((hit) => hit.chunkId)).toEqual(['rare']);
+    expect(prisma.bookChunk.findMany.mock.calls[1][0].skip).toBe(250);
+  });
+
+  it('keeps SYSTEM scope separate from private owners', async () => {
+    await service.retrieve(
+      {
+        ownerScope: '__system__',
+        bookId: 'book-a',
+        embeddingVersion: 'book-embedding-v1',
+        spoilerCeiling: 2,
+      },
+      { queries: ['谁'], limit: 4, maxContextChars: 3600, maxPerSection: 4 },
+    );
+    expect(prisma.bookChunk.findMany.mock.calls[0][0].where.book).toEqual({
+      visibility: 'SYSTEM',
+      status: 'READY',
+      embeddingVersion: 'book-embedding-v1',
+    });
+  });
+
+  it('does not return dense results when the visible corpus exceeds its budget', async () => {
+    prisma.bookChunk.findMany.mockResolvedValue([
+      {
+        ...chunk('large', 1, 0, 0, 100),
+        content: 'a'.repeat(16 * 1024 * 1024 + 1),
+      },
+    ]);
+    await expect(
+      service.retrieve(
+        {
+          ownerScope: 'user-a',
+          bookId: 'book-a',
+          embeddingVersion: 'book-embedding-v1',
+          spoilerCeiling: 1,
+        },
+        { queries: ['谁'], limit: 4, maxContextChars: 3600, maxPerSection: 4 },
+      ),
+    ).rejects.toThrow('超出词法检索预算');
+  });
+
+  it('does not start vector search when cancelled during embedding', async () => {
+    const controller = new AbortController();
+    embeddings.embedBatch.mockImplementation(async () => {
+      controller.abort();
+      return [[1, 0, 0]];
+    });
+    await expect(
+      service.retrieve(
+        {
+          ownerScope: 'user-a',
+          bookId: 'book-a',
+          embeddingVersion: 'book-embedding-v1',
+          spoilerCeiling: 1,
+        },
+        { queries: ['谁'], limit: 4, maxContextChars: 3600, maxPerSection: 4 },
+        controller.signal,
+      ),
+    ).rejects.toMatchObject({ name: 'AbortError' });
+    expect(vectorStore.searchChunkIds).not.toHaveBeenCalled();
+  });
+
+  it('stops the dense sibling after lexical scoring fails', async () => {
+    let resolveEmbedding!: (vectors: number[][]) => void;
+    embeddings.embedBatch.mockImplementation(
+      () =>
+        new Promise<number[][]>((resolve) => {
+          resolveEmbedding = resolve;
+        }),
+    );
+    const clock = jest
+      .spyOn(performance, 'now')
+      .mockReturnValue(6000)
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0);
+    try {
+      await expect(
+        service.retrieve(
+          {
+            ownerScope: 'user-a',
+            bookId: 'book-a',
+            embeddingVersion: 'book-embedding-v1',
+            spoilerCeiling: 1,
+          },
+          {
+            queries: ['谁'],
+            limit: 4,
+            maxContextChars: 3600,
+            maxPerSection: 4,
+          },
+        ),
+      ).rejects.toThrow('超出词法检索预算');
+      resolveEmbedding([[1, 0, 0]]);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(vectorStore.searchChunkIds).not.toHaveBeenCalled();
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   function chunk(

@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy, Logger } from '@nestjs/common';
+import { Injectable, OnApplicationShutdown, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   type ClientConfig,
@@ -10,7 +10,7 @@ export type McpTool = Awaited<
 >[number];
 
 @Injectable()
-export class McpService implements OnModuleDestroy {
+export class McpService implements OnApplicationShutdown {
   private mcpClient: MultiServerMCPClient | null = null;
   private readonly logger = new Logger(McpService.name);
   private cachedTools: McpTool[] | null = null;
@@ -109,7 +109,8 @@ export class McpService implements OnModuleDestroy {
     return this.toolsLoadPromise;
   }
 
-  async onModuleDestroy() {
+  // Keep tool transports usable until active HTTP requests have drained.
+  async onApplicationShutdown() {
     if (this.mcpClient) {
       const closeableClient = this.mcpClient as MultiServerMCPClient & {
         close?: () => Promise<void>;

@@ -1,10 +1,54 @@
 import { validateEnvironment } from './env.validation';
 
 describe('validateEnvironment optional integrations', () => {
+  it('accepts optional tarot configuration and refuses unsafe classifier bases', () => {
+    const base = {
+      DATABASE_URL: 'postgresql://localhost/booksoul',
+      JWT_ACCESS_SECRET: 'a-private-test-secret-that-is-long-enough',
+    };
+    expect(() =>
+      validateEnvironment({
+        ...base,
+        TYPESAFE_API_KEY: '',
+        TYPESAFE_API_BASE: '',
+      }),
+    ).not.toThrow();
+    expect(() =>
+      validateEnvironment({
+        ...base,
+        TYPESAFE_API_BASE: 'https://api.typesafe.ai/',
+      }),
+    ).not.toThrow();
+    for (const url of [
+      'http://api.typesafe.ai',
+      'https://user:pass@example.test',
+      'https://example.test/path',
+      'https://example.test/?key=private',
+    ])
+      expect(() =>
+        validateEnvironment({ ...base, TYPESAFE_API_BASE: url }),
+      ).toThrow('TYPESAFE_API_BASE');
+  });
   const validBase = {
     DATABASE_URL: 'postgresql://localhost/booksoul',
     JWT_ACCESS_SECRET: 'a-private-test-secret-that-is-long-enough',
   };
+
+  it('accepts decisions paths and refuses paths that can replace the host', () => {
+    for (const path of ['/v1/systemone', '/api/v1/decisions', ''])
+      expect(() =>
+        validateEnvironment({ ...validBase, TYPESAFE_API_PATH: path }),
+      ).not.toThrow();
+    for (const path of [
+      '//other.example.test/decisions',
+      'https://other.example.test',
+      '/v1/chat/completions',
+      '/api/v1/decisions?key=secret',
+    ])
+      expect(() =>
+        validateEnvironment({ ...validBase, TYPESAFE_API_PATH: path }),
+      ).toThrow('TYPESAFE_API_PATH');
+  });
 
   it('keeps email delivery optional', () => {
     expect(validateEnvironment({ ...validBase })).toEqual(validBase);

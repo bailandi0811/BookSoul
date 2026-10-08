@@ -21,6 +21,31 @@ export const InputArea = () => {
   const [externalResearch, setExternalResearch] = useState(false);
   const [pendingSpoilers, setPendingSpoilers] = useState(false);
   const [pendingResearch, setPendingResearch] = useState(false);
+  const [retrievalMode, setRetrievalMode] = useState<"quick" | "deep">("quick");
+  const [pendingMode, setPendingMode] = useState<"quick" | "deep">("quick");
+  const bookId = useChatStore((state) => state.currentBookId);
+  const sessionId = useChatStore((state) => state.sessionId);
+  const [previousScope, setPreviousScope] = useState({ bookId, sessionId });
+  if (
+    previousScope.bookId !== bookId ||
+    previousScope.sessionId !== sessionId
+  ) {
+    // Assigning the first session ID continues the draft's conversation.
+    const firstSessionCreated =
+      previousScope.bookId === bookId &&
+      previousScope.sessionId === null &&
+      sessionId !== null;
+    setPreviousScope({ bookId, sessionId });
+    if (!firstSessionCreated) {
+      setRetrievalMode("quick");
+      setPendingMode("quick");
+    }
+    setSpoilerOverride(false);
+    setExternalResearch(false);
+    setPendingSpoilers(false);
+    setPendingResearch(false);
+    setOptionsOpen(false);
+  }
   const bookTitle = useBooksStore((state) => state.currentBook?.title);
   const readingProgress = useBooksStore((state) => state.readingProgress);
   const {
@@ -56,7 +81,7 @@ export const InputArea = () => {
     if (!draftInput.trim() || isLoading) return;
     const text = draftInput.trim();
     setDraftInput("");
-    void sendMessage(text, spoilerOverride, externalResearch);
+    void sendMessage(text, spoilerOverride, externalResearch, retrievalMode);
     setSpoilerOverride(false);
     setExternalResearch(false);
     setOptionsOpen(false);
@@ -131,6 +156,7 @@ export const InputArea = () => {
           )}
           {spoilerOverride ? "本次可包含后文" : visibleRange}
           {externalResearch && <Globe2 size={14} aria-label="本次允许联网" />}
+          {retrievalMode === "deep" && <span> · 深度模式</span>}
         </span>
         <div className="relative">
           <button
@@ -142,12 +168,15 @@ export const InputArea = () => {
               optionsButtonRef.current?.focus({ preventScroll: true });
               setPendingSpoilers(spoilerOverride);
               setPendingResearch(externalResearch);
+              setPendingMode(retrievalMode);
               setOptionsOpen(true);
             }}
             className="composer-options-button"
           >
             <SlidersHorizontal size={14} /> 本次选项
-            {(spoilerOverride || externalResearch) && (
+            {(spoilerOverride ||
+              externalResearch ||
+              retrievalMode === "deep") && (
               <span className="options-active-dot" />
             )}
           </button>
@@ -158,8 +187,38 @@ export const InputArea = () => {
             onClose={() => setOptionsOpen(false)}
           >
             <p className="dialog-intro mb-4">
-              只用于下一次提问，发送后自动恢复默认范围。
+              回答模式在当前会话保持；全书检索与联网授权仅用于下一次提问。
             </p>
+            <fieldset disabled={isLoading} className="mb-4">
+              <legend className="mb-2 font-medium">回答模式</legend>
+              <label className="composer-option">
+                <input
+                  type="radio"
+                  name={`${optionsId}-mode`}
+                  value="quick"
+                  checked={pendingMode === "quick"}
+                  onChange={() => setPendingMode("quick")}
+                />
+                <span>快速 · 一次混合检索</span>
+              </label>
+              <label className="composer-option">
+                <input
+                  type="radio"
+                  name={`${optionsId}-mode`}
+                  value="deep"
+                  checked={pendingMode === "deep"}
+                  onChange={() => {
+                    setPendingMode("deep");
+                  }}
+                />
+                <span>深度 · 按需检索与工具协作</span>
+              </label>
+              {pendingMode === "deep" && (
+                <p className="text-xs text-muted-foreground">
+                  深度模式按需补检，支持本书记忆、授权联网和邮件草稿。
+                </p>
+              )}
+            </fieldset>
             <label className="composer-option">
               <input
                 type="checkbox"
@@ -203,6 +262,7 @@ export const InputArea = () => {
                 onClick={() => {
                   setSpoilerOverride(pendingSpoilers);
                   setExternalResearch(pendingResearch);
+                  setRetrievalMode(pendingMode);
                   setOptionsOpen(false);
                 }}
               >

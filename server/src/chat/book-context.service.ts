@@ -80,12 +80,16 @@ export class BookContextService {
 
     const [retrieved, memoryContext] = await Promise.all([
       plan.bookQueries.length
-        ? this.retriever.retrieve(context.boundary, {
-            queries: plan.bookQueries,
-            limit: plan.bookLimit,
-            maxContextChars: plan.maxBookContextChars,
-            maxPerSection: plan.maxChunksPerSection,
-          })
+        ? this.retriever.retrieve(
+            context.boundary,
+            {
+              queries: plan.bookQueries,
+              limit: plan.bookLimit,
+              maxContextChars: plan.maxBookContextChars,
+              maxPerSection: plan.maxChunksPerSection,
+            },
+            abortSignal,
+          )
         : Promise.resolve([]),
       plan.memoryPolicy !== 'none'
         ? this.buildMemoryContext(

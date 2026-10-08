@@ -83,6 +83,40 @@ describe('MemoryService gate, scope, and recall', () => {
     expect(result.hasNewMemories).toBe(false);
     expect(persistMemory).not.toHaveBeenCalled();
   });
+  it('does not continue memory persistence after a cancelled scope read', async () => {
+    const controller = new AbortController();
+    memoryRepo.getForBookContext.mockImplementation(async () => {
+      controller.abort();
+      return [];
+    });
+    await expect(
+      service.processAndStoreBookMemory(
+        'user-a',
+        'session-a',
+        'book-a',
+        '请记住这本书我怀疑旧友',
+        controller.signal,
+      ),
+    ).rejects.toThrow();
+    expect(persistMemory).not.toHaveBeenCalled();
+    expect(memoryRepo.update).not.toHaveBeenCalled();
+  });
+  it('rejects cancelled book memory recall before reading private data', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      service.buildBookAgentContext(
+        'user-a',
+        'session-a',
+        'book-a',
+        '笔记',
+        5,
+        'book_notes',
+        controller.signal,
+      ),
+    ).rejects.toThrow();
+    expect(memoryRepo.getForBookContext).not.toHaveBeenCalled();
+  });
 
   it('creates a proposal for inferred preferences and confirms explicit requests', async () => {
     const proposed = await service.processAndStoreMemory(

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OpenAIEmbeddings } from '@langchain/openai';
+import { setTimeout as wait } from 'node:timers/promises';
 import { IngestionError } from '../ingestion/errors/ingestion-error';
 
 const DASHSCOPE_EMBEDDING_BATCH_LIMIT = 10;
@@ -41,7 +42,19 @@ export class BookEmbeddingService {
     });
   }
 
-  async embedBatch(texts: string[]): Promise<number[][]> {
+  async embedBatch(
+    texts: string[],
+    signal?: AbortSignal,
+    options: { maxAttempts?: number } = {},
+  ): Promise<number[][]> {
+    this.assertActive(signal);
+    const maxAttempts = options.maxAttempts ?? this.maxAttempts;
+    if (
+      !Number.isInteger(maxAttempts) ||
+      maxAttempts < 1 ||
+      maxAttempts > this.maxAttempts
+    )
+      throw new Error('Invalid embedding attempt limit');
     if (texts.length === 0 || texts.some((text) => !text.trim())) {
       throw new IngestionError(
         'EMBEDDING_UNAVAILABLE',
@@ -50,22 +63,27 @@ export class BookEmbeddingService {
     }
 
     let lastError: unknown;
-    for (let attempt = 1; attempt <= this.maxAttempts; attempt += 1) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      this.assertActive(signal);
       try {
         const vectors = await this.client.embedDocuments(texts);
+        this.assertActive(signal);
         this.validateVectors(vectors, texts.length);
         return vectors;
       } catch (error) {
+        this.assertActive(signal);
         lastError = error;
         const summary = this.safeErrorSummary(error);
-        if (attempt >= this.maxAttempts || !this.isRetryable(error)) {
+        if (attempt >= maxAttempts || !this.isRetryable(error)) {
           this.logger.error(`Embedding batch failed (${summary})`);
           break;
         }
         this.logger.warn(
           `Embedding batch attempt ${attempt}/${this.maxAttempts} failed (${summary}); retrying`,
         );
-        await this.delay(this.retryBaseMs * 2 ** (attempt - 1));
+        await wait(this.retryBaseMs * 2 ** (attempt - 1), undefined, {
+          signal,
+        });
       }
     }
 
@@ -97,7 +115,9 @@ export class BookEmbeddingService {
   private isRetryable(error: unknown): boolean {
     const status = this.errorStatus(error);
     if (status !== null) {
-      return status === 408 || status === 409 || status === 429 || status >= 500;
+      return (
+        status === 408 || status === 409 || status === 429 || status >= 500
+      );
     }
     return this.errorName(error) !== 'AbortError';
   }
@@ -147,8 +167,10 @@ export class BookEmbeddingService {
     }
   }
 
-  private delay(milliseconds: number): Promise<void> {
-    if (milliseconds <= 0) return Promise.resolve();
-    return new Promise((resolve) => setTimeout(resolve, milliseconds));
+  private assertActive(signal?: AbortSignal): void {
+    if (!signal?.aborted) return;
+    const error = new Error('Aborted');
+    error.name = 'AbortError';
+    throw error;
   }
 }

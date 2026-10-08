@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 import { resolveAppScreen } from "./app-flow";
 
 describe("app authentication flow", () => {
+  it('gates the tarot deep link and preserves it after authentication', () => {
+    const route = { view: 'library' as const, hasEnteredApp: false, isTarotRoute: true };
+    expect(resolveAppScreen({ ...route, authReady: false, isAuthenticated: false })).toBe('loading');
+    expect(resolveAppScreen({ ...route, authReady: true, isAuthenticated: false })).toBe('auth');
+    expect(resolveAppScreen({ ...route, authReady: true, isAuthenticated: true })).toBe('tarot');
+  });
   it("opens the independent community route after authentication", () => {
     expect(resolveAppScreen({authReady:true,isAuthenticated:true,view:'library',hasEnteredApp:false,isCommunityRoute:true})).toBe('community');
     expect(resolveAppScreen({authReady:true,isAuthenticated:false,view:'library',isCommunityRoute:true})).toBe('auth');

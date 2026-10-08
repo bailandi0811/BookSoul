@@ -1,5 +1,6 @@
 import {
   IsBoolean,
+  IsIn,
   IsOptional,
   IsString,
   IsUUID,
@@ -8,6 +9,9 @@ import {
 } from 'class-validator';
 
 export class ChatDto {
+  @IsOptional()
+  @IsIn(['quick', 'deep'])
+  retrievalMode?: 'quick' | 'deep';
   @IsString()
   @MinLength(1)
   @MaxLength(10_000)

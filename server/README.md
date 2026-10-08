@@ -10,7 +10,19 @@ NestJS 11 API，提供账号认证、私人书架、EPUB/TXT 持久化处理、�
 
 部署代理须保留 Origin、子协议和 Upgrade，公开站点使用 WSS，空闲超时需覆盖心跳；沿用现有 `CORS_ORIGINS`，缺失或不允许的 Origin 在 101 前拒绝，URL 不得带票据，日志不得记录票据/消息正文。客户端本地 Vite `/api` 代理已增加 `ws:true`，生产配置未改。发布前检查[验收记录](../docs/community-chat-acceptance.md)中的待验证项。
 
-## 命令
+## 快速与深度书内问答
+
+深度工具回合的文本保持私有，最终回答使用独立且禁用工具的模型回合，通过 SSE 逐段发送；最多四次主模型调用的上限不变。部分请求因此增加一次调用、延迟和费用。取消、阅读范围收紧或最终输出无效时返回错误，不保存未完成回答；显式记忆保存请求仍等待门控结果后展示正文。
+
+`POST /api/chat` 的可选 `retrievalMode` 为 `quick`（缺省）或 `deep`。快速沿用普通 RAG（现有 Planner、Milvus 向量 + 当前可见 BookChunk 的 BM25）；深度采用 Agentic RAG，同样混合检索，主模型先理解本轮请求，由原生工具调用按需执行初次检索或补检，已有依据时直接回答；不按词表预先强制检索或召回记忆。普通确认可一个模型回合、零工具结束，事实查询通常为工具请求与依据原文回答两个回合。两种模式均由服务端限定当前用户、书籍、有效索引版本与阅读上限，与 `responseDepth`（回答详略）独立。
+
+deep 支持已确认的本书记忆/全局偏好、本次允许的联网 MCP 路由和明确邮件意图的草稿工具；不直接绑定任意 MCP 工具。联网隔离路由只接收原问题与书名，邮件仍需用户确认发送。最多 4 个主模型回合、3 次工具执行、3 次书内检索，在线期限 90 秒；不再强制执行独立 plan/check 或固定 5 秒规划。工具回合缓冲完整后才展示最终回答，可能增加首字等待；有 `thinking` 心跳与可选 `runSummary`。成功后用原用户消息执行一次记忆门控，保存失败明确反馈。超时/检索失败显式报错，无自动模式或供应商切换。预算见[修正设计](../docs/superpowers/specs/2026-10-06-agentic-reading-revision-design.md)，工程与真实验收状态见[修正验收](../docs/agentic-reading-revision-acceptance.md)。
+
+纯离线自检：`node -r ts-node/register test/run-deep-reading-offline.ts --fixtures test/fixtures/deep-reading-mode.json`。它不加载 .env、不连接数据库、不调用模型；输出是题集/评分计算校验，不能当作实际召回或质量提升。
+
+真实验收仅使用专用 `test/start-deep-reading-acceptance.ts` 和 `test/run-deep-reading-live.ts`；需先核验独立数据库、书籍和记忆两个 `test_*` 向量集合、上传目录、准备好的合成 READY 书籍及 B0 记录，并获准实际调用费用。不得直接运行旧 reader E2E、修改实际环境、清库或重建生产集合来准备测试。
+
+## 常用脚本
 
 ```bash
 npm ci
@@ -56,6 +68,8 @@ npm run test:db
 ## 书籍处理生命周期
 
 上传只保存文件并创建持久任务。worker 依次执行解析、分节、切块、批量 Embedding、Milvus 写入和一致性核对，成功后书籍进入 `READY`。失败会保留稳定错误码并支持重试；进程重启后会回收超时租约。
+
+单书问答采用 Milvus 向量召回与服务端 BM25 混合检索。BM25 仅使用 PostgreSQL `BookChunk` 中当前书籍、当前版本及阅读上限内的正文计算统计；无需补建索引、重新上传或在 Milvus 保存正文。融合策略、资源预算、验证结果与限制见[混合检索验收记录](../docs/hybrid-retrieval-acceptance.md)。
 
 删除先把书籍置为 `DELETING`，再可靠清理向量、源文件和 PostgreSQL 记录。部分失败不会误报完成，后台会继续重试。
 
@@ -118,6 +132,25 @@ OSS 配置是可选且须整组填写的 `OSS_REGION`、`OSS_BUCKET`、`OSS_ACCE
 `npm run migrate:file-data` 可幂等复制旧 JSON 数据，不删除源文件。
 
 `npm run migrate:private-reader -- ../天龙八部.epub` 可创建稳定的只读系统示例书。正文随后会发送给当前 Embedding 服务并写入当前 Milvus 目标，因此执行前必须确认文件处理权限和外部数据目的地。书籍 READY 后执行 `npm run migrate:private-reader:backfill`，把可识别的注册用户旧会话和小说内容类记忆绑定到各自的系统书助手；账号偏好与用户事实仍保持全局。
+
+## 心绪塔罗
+
+`TarotModule` 提供登录用户专用的四个 POST 端点 `/api/tarot/classifications|draws|reveals|readings`。复用现有 JWT 认证；牌堆、问题与揭晓顺序由服务端按 owner 保存在内存，客户端不能指定牌面。同许可证洗牌和同下标揭晓均幂等，断流可用原局重新解读；不会接入书籍、RAG、记忆、公共聊天或 Prisma 写入。
+
+可选 `TYPESAFE_API_KEY` 与 HTTPS 根地址 `TYPESAFE_API_BASE`（默认 `https://api.typesafe.ai`）用于 Jev 分类。未配置或占位密钥时不发网络请求，用户自行选择牌阵；异常、无效响应与 5 秒超时也进入自选，取消不签发新许可证。解读沿用现有 `openai` 配置，最多 800 输出 token、零自动重试，总截止时间沿用 `openai.requestTimeoutMs`。提问会发送到分类与解读供应商，保留策略尚未核实，请勿提交敏感信息。
+
+目前仅支持单进程：重启丢失局状态，多实例需先设计共享状态，不能直接水平扩容。许可证 10 分钟、局 30 分钟，每分钟清理；最多 1,000 份当前状态，外部调用全局 20、每用户 1。每用户每 10 分钟分类／洗牌／揭晓／解读分别限 10／10／30／10 次，重试计次。接口契约与错误码见[设计规格](../docs/superpowers/specs/2026-10-05-ai-tarot-design.md)，离线验证见[验收记录](../docs/tarot-acceptance.md)。
+
+Jev 分类也可通过胜算云接入。在本地 `server/.env` 配置下列字段，将胜算云密钥填入 `TYPESAFE_API_KEY` 后重启服务端（密钥仅保存在服务端）：
+
+```dotenv
+TYPESAFE_API_KEY=
+TYPESAFE_API_BASE=https://router.shengsuanyun.com
+TYPESAFE_API_PATH=/api/v1/decisions
+TYPESAFE_MODEL_NAME=typesafe/jev-latest
+```
+
+未设置路径与模型名时仍默认 `/v1/systemone` 与 `jev-latest`，保持 TypeSafe 官方接入兼容。胜算云调用协议见[官方 Jev 文档](https://lean.shengsuanyun.com/apidocs/api/decisions/jev-api)。分类仅发送当前塔罗问题与固定牌阵选项，不发送小说正文或书内聊天；上游数据保留策略尚未核实，费用以控制台当前报价为准。此配置不改变小说聊天和 Embedding 供应商。
 
 ## 端到端验收
 

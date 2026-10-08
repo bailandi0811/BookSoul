@@ -6,7 +6,34 @@ export function validateEnvironment(
   config: Record<string, unknown>,
 ): Record<string, unknown> {
   const databaseUrl = String(config.DATABASE_URL ?? '').trim();
+  const typesafeBase = String(config.TYPESAFE_API_BASE ?? '').trim();
+  if (typesafeBase) {
+    let url: URL;
+    try {
+      url = new URL(typesafeBase);
+    } catch {
+      throw new Error('TYPESAFE_API_BASE must be an HTTPS base URL');
+    }
+    if (
+      url.protocol !== 'https:' ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      url.pathname !== '/'
+    )
+      throw new Error('TYPESAFE_API_BASE must be an HTTPS base URL');
+  }
   const accessSecret = String(config.JWT_ACCESS_SECRET ?? '').trim();
+  const typesafePath = String(config.TYPESAFE_API_PATH ?? '').trim();
+  if (
+    typesafePath &&
+    !['/v1/systemone', '/api/v1/decisions'].includes(typesafePath)
+  ) {
+    throw new Error(
+      'TYPESAFE_API_PATH must be /v1/systemone or /api/v1/decisions',
+    );
+  }
 
   if (!databaseUrl) {
     throw new Error('DATABASE_URL is required');

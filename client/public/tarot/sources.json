@@ -1,0 +1,704 @@
+[
+  {
+    "id": "major-00",
+    "file": "major-00.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:RWS_Tarot_00_Fool.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/9/90/RWS_Tarot_00_Fool.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Fool (Major Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "major-01",
+    "file": "major-01.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:RWS_Tarot_01_Magician.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/d/de/RWS_Tarot_01_Magician.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Magician (Major Arcana)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "major-02",
+    "file": "major-02.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:RWS_Tarot_02_High_Priestess.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/8/88/RWS_Tarot_02_High_Priestess.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Popess (Major Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "major-03",
+    "file": "major-03.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:RWS_Tarot_03_Empress.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/d/d2/RWS_Tarot_03_Empress.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Empress (Major Arcana)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "major-04",
+    "file": "major-04.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:RWS_Tarot_04_Emperor.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/c/c3/RWS_Tarot_04_Emperor.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Emperor (Major Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "major-05",
+    "file": "major-05.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:RWS_Tarot_05_Hierophant.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/8/8d/RWS_Tarot_05_Hierophant.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Pope (Major Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "major-06",
+    "file": "major-06.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:RWS_Tarot_06_Lovers.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/d/db/RWS_Tarot_06_Lovers.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Lovers (Major Arcana)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Nude couples in art|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "major-07",
+    "file": "major-07.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:RWS_Tarot_07_Chariot.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/9/9b/RWS_Tarot_07_Chariot.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Chariot (Major Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "major-08",
+    "file": "major-08.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:RWS_Tarot_08_Strength.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/f/f5/RWS_Tarot_08_Strength.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Strength (Major Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "major-09",
+    "file": "major-09.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:RWS_Tarot_09_Hermit.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/4/4d/RWS_Tarot_09_Hermit.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Hermit (Major Arcana)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "major-10",
+    "file": "major-10.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:RWS_Tarot_10_Wheel_of_Fortune.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/3/3c/RWS_Tarot_10_Wheel_of_Fortune.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Wheel of Fortune (Major Arcana)|Typhon|PD-old-80-expired|CC-PD-Mark|Angels in art in the United Kingdom|Sphinxes in art|Drawings of Anubis|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "major-11",
+    "file": "major-11.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:RWS_Tarot_11_Justice.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/e/e0/RWS_Tarot_11_Justice.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Justice (Major Arcana)|PD-old-80-expired|CC-PD-Mark|Justice (text)|PD-old missing SDC copyright status|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "major-12",
+    "file": "major-12.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:RWS_Tarot_12_Hanged_Man.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/2/2b/RWS_Tarot_12_Hanged_Man.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Hanged Man (Major Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "major-13",
+    "file": "major-13.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:RWS_Tarot_13_Death.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/d/d7/RWS_Tarot_13_Death.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Death (Major Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "major-14",
+    "file": "major-14.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:RWS_Tarot_14_Temperance.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/f/f8/RWS_Tarot_14_Temperance.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Temperance (Major Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "major-15",
+    "file": "major-15.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:RWS_Tarot_15_Devil.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/5/55/RWS_Tarot_15_Devil.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Devil (Major Arcana)|Files with derivative versions|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "major-16",
+    "file": "major-16.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:RWS_Tarot_16_Tower.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/5/53/RWS_Tarot_16_Tower.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Tower (Major Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "major-17",
+    "file": "major-17.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:RWS_Tarot_17_Star.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/d/db/RWS_Tarot_17_Star.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Star (Major Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "major-18",
+    "file": "major-18.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:RWS_Tarot_18_Moon.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/7/7f/RWS_Tarot_18_Moon.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Moon (Major Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "major-19",
+    "file": "major-19.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:RWS_Tarot_19_Sun.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/1/17/RWS_Tarot_19_Sun.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Sun (Major Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "major-20",
+    "file": "major-20.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:RWS_Tarot_20_Judgement.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/d/dd/RWS_Tarot_20_Judgement.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Judgement (Major Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "major-21",
+    "file": "major-21.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:RWS_Tarot_21_World.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/f/ff/RWS_Tarot_21_World.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)|World (Major Arcana)"
+  },
+  {
+    "id": "wands-01",
+    "file": "wands-01.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Wands01.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/1/11/Wands01.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Clubs (Minor Arcana)|Wands|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "wands-02",
+    "file": "wands-02.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Wands02.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/0/0f/Wands02.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Clubs (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "wands-03",
+    "file": "wands-03.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Wands03.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/f/ff/Wands03.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Clubs (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "wands-04",
+    "file": "wands-04.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Wands04.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/a/a4/Wands04.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Clubs (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "wands-05",
+    "file": "wands-05.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Wands05.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/9/9d/Wands05.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Clubs (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "wands-06",
+    "file": "wands-06.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Wands06.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/3/3b/Wands06.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Clubs (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "wands-07",
+    "file": "wands-07.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Wands07.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/e/e4/Wands07.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Clubs (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "wands-08",
+    "file": "wands-08.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Wands08.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/6/6b/Wands08.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Clubs (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "wands-09",
+    "file": "wands-09.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Wands09.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/e/e7/Wands09.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "wands-10",
+    "file": "wands-10.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Wands10.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/0/0b/Wands10.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Clubs (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "wands-11",
+    "file": "wands-11.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Wands11.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/6/6a/Wands11.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Clubs (Minor Arcana)|Salamanders (Elementals)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Pages (Minor Arcana)|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "wands-12",
+    "file": "wands-12.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Wands12.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/1/16/Wands12.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Sagittarius (astrology)|Clubs (Minor Arcana)|Salamanders (Elementals)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Knights (Minor Arcana)|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "wands-13",
+    "file": "wands-13.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Wands13.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/0/0d/Wands13.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Aries (astrology)|Clubs (Minor Arcana)|Salamanders (Elementals)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Queens (Minor Arcana)|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "wands-14",
+    "file": "wands-14.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Wands14.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/c/ce/Wands14.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Leo (astrology)|Clubs (Minor Arcana)|Salamanders (Elementals)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Kings (Minor Arcana)|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "cups-01",
+    "file": "cups-01.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Cups01.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/3/36/Cups01.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Cups (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "cups-02",
+    "file": "cups-02.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Cups02.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/f/f8/Cups02.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Cups (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "cups-03",
+    "file": "cups-03.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Cups03.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/7/7a/Cups03.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Cups (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "cups-04",
+    "file": "cups-04.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Cups04.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/3/35/Cups04.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Cups (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "cups-05",
+    "file": "cups-05.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Cups05.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/d/d7/Cups05.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Cups (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "cups-06",
+    "file": "cups-06.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Cups06.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/1/17/Cups06.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Cups (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "cups-07",
+    "file": "cups-07.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Cups07.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/a/ae/Cups07.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Cups (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "cups-08",
+    "file": "cups-08.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Cups08.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/6/60/Cups08.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Cups (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "cups-09",
+    "file": "cups-09.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Cups09.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/2/24/Cups09.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Cups (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "cups-10",
+    "file": "cups-10.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Cups10.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/8/84/Cups10.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Cups (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "cups-11",
+    "file": "cups-11.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Cups11.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/a/ad/Cups11.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Cups (Minor Arcana)|Undine|PD-old-80-expired|CC-PD-Mark|Pages (Minor Arcana)|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "cups-12",
+    "file": "cups-12.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Cups12.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/f/fa/Cups12.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Cups (Minor Arcana)|Pisces (astrology)|Undine|PD-old-80-expired|CC-PD-Mark|Knights (Minor Arcana)|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "cups-13",
+    "file": "cups-13.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Cups13.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/6/62/Cups13.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Cancer (astrology)|Cups (Minor Arcana)|Undine|PD-old-80-expired|CC-PD-Mark|Queens (Minor Arcana)|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "cups-14",
+    "file": "cups-14.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Cups14.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/0/04/Cups14.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Cups (Minor Arcana)|Scorpio (astrology)|Undine|PD-old-80-expired|CC-PD-Mark|Kings (Minor Arcana)|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "swords-01",
+    "file": "swords-01.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Swords01.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/1/1a/Swords01.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Swords (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "swords-02",
+    "file": "swords-02.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Swords02.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/9/9e/Swords02.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Swords (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "swords-03",
+    "file": "swords-03.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Swords03.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/0/02/Swords03.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Swords (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|3 of Swords|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "swords-04",
+    "file": "swords-04.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Swords04.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/b/bf/Swords04.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Swords (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "swords-05",
+    "file": "swords-05.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Swords05.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/2/23/Swords05.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Swords (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "swords-06",
+    "file": "swords-06.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Swords06.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/2/29/Swords06.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Swords (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "swords-07",
+    "file": "swords-07.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Swords07.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/3/34/Swords07.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Swords (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "swords-08",
+    "file": "swords-08.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Swords08.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/a/a7/Swords08.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Swords (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "swords-09",
+    "file": "swords-09.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Swords09.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/2/2f/Swords09.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Swords (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "swords-10",
+    "file": "swords-10.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Swords10.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/d/d4/Swords10.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Swords (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "swords-11",
+    "file": "swords-11.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Swords11.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/4/4c/Swords11.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Swords (Minor Arcana)|Sylphs|PD-old-80-expired|CC-PD-Mark|Pages (Minor Arcana)|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "swords-12",
+    "file": "swords-12.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Swords12.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/b/b0/Swords12.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Gemini (astrology)|Knights of Swords|Swords (Minor Arcana)|Sylphs|Images with extracted images|PD-old-80-expired|CC-PD-Mark|Knights on horseback|PD-old missing SDC copyright status|Knights (Minor Arcana)|Emoji and stickers from Wikimedia Community|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "swords-13",
+    "file": "swords-13.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Swords13.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/d/d4/Swords13.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Libra (astrology)|Swords (Minor Arcana)|Sylphs|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Queens (Minor Arcana)|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "swords-14",
+    "file": "swords-14.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Swords14.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/3/33/Swords14.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Aquarius (astrology)|Swords (Minor Arcana)|Sylphs|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Kings (Minor Arcana)|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "pentacles-01",
+    "file": "pentacles-01.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Pents01.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/f/fd/Pents01.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Coins (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "pentacles-02",
+    "file": "pentacles-02.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Pents02.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/9/9f/Pents02.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Coins (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "pentacles-03",
+    "file": "pentacles-03.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Pents03.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/4/42/Pents03.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Coins (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "pentacles-04",
+    "file": "pentacles-04.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Pents04.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/3/35/Pents04.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Coins (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "pentacles-05",
+    "file": "pentacles-05.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Pents05.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/9/96/Pents05.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Coins (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "pentacles-06",
+    "file": "pentacles-06.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Pents06.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/a/a6/Pents06.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Coins (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "pentacles-07",
+    "file": "pentacles-07.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Pents07.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/6/6a/Pents07.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Coins (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "pentacles-08",
+    "file": "pentacles-08.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Pents08.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/4/49/Pents08.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Coins (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "pentacles-09",
+    "file": "pentacles-09.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Pents09.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/f/f0/Pents09.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Coins (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "pentacles-10",
+    "file": "pentacles-10.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Pents10.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/4/42/Pents10.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Coins (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "pentacles-11",
+    "file": "pentacles-11.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Pents11.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/e/ec/Pents11.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Coins (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Pages (Minor Arcana)|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "pentacles-12",
+    "file": "pentacles-12.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Pents12.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/d/d5/Pents12.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Coins (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Knights (Minor Arcana)|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "pentacles-13",
+    "file": "pentacles-13.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Pents13.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/8/88/Pents13.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Queens of Coins|Coins (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Queens (Minor Arcana)|Rider-Waite-Smith tarot deck (TaionWC)"
+  },
+  {
+    "id": "pentacles-14",
+    "file": "pentacles-14.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Pents14.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/1/1c/Pents14.jpg",
+    "license": "Public domain",
+    "artist": "Pamela Colman Smith",
+    "categories": "Coins (Minor Arcana)|PD-old-80-expired|CC-PD-Mark|PD-old missing SDC copyright status|Kings (Minor Arcana)|Rider-Waite-Smith tarot deck (TaionWC)"
+  }
+]

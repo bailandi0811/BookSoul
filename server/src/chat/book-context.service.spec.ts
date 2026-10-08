@@ -49,12 +49,16 @@ describe('BookContextService', () => {
       recentMessages: [{ role: 'user', content: '上一条问题' }],
       abortSignal: undefined,
     });
-    expect(retriever.retrieve).toHaveBeenCalledWith(context().boundary, {
-      queries: ['谁出现了？'],
-      limit: 4,
-      maxContextChars: 3_600,
-      maxPerSection: 4,
-    });
+    expect(retriever.retrieve).toHaveBeenCalledWith(
+      context().boundary,
+      {
+        queries: ['谁出现了？'],
+        limit: 4,
+        maxContextChars: 3_600,
+        maxPerSection: 4,
+      },
+      undefined,
+    );
     expect(memory.buildBookAgentContext).not.toHaveBeenCalled();
   });
 

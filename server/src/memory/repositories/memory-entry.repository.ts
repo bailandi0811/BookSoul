@@ -70,7 +70,8 @@ export class MemoryEntryRepository {
     return records.map((record) => this.toEntry(record));
   }
 
-  async save(entry: MemoryEntry): Promise<void> {
+  async save(entry: MemoryEntry, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted();
     this.validateIdentity(entry.userId, entry.id);
     requireSafePathSegment(entry.sessionId, '会话标识');
 
@@ -78,6 +79,7 @@ export class MemoryEntryRepository {
       where: { id: entry.id },
       select: { ownerId: true },
     });
+    signal?.throwIfAborted();
     if (existing && existing.ownerId !== entry.userId) {
       throw new ConflictException('记忆标识已归属其他用户');
     }
@@ -95,6 +97,7 @@ export class MemoryEntryRepository {
         updatedAt: data.updatedAt,
       },
     });
+    signal?.throwIfAborted();
   }
 
   async delete(memoryId: string, userId: string): Promise<void> {
@@ -108,8 +111,11 @@ export class MemoryEntryRepository {
     memoryId: string,
     userId: string,
     updates: Partial<MemoryEntry>,
+    signal?: AbortSignal,
   ): Promise<MemoryEntry | null> {
+    signal?.throwIfAborted();
     const existing = await this.getById(memoryId, userId);
+    signal?.throwIfAborted();
     if (!existing) return null;
 
     const updated: MemoryEntry = {
@@ -121,7 +127,7 @@ export class MemoryEntryRepository {
       createdAt: existing.createdAt,
       updatedAt: new Date().toISOString(),
     };
-    await this.save(updated);
+    await this.save(updated, ...(signal ? [signal] : []));
     return updated;
   }
 

@@ -19,6 +19,7 @@ import { DataType, IndexType, MetricType } from '@zilliz/milvus2-sdk-node';
 import { CreateMemoryDto, UpdateMemoryDto } from './dto/memory.dto';
 import { requireSafePathSegment } from '../auth/auth-context';
 import { withTimeout } from '../common/promise-timeout';
+import { AsyncLocalStorage } from 'node:async_hooks';
 
 export interface AgentMemoryContext {
   text: string;
@@ -31,6 +32,8 @@ export type BookMemoryContextPolicy = 'preferences' | 'book_notes';
 export class MemoryService {
   private readonly logger = new Logger(MemoryService.name);
   private readonly embeddings: OpenAIEmbeddings;
+  private readonly cancellableEmbeddings: OpenAIEmbeddings;
+  private readonly embeddingSignals = new AsyncLocalStorage<AbortSignal>();
   private readonly model: ChatOpenAI;
   private readonly COLLECTION_NAME = 'memory_embeddings';
   private readonly MEMORY_GATE_THRESHOLD = 0.7;
@@ -58,6 +61,32 @@ export class MemoryService {
       dimensions: this.configService.get<number>('milvus.vectorDim'),
       timeout: this.openAiRequestTimeoutMs,
       maxRetries: 1,
+    });
+    this.cancellableEmbeddings = new OpenAIEmbeddings({
+      apiKey: this.configService.get<string>('openai.apiKey'),
+      model: this.configService.get<string>('openai.embeddingModel'),
+      configuration: {
+        baseURL: this.configService.get<string>('openai.baseUrl'),
+        // embedQuery has no signal parameter. Request-local storage propagates
+        // cancellation without mutating a shared client during concurrent runs.
+        fetch: (input, init) => {
+          const signal = this.embeddingSignals.getStore();
+          signal?.throwIfAborted();
+          return globalThis.fetch(input, {
+            ...init,
+            ...(signal
+              ? {
+                  signal: init?.signal
+                    ? AbortSignal.any([signal, init.signal])
+                    : signal,
+                }
+              : {}),
+          });
+        },
+      },
+      dimensions: this.configService.get<number>('milvus.vectorDim'),
+      timeout: this.openAiRequestTimeoutMs,
+      maxRetries: 0,
     });
 
     this.model = new ChatOpenAI({
@@ -196,9 +225,17 @@ ${messages.map((m) => `- ${m}`).join('\n')}
     sessionId: string,
     bookId: string,
     message: string,
+    signal?: AbortSignal,
   ): Promise<MemoryUpdateEvent> {
     requireSafePathSegment(bookId, '书籍标识');
-    return this.processAndStoreScopedMemory(userId, sessionId, message, bookId);
+    signal?.throwIfAborted();
+    return this.processAndStoreScopedMemory(
+      userId,
+      sessionId,
+      message,
+      bookId,
+      signal,
+    );
   }
 
   private async processAndStoreScopedMemory(
@@ -206,10 +243,13 @@ ${messages.map((m) => `- ${m}`).join('\n')}
     sessionId: string,
     message: string,
     currentBookId: string | null,
+    signal?: AbortSignal,
   ): Promise<MemoryUpdateEvent> {
     requireSafePathSegment(userId, '用户标识');
     requireSafePathSegment(sessionId, '会话标识');
+    signal?.throwIfAborted();
     const importanceScore = await this.scoreImportance(message);
+    signal?.throwIfAborted();
     const explicitConfirmation = this.isExplicitMemoryRequest(message);
     const category = this.determineCategory(message);
 
@@ -234,6 +274,7 @@ ${messages.map((m) => `- ${m}`).join('\n')}
     const existingMemories = bookId
       ? await this.memoryEntryRepo.getForBookContext(userId, bookId)
       : await this.memoryEntryRepo.getByUserId(userId);
+    signal?.throwIfAborted();
     const duplicate = existingMemories.find(
       (entry) =>
         (entry.bookId ?? null) === bookId &&
@@ -242,23 +283,31 @@ ${messages.map((m) => `- ${m}`).join('\n')}
     );
     if (duplicate) {
       const now = new Date().toISOString();
-      const updated = await this.memoryEntryRepo.update(duplicate.id, userId, {
-        importance: Math.max(duplicate.importance, importanceScore.score),
-        metadata: {
-          ...duplicate.metadata,
-          verified: duplicate.metadata.verified || explicitConfirmation,
-          occurrences: (duplicate.metadata.occurrences ?? 1) + 1,
-          lastSeenAt: now,
-          sourceSessionIds: [
-            ...new Set([
-              ...(duplicate.metadata.sourceSessionIds ?? [duplicate.sessionId]),
-              sessionId,
-            ]),
-          ],
+      const updated = await this.memoryEntryRepo.update(
+        duplicate.id,
+        userId,
+        {
+          importance: Math.max(duplicate.importance, importanceScore.score),
+          metadata: {
+            ...duplicate.metadata,
+            verified: duplicate.metadata.verified || explicitConfirmation,
+            occurrences: (duplicate.metadata.occurrences ?? 1) + 1,
+            lastSeenAt: now,
+            sourceSessionIds: [
+              ...new Set([
+                ...(duplicate.metadata.sourceSessionIds ?? [
+                  duplicate.sessionId,
+                ]),
+                sessionId,
+              ]),
+            ],
+          },
         },
-      });
+        ...(signal ? [signal] : []),
+      );
+      signal?.throwIfAborted();
       if (updated?.level === MemoryLevel.LONG_TERM && !updated.bookId) {
-        await this.storeToMilvus(updated);
+        await this.storeToMilvus(updated, signal);
       }
       return {
         hasNewMemories: false,
@@ -292,7 +341,8 @@ ${messages.map((m) => `- ${m}`).join('\n')}
       },
     };
 
-    await this.persistMemory(memoryEntry);
+    await this.persistMemory(memoryEntry, ...(signal ? [signal] : []));
+    signal?.throwIfAborted();
 
     return {
       hasNewMemories: true,
@@ -577,13 +627,16 @@ ${messages.map((m) => `- ${m}`).join('\n')}
     query: string,
     topK = 5,
     policy: BookMemoryContextPolicy = 'book_notes',
+    signal?: AbortSignal,
   ): Promise<AgentMemoryContext> {
     requireSafePathSegment(userId, '用户标识');
     requireSafePathSegment(sessionId, '会话标识');
     requireSafePathSegment(bookId, '书籍标识');
 
+    signal?.throwIfAborted();
     const safeTopK = Math.max(1, Math.min(20, topK));
     const scoped = await this.memoryEntryRepo.getForBookContext(userId, bookId);
+    signal?.throwIfAborted();
     const stable = scoped.filter(
       (entry) =>
         entry.userId === userId &&
@@ -766,24 +819,38 @@ ${messages.map((m) => `- ${m}`).join('\n')}
     }
   }
 
-  private async persistMemory(memory: MemoryEntry): Promise<void> {
-    await this.memoryEntryRepo.save(memory);
+  private async persistMemory(
+    memory: MemoryEntry,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    signal?.throwIfAborted();
+    await this.memoryEntryRepo.save(memory, ...(signal ? [signal] : []));
+    signal?.throwIfAborted();
     if (memory.level === MemoryLevel.LONG_TERM && !memory.bookId) {
-      await this.storeToMilvus(memory);
+      await this.storeToMilvus(memory, signal);
     }
   }
 
-  private async storeToMilvus(memory: MemoryEntry): Promise<void> {
+  private async storeToMilvus(
+    memory: MemoryEntry,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    signal?.throwIfAborted();
     if (this.milvusService.isAvailable?.() === false) {
       this.logger.warn('Memory vector write skipped: Milvus unavailable');
       return;
     }
     try {
       const vector = await withTimeout(
-        this.embeddings.embedQuery(memory.content),
+        signal
+          ? this.embeddingSignals.run(signal, () =>
+              this.cancellableEmbeddings.embedQuery(memory.content),
+            )
+          : this.embeddings.embedQuery(memory.content),
         this.openAiRequestTimeoutMs,
         'Memory embedding',
       );
+      signal?.throwIfAborted();
       memory.vector = vector;
 
       await withTimeout(
@@ -808,8 +875,10 @@ ${messages.map((m) => `- ${m}`).join('\n')}
         this.milvusRequestTimeoutMs,
         'Memory vector write',
       );
+      signal?.throwIfAborted();
     } catch (error) {
-      this.logger.error(`Failed to store memory to Milvus: ${error}`);
+      if (signal) throw error;
+      this.logger.error('Failed to store memory to Milvus');
     }
   }
 }

@@ -23,6 +23,11 @@ import { ChatDto } from './dto/chat.dto';
 import { AgentRunStatus } from '@prisma/client';
 import { AgentAdmissionService } from './admission/agent-admission.service';
 import type { AgentRunFinalStatus } from './admission/agent-admission.types';
+import {
+  deepDeadline,
+  DeepBookError,
+  DEEP_BOOK_LIMITS as L,
+} from './deep-book.types';
 
 @Controller('api/chat')
 @UseGuards(JwtAuthGuard)
@@ -71,6 +76,11 @@ export class ChatController {
     @Res() res: Response,
     @CurrentAuth() auth: AuthContext,
   ): Promise<void> {
+    if (
+      body.retrievalMode !== undefined &&
+      !['quick', 'deep'].includes(body.retrievalMode)
+    )
+      throw new BadRequestException('检索模式无效');
     const context = await this.sessions.resolve(
       auth.userId,
       body.sessionId,
@@ -129,13 +139,33 @@ export class ChatController {
     };
 
     let finalStatus: AgentRunFinalStatus = AgentRunStatus.FAILED;
+    const deadline =
+      body.retrievalMode === 'deep'
+        ? deepDeadline(abortController.signal, L.requestMs)
+        : undefined;
+    const heartbeat =
+      body.retrievalMode === 'deep'
+        ? setInterval(() => {
+            if (!abortController.signal.aborted && !deadline?.signal.aborted)
+              writeEvent({ thinking: '正在等待本轮处理完成…' });
+          }, L.heartbeatMs)
+        : undefined;
     try {
       for await (const event of this.chatService.stream(context, body.message, {
         externalResearch: body.externalResearch === true,
-        abortSignal: abortController.signal,
+        abortSignal: deadline?.signal ?? abortController.signal,
         accountEmail: auth.kind === 'user' ? auth.email : undefined,
+        ...(body.retrievalMode === 'deep'
+          ? {
+              retrievalMode: 'deep',
+              runId: admission.lease.runId,
+              spoilerOverride: body.spoilerOverride === true,
+            }
+          : {}),
       })) {
-        if (event.type === 'references') {
+        if (event.type === 'run_summary') {
+          writeEvent({ runSummary: event.data });
+        } else if (event.type === 'references') {
           writeEvent({ references: event.data });
         } else if (event.type === 'external_references') {
           writeEvent({ externalReferences: event.data });
@@ -162,17 +192,38 @@ export class ChatController {
         res.write('data: [DONE]\n\n');
         res.end();
       }
-    } catch {
+    } catch (error: unknown) {
       finalStatus = abortController.signal.aborted
         ? admission.lease.hasLostLease()
           ? AgentRunStatus.LEASE_LOST
           : AgentRunStatus.CANCELLED
         : AgentRunStatus.FAILED;
       if (abortController.signal.aborted) return;
-      this.logger.error(`Book chat failed for session ${body.sessionId}`);
-      writeEvent({ error: '小说助手暂时不可用，请稍后重试' });
+      const code =
+        error instanceof DeepBookError
+          ? error.code
+          : body.retrievalMode === 'deep'
+            ? 'DEEP_MODE_UNAVAILABLE'
+            : undefined;
+      this.logger.error(
+        `Book chat failed runId=${admission.lease.runId}, code=${code ?? 'BOOK_CHAT_UNAVAILABLE'}${error instanceof DeepBookError && error.diagnostic ? `, stage=${error.diagnostic.stage}, reason=${error.diagnostic.reason}` : ''}`,
+      );
+      writeEvent({
+        error:
+          code === 'DEEP_MODE_TIMEOUT'
+            ? '本次处理超时，请稍后重试'
+            : code === 'BOOK_CONTEXT_CHANGED'
+              ? '书籍或阅读范围已变化，请刷新后重试'
+              : '小说助手暂时不可用，请稍后重试',
+        ...(code ? { code } : {}),
+        ...(error instanceof DeepBookError && error.diagnostic
+          ? { stage: error.diagnostic.stage, reason: error.diagnostic.reason }
+          : {}),
+      });
       if (!res.writableEnded && !res.destroyed) res.end();
     } finally {
+      if (heartbeat) clearInterval(heartbeat);
+      deadline?.dispose();
       res.off('close', onClose);
       await admission.lease.finish(finalStatus);
     }

@@ -1,0 +1,83 @@
+name: booksoul
+
+services:
+  api:
+    image: ${API_IMAGE:?Set a versioned API_IMAGE}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 120s
+    env_file:
+      - path: ${APP_ENV_FILE:?Set an absolute APP_ENV_FILE}
+        format: raw
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      BOOK_UPLOAD_DIR: /data/books
+    expose:
+      - "3000"
+    volumes:
+      - type: bind
+        source: ${UPLOAD_HOST_DIR:?Set an existing UPLOAD_HOST_DIR}
+        target: /data/books
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/', {signal: AbortSignal.timeout(3000)}).then(r => {if (!r.ok) process.exit(1)}).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - application
+
+  web:
+    image: ${WEB_IMAGE:?Set a versioned WEB_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - type: bind
+        source: ${TLS_HOST_DIR:?Set an existing TLS_HOST_DIR}
+        target: /etc/nginx/tls
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging: *logging
+    networks:
+      - application
+
+  migration:
+    profiles: ["migration"]
+    image: ${MIGRATION_IMAGE:?Set a versioned MIGRATION_IMAGE}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: "no"
+    env_file:
+      - path: ${APP_ENV_FILE:?Set an absolute APP_ENV_FILE}
+        format: raw
+    entrypoint: ["./node_modules/.bin/prisma"]
+    command: ["--version"]
+    logging: *logging
+    networks:
+      - application
+
+networks:
+  application:
+    name: booksoul_application
+    external: true

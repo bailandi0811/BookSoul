@@ -12,12 +12,14 @@ describe('real HTTP upgrade with mock database', () => {
   let adapter: CommunityWsAdapter;
   let tickets: CommunityTicketsService;
   let url: string;
+  let draining: boolean;
   const identity = {
     userId: 'fixture',
     authVersion: 1,
     expiresAt: Date.now() + 600_000,
   };
   beforeEach(async () => {
+    draining = false;
     tickets = new CommunityTicketsService(
       {
         user: { findUnique: async () => ({ authVersion: 1 }) },
@@ -29,7 +31,7 @@ describe('real HTTP upgrade with mock database', () => {
     );
     tickets.setAllowedOrigins(new Set(['http://localhost:5173']));
     http = createServer();
-    adapter = new CommunityWsAdapter(http, tickets);
+    adapter = new CommunityWsAdapter(http, tickets, () => draining);
     adapter.create(0, { path: COMMUNITY_PATH });
     await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve));
     url = `ws://127.0.0.1:${(http.address() as AddressInfo).port}${COMMUNITY_PATH}`;
@@ -49,6 +51,19 @@ describe('real HTTP upgrade with mock database', () => {
       socket.once('error', reject);
     });
   }
+  it('refuses new upgrades when shutdown begins without consuming the ticket', async () => {
+    const issued = await tickets.issue(identity, 'http://localhost:5173');
+    draining = true;
+    await expect(
+      connect([COMMUNITY_PROTOCOL, `ticket.${issued.ticket}`]),
+    ).rejects.toThrow();
+    draining = false;
+    const socket = await connect([
+      COMMUNITY_PROTOCOL,
+      `ticket.${issued.ticket}`,
+    ]);
+    socket.terminate();
+  });
   it('rejects_missing_reused_or_wrong_origin_before_101', async () => {
     await expect(connect([COMMUNITY_PROTOCOL])).rejects.toThrow('401');
     const issued = await tickets.issue(identity, 'http://localhost:5173');

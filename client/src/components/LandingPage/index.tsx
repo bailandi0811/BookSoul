@@ -1,7 +1,10 @@
 import { BookCover } from "@/components/BookCover";
 import { BookSoulMark } from "@/components/BookSoulMark";
 import { ArrowRight, FileText, LockKeyhole, Quote, ShieldCheck, UploadCloud } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
+import { useState } from "react";
+
+let landingIntroduced = false;
 
 const promiseItems = [
   {
@@ -22,6 +25,15 @@ const promiseItems = [
 ];
 
 export function LandingPage({ onEnter }: { onEnter: () => void }) {
+  const reducedMotion = useReducedMotion() === true;
+  const [introduce] = useState(() => {
+    if (landingIntroduced) return false;
+    landingIntroduced = true;
+    return true;
+  });
+  const copyIntro = introduce && !reducedMotion ? { opacity: 0, y: 14 } : false;
+  const stageIntro = introduce && !reducedMotion ? { opacity: 0, y: 18, scale: 0.98 } : false;
+
   return (
     <main className="landing-page text-foreground">
       <nav className="landing-nav" aria-label="首页导航">
@@ -45,7 +57,7 @@ export function LandingPage({ onEnter }: { onEnter: () => void }) {
       <section className="landing-hero" aria-labelledby="landing-title">
         <motion.div
           className="landing-copy"
-          initial={{ opacity: 0, y: 14 }}
+          initial={copyIntro}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
         >
@@ -80,7 +92,7 @@ export function LandingPage({ onEnter }: { onEnter: () => void }) {
         <motion.div
           className="landing-stage"
           aria-label="BookSoul 阅读书房预览"
-          initial={{ opacity: 0, y: 18, scale: 0.98 }}
+          initial={stageIntro}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.46, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
         >

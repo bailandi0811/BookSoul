@@ -48,14 +48,24 @@ export class BookVectorStoreService {
     }
   }
 
-  async ensureCollection(): Promise<void> {
+  async ensureCollection(signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted();
+    if (signal && !this.ensurePromise) {
+      // READY reads must use an existing index. A cancelled read must not own a
+      // shared initialization promise or recreate a missing collection.
+      await this.ensureCollectionInternal(signal);
+      signal.throwIfAborted();
+      this.ensurePromise ??= Promise.resolve();
+      return;
+    }
     if (!this.ensurePromise) {
       this.ensurePromise = this.ensureCollectionInternal().catch((error) => {
         this.ensurePromise = null;
         throw this.vectorStoreError(error);
       });
     }
-    return this.ensurePromise;
+    await this.ensurePromise;
+    signal?.throwIfAborted();
   }
 
   async replaceVersionStart(scope: BookVectorScope): Promise<void> {
@@ -132,6 +142,7 @@ export class BookVectorStoreService {
     vector: number[],
     spoilerCeiling: number,
     limit: number,
+    signal?: AbortSignal,
   ): Promise<BookVectorSearchHit[]> {
     this.versionFilter(scope);
     if (vector.length !== this.vectorDim) {
@@ -149,7 +160,8 @@ export class BookVectorStoreService {
     ) {
       throw new Error('Invalid server-derived vector search boundary');
     }
-    await this.ensureCollection();
+    await this.ensureCollection(signal);
+    signal?.throwIfAborted();
     try {
       const result = await this.client().search({
         collection_name: this.collectionName,
@@ -183,13 +195,16 @@ export class BookVectorStoreService {
     );
   }
 
-  private async ensureCollectionInternal(): Promise<void> {
+  private async ensureCollectionInternal(signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted();
     const client = this.client();
     const exists = await client.hasCollection({
       collection_name: this.collectionName,
       timeout: this.timeoutMs,
     });
+    signal?.throwIfAborted();
     if (!exists.value) {
+      if (signal) throw new Error('READY book vector collection is missing');
       await client.createCollection({
         collection_name: this.collectionName,
         description: 'BookSoul private book chunk vectors',
@@ -241,20 +256,23 @@ export class BookVectorStoreService {
         timeout: this.timeoutMs,
       });
     } else {
-      await this.validateCollectionSchema();
+      await this.validateCollectionSchema(signal);
     }
+    signal?.throwIfAborted();
     await client.loadCollection({
       collection_name: this.collectionName,
       timeout: this.timeoutMs,
     });
   }
 
-  private async validateCollectionSchema(): Promise<void> {
+  private async validateCollectionSchema(signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted();
     const description = await this.client().describeCollection({
       collection_name: this.collectionName,
       timeout: this.timeoutMs,
     });
     const fields = description.schema.fields;
+    signal?.throwIfAborted();
     for (const name of REQUIRED_FIELDS) {
       if (!fields.some((field) => field.name === name)) {
         throw new Error(`Milvus collection is missing required field ${name}`);

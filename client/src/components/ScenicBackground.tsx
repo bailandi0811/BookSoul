@@ -15,6 +15,13 @@ export function ScenicBackground() {
     document.documentElement.classList.toggle("dark", theme === "dark");
     document.documentElement.style.colorScheme = theme;
   }, [theme]);
+  useEffect(() => {
+    // Enable the mist fade only after the first paint, so the homepage does not flash bright.
+    const frame = requestAnimationFrame(() => {
+      document.documentElement.classList.add("veil-live");
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
   // Remount the animation boundary so exiting private images cannot survive a login change.
   return <BackgroundImage key={scope} />;
 }

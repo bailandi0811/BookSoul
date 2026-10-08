@@ -19,6 +19,7 @@ import { CommunityChatHost } from "@/components/CommunityChat/CommunityChatHost"
 
 const CommunityChatPage = lazy(() => import("@/components/CommunityChat/CommunityChatPage").then(module => ({ default: module.CommunityChatPage })));
 
+const TarotPage = lazy(() => import("@/components/Tarot/TarotPage").then(module => ({ default: module.TarotPage })));
 const BookChat = lazy(loadBookChat);
 const BookOverview = lazy(loadBookOverview);
 const BookReader = lazy(loadBookReader);
@@ -42,6 +43,7 @@ function App() {
   const userId = useAuthStore((s) => s.user?.id);
   const [accountRoute, setAccountRoute] = useState(() => window.location.hash === "#account");
   const [communityRoute, setCommunityRoute] = useState(() => window.location.hash === "#community");
+  const [tarotRoute, setTarotRoute] = useState(() => window.location.hash === "#tarot");
   const [authReady, setAuthReady] = useState(false);
   const [restorationFailed, setRestorationFailed] = useState(false);
   const [restorationAttempt, setRestorationAttempt] = useState(0);
@@ -61,6 +63,7 @@ function App() {
     isResetRoute: resetRoute.isResetRoute,
     isAccountRoute: accountRoute,
     isCommunityRoute: communityRoute,
+    isTarotRoute: tarotRoute,
   });
   const reducedMotion = useReducedMotion() === true;
   const [trackedScreen, setTrackedScreen] = useState(screen);
@@ -73,9 +76,10 @@ function App() {
     useBooksStore.getState().backToLibrary();
     setAccountRoute(false);
     setCommunityRoute(false);
+    setTarotRoute(false);
     setShowLogin(false);
     setHasEnteredApp(false);
-    if (window.location.hash === "#account" || window.location.hash === "#community")
+    if (window.location.hash === "#account" || window.location.hash === "#community" || window.location.hash === "#tarot")
       history.replaceState(history.state, "", window.location.pathname + window.location.search);
   };
 
@@ -83,6 +87,7 @@ function App() {
     const captureResetLink = () => {
       setAccountRoute(window.location.hash === "#account");
       setCommunityRoute(window.location.hash === "#community");
+      setTarotRoute(window.location.hash === "#tarot");
       const route = readResetRoute(window.location.hash);
       if (!route.isResetRoute) return;
       restoration.current?.abort();
@@ -166,50 +171,50 @@ function App() {
       />
     );
 
-  if (screen === "loading") {
-    return (
-      <div className="grid min-h-[100dvh] place-items-center bg-background text-sm text-muted-foreground">
-        {restorationFailed ? (
-          <div role="alert" className="flex max-w-sm flex-col items-center gap-4 px-6 text-center">
-            <h1 className="text-lg font-medium text-foreground">暂时无法恢复会话</h1>
-            <p>服务连接超时或暂不可用，请稍后重试。</p>
-            <Button onClick={() => {
-              setRestorationFailed(false);
-              setRestorationAttempt((attempt) => attempt + 1);
-            }}>重试</Button>
-          </div>
-        ) : "正在恢复会话…"}
-      </div>
-    );
-  }
-
-  if (screen === "auth") {
-    return (
-      <AuthPage
-        onBackHome={backToHomepage}
-        onAuthenticated={() => {
-          setShowLogin(false);
-          setHasEnteredApp(true);
-          setAccountRoute(false);
-          if (window.location.hash === "#account") history.replaceState(history.state, "", window.location.pathname + window.location.search);
-          useBooksStore.getState().backToLibrary();
-        }}
-      />
-    );
-  }
+  const sessionGate = restorationFailed ? (
+    <div role="alert" className="flex max-w-sm flex-col items-center gap-4 px-6 text-center">
+      <h1 className="text-lg font-medium text-foreground">暂时无法恢复会话</h1>
+      <p>服务连接超时或暂不可用，请稍后重试。</p>
+      <Button onClick={() => {
+        setRestorationFailed(false);
+        setRestorationAttempt((attempt) => attempt + 1);
+      }}>重试</Button>
+    </div>
+  ) : "正在恢复会话…";
 
   return (
     <>
       <AppScreenStage screenKey={screen} shift={shift}>
-        <Suspense
-          fallback={
-            <div className="app-screen-fallback grid place-items-center bg-background text-sm text-muted-foreground">
-              正在翻开书页…
-            </div>
-          }
-        >
+        {screen === "loading" ? (
+          <div className="grid min-h-full place-items-center bg-background text-sm text-muted-foreground">
+            {sessionGate}
+          </div>
+        ) : (
+          <Suspense
+            fallback={
+              <div className="app-screen-fallback grid min-h-full place-items-center text-sm text-muted-foreground">
+                正在翻开书页…
+              </div>
+            }
+          >
           {screen === "landing" ? (
             <LandingPage onEnter={() => setHasEnteredApp(true)} />
+          ) : screen === "auth" ? (
+            <AuthPage
+              onBackHome={backToHomepage}
+              onAuthenticated={() => {
+                setShowLogin(false);
+                setHasEnteredApp(true);
+                setAccountRoute(false);
+                if (window.location.hash === "#account") history.replaceState(history.state, "", window.location.pathname + window.location.search);
+                useBooksStore.getState().backToLibrary();
+              }}
+            />
+          ) : screen === "tarot" ? (
+            <TarotPage key={userId} onBack={() => {
+              useBooksStore.getState().backToLibrary(); setHasEnteredApp(true); setTarotRoute(false);
+              history.replaceState(history.state, "", window.location.pathname + window.location.search);
+            }} />
           ) : screen === "community" ? (
             <CommunityChatPage onBack={() => {
               useBooksStore.getState().backToLibrary();
@@ -224,10 +229,11 @@ function App() {
               history.replaceState(history.state, "", window.location.pathname + window.location.search);
             }} />
           ) : screen === "library" ? <Entrance onBackHome={backToHomepage} /> : screen === "book" ? <BookOverview /> : screen === "reader" ? <BookReader /> : <BookChat />}
-        </Suspense>
+          </Suspense>
+        )}
       </AppScreenStage>
-      {screen !== "landing" && <CommunityChatHost />}
-      <BookCoverFlightHost />
+      {screen !== "landing" && screen !== "auth" && screen !== "loading" && <CommunityChatHost />}
+      {screen !== "auth" && screen !== "loading" && <BookCoverFlightHost />}
     </>
   );
 }

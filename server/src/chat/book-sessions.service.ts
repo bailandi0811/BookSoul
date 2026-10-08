@@ -5,6 +5,7 @@ import { requireSafePathSegment } from '../auth/auth-context';
 import { BookAssistantsService } from '../books/book-assistants.service';
 import { BookReadingService } from '../books/book-reading.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { assertDeepActive } from './deep-book.types';
 
 interface StoredHistoryMessage {
   type: 'human' | 'ai';
@@ -166,9 +167,11 @@ export class BookSessionsService {
     context: BookChatContext,
     query: string,
     response: string,
+    signal?: AbortSignal,
   ): Promise<void> {
     const lockKey = `${context.ownerId}:${context.sessionId}`;
     await this.withHistoryLock(lockKey, async () => {
+      if (signal) assertDeepActive(signal);
       const record = await this.prisma.chatSessionRecord.findUnique({
         where: {
           ownerId_sessionId: {
@@ -188,6 +191,7 @@ export class BookSessionsService {
         !record.title || record.title === '新对话'
           ? this.titleFromQuery(query)
           : record.title;
+      if (signal) assertDeepActive(signal);
       const updated = await this.prisma.chatSessionRecord.updateMany({
         where: {
           ownerId: context.ownerId,
