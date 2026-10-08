@@ -1,4 +1,10 @@
-import { useState } from "react";
+import {
+  Children,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import ReactMarkdown from "react-markdown";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowLeft, ArrowUpRight, Check, RotateCcw } from "lucide-react";
@@ -69,6 +75,33 @@ function Face({ card }: { card: TarotCard }) {
     </div>
   );
 }
+
+function headingText(children: ReactNode) {
+  return Children.toArray(children)
+    .map((child) => (typeof child === "string" ? child : ""))
+    .join("")
+    .trim();
+}
+
+function isMobileTarot() {
+  return (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(max-width: 800px)").matches
+  );
+}
+function useMobileTarot() {
+  const [mobile, setMobile] = useState(isMobileTarot);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const query = window.matchMedia("(max-width: 800px)");
+    const update = () => setMobile(query.matches);
+    update();
+    query.addEventListener?.("change", update);
+    return () => query.removeEventListener?.("change", update);
+  }, []);
+  return mobile;
+}
 function WaitingIllustration() {
   return (
     <div className="tarot-waiting-illustration" aria-hidden="true">
@@ -90,6 +123,10 @@ function WaitingIllustration() {
 export function TarotPage({ onBack }: { onBack: () => void }) {
   const round = useTarotRound();
   const { state } = round;
+  const mobile = useMobileTarot();
+  const deckRef = useRef<HTMLDivElement>(null);
+  const scrollFrameRef = useRef<number | null>(null);
+  const [focusedIndex, setFocusedIndex] = useState(38);
   const reduced = useReducedMotion() === true;
   const definition = getTarotSpread(
     state.draw?.spread ?? state.classification?.spread ?? "three_card",
@@ -99,18 +136,122 @@ export function TarotPage({ onBack }: { onBack: () => void }) {
     state.phase,
   );
   const full = !!state.draw && state.cards.length === required;
+  const questionReady = state.classification !== null || state.draw !== null;
+  const stage = !questionReady
+    ? "question"
+    : !state.draw
+      ? "choose"
+      : full
+        ? "reading"
+        : "drawing";
   const reset = () => round.reset();
-  const questionReady = state.classification !== null;
-  const status =
+  const statusValue =
     state.phase === "classifying"
       ? "正在整理问题"
       : state.phase === "shuffling"
         ? "正在洗牌"
         : state.draw
-          ? `${definition.name} · ${full ? "已抽完" : "待抽取"}`
+          ? full
+            ? state.phase === "reading"
+              ? "正在解读"
+              : state.phase === "failed"
+                ? "等待重试"
+                : state.phase === "complete"
+                  ? "解读完成"
+                  : "已抽完"
+            : "待抽取"
           : questionReady
             ? "选择牌阵"
             : "等待提问";
+
+  const centerCard = (index: number, behavior: ScrollBehavior = "smooth") => {
+    const deck = deckRef.current;
+    const card = deck?.querySelector<HTMLElement>(
+      `[data-card-index="${index}"]`,
+    );
+    if (!deck || !card) return;
+    const left = card.offsetLeft - (deck.clientWidth - card.offsetWidth) / 2;
+    if (typeof deck.scrollTo === "function")
+      deck.scrollTo({ left, behavior: reduced ? "auto" : behavior });
+    else deck.scrollLeft = left;
+  };
+
+  useEffect(() => {
+    if (!state.draw || !mobile) return;
+    const next = 38;
+    setFocusedIndex(next);
+    const frame = window.requestAnimationFrame(() => centerCard(next, "auto"));
+    return () => window.cancelAnimationFrame(frame);
+    // A new authoritative draw starts a fresh centered ribbon.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mobile, state.draw?.readingId]);
+
+  useEffect(() => {
+    if (!state.draw || full || !mobile) return;
+    const selected = new Set(state.cards.map((card) => card.index));
+    if (!selected.has(focusedIndex)) return;
+    let next = focusedIndex + 1;
+    while (next < state.draw.cardCount && selected.has(next)) next += 1;
+    if (next >= state.draw.cardCount) {
+      next = focusedIndex - 1;
+      while (next >= 0 && selected.has(next)) next -= 1;
+    }
+    if (next < 0 || next >= state.draw.cardCount) return;
+    setFocusedIndex(next);
+    const frame = window.requestAnimationFrame(() => centerCard(next));
+    return () => window.cancelAnimationFrame(frame);
+    // Drawn cards leave the active center so the next choice is actionable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mobile, state.cards.length, state.draw?.readingId]);
+
+  useEffect(
+    () => () => {
+      if (scrollFrameRef.current !== null)
+        window.cancelAnimationFrame(scrollFrameRef.current);
+    },
+    [],
+  );
+
+  const updateFocusedCard = () => {
+    if (!mobile || scrollFrameRef.current !== null) return;
+    scrollFrameRef.current = window.requestAnimationFrame(() => {
+      scrollFrameRef.current = null;
+      const deck = deckRef.current;
+      if (!deck) return;
+      const center = deck.getBoundingClientRect().left + deck.clientWidth / 2;
+      let nearest = focusedIndex;
+      let nearestDistance = Number.POSITIVE_INFINITY;
+      deck
+        .querySelectorAll<HTMLElement>("[data-card-index]")
+        .forEach((card) => {
+          const bounds = card.getBoundingClientRect();
+          const distance = Math.abs(bounds.left + bounds.width / 2 - center);
+          if (distance < nearestDistance) {
+            nearestDistance = distance;
+            nearest = Number(card.dataset.cardIndex);
+          }
+        });
+      if (nearest !== focusedIndex) setFocusedIndex(nearest);
+    });
+  };
+
+  const ReadingSectionHeading = ({ children }: { children?: ReactNode }) => {
+    const text = headingText(children);
+    const positionIndex = definition.positions.findIndex(
+      (position) => position.label === text,
+    );
+    const card = positionIndex >= 0 ? state.cards[positionIndex] : undefined;
+    return (
+      <h3 className="tarot-reading-section-heading">
+        {card && (
+          <span className="tarot-reading-heading-card" aria-hidden="true">
+            <Face card={card} />
+          </span>
+        )}
+        <span>{children}</span>
+      </h3>
+    );
+  };
   return (
     <div className="tarot-page">
       <ScenicBackground />
@@ -133,24 +274,53 @@ export function TarotPage({ onBack }: { onBack: () => void }) {
             </h1>
             <p>给心里的问题，留一点想象。</p>
           </div>
-          <button className="tarot-reset" onClick={reset}>
-            <RotateCcw size={19} />
-            重新占卜
-          </button>
+          {(!mobile || questionReady) && (
+            <button className="tarot-reset" onClick={reset}>
+              <RotateCcw size={19} />
+              重新占卜
+            </button>
+          )}
         </section>
-        <div className="tarot-question-bar">
-          <span className="tarot-question-label">这次的问题</span>
-          <p>
-            {questionReady
-              ? state.question
-              : "把一个悬而未决的念头，写在这里。"}
-          </p>
-          <span className="tarot-round-status" role="status">
-            {status}
-          </span>
-        </div>
-        <div className="tarot-layout">
-          <section className="tarot-table" aria-label="塔罗牌桌">
+        {(!mobile || questionReady) && (
+          <motion.div
+            className="tarot-question-bar"
+            data-stage={stage}
+            data-continuity="settled-question"
+            layoutId={mobile ? "tarot-question-sheet" : undefined}
+            initial={!mobile || reduced ? false : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              duration: !mobile || reduced ? 0 : 0.24,
+              ease: PAPER_EASE,
+            }}
+          >
+            <span className="tarot-question-label">这次的问题</span>
+            <p>
+              {questionReady
+                ? state.question
+                : "把一个悬而未决的念头，写在这里。"}
+            </p>
+            <span className="tarot-round-status" role="status">
+              {state.draw && (
+                <span className="tarot-status-spread">
+                  {definition.name}
+                  <span aria-hidden="true"> · </span>
+                </span>
+              )}
+              <span className="tarot-status-value">{statusValue}</span>
+            </span>
+          </motion.div>
+        )}
+        <div className="tarot-layout" data-stage={stage}>
+          <div className="tarot-result-corners" aria-hidden="true">
+            <Corners />
+          </div>
+          <section
+            className="tarot-table"
+            aria-label="塔罗牌桌"
+            data-inactive={!state.draw}
+            data-complete={full}
+          >
             <Corners />
             <div
               className={`tarot-slot-row ${required === 1 ? "single-card" : ""}`}
@@ -232,10 +402,23 @@ export function TarotPage({ onBack }: { onBack: () => void }) {
                 <span />
               </p>
             )}
-            <div className="tarot-deck-well">
+            {state.draw && !full && (
+              <div className="tarot-mobile-selection" aria-live="polite">
+                <span />
+                <strong>
+                  已选 {state.cards.length} / {required} 张
+                </strong>
+                <span />
+              </div>
+            )}
+            {(!mobile || !full || state.phase === "failed") && (
+              <div className="tarot-deck-well">
               <div
                 className={`tarot-deck ${state.draw ? "is-ready" : ""}`}
-                aria-label="78 张待抽卡牌"
+                aria-label="78 张待抽卡牌，左右滑动选择"
+                data-layout="orbit"
+                ref={deckRef}
+                onScroll={updateFocusedCard}
               >
                 {[0, 1, 2].map((row) => (
                   <div className="tarot-arc" key={row}>
@@ -245,11 +428,22 @@ export function TarotPage({ onBack }: { onBack: () => void }) {
                         (card) => card.index === index,
                       );
                       const center = column - 12.5;
+                      const orbitDistance = index - focusedIndex;
+                      const displayedOrbitDistance = Math.max(
+                        -4,
+                        Math.min(4, orbitDistance),
+                      );
+                      if (selected && mobile) return null;
                       return (
                         <motion.button
                           type="button"
                           key={index}
                           className="tarot-card-back"
+                          data-card-index={index}
+                          data-focused={focusedIndex === index}
+                          data-focus-distance={displayedOrbitDistance}
+                          data-orbit-distance={displayedOrbitDistance}
+                          data-orbit-visible={Math.abs(orbitDistance) <= 4}
                           style={{
                             left: `${(column / 25) * 93}%`,
                             top: `${25 - center * center * 0.15}px`,
@@ -275,7 +469,22 @@ export function TarotPage({ onBack }: { onBack: () => void }) {
                             duration: reduced ? 0 : 0.18,
                             ease: PAPER_EASE,
                           }}
-                          onClick={() => void round.reveal(index)}
+                          onFocus={() => {
+                            if (!mobile) return;
+                            setFocusedIndex(index);
+                            centerCard(index);
+                          }}
+                          onClick={() => {
+                            if (
+                              mobile &&
+                              focusedIndex !== index
+                            ) {
+                              setFocusedIndex(index);
+                              centerCard(index);
+                              return;
+                            }
+                            void round.reveal(index);
+                          }}
                         >
                           <img src="/tarot/back.svg" alt="" />
                           <AnimatePresence>
@@ -296,7 +505,15 @@ export function TarotPage({ onBack }: { onBack: () => void }) {
                   </div>
                 ))}
               </div>
-            </div>
+              </div>
+            )}
+            {state.draw && !full && (
+              <p className="tarot-mobile-deck-guide">
+                <span />
+                左右滑动，点击中间的牌
+                <span />
+              </p>
+            )}
             <p className="tarot-table-foot">
               {state.phase === "revealing"
                 ? "正在翻开你的牌…"
@@ -328,11 +545,25 @@ export function TarotPage({ onBack }: { onBack: () => void }) {
                 transition={{ duration: reduced ? 0 : 0.2, ease: PAPER_EASE }}
               >
                 {!questionReady ? (
-                  <div className="tarot-question-panel">
+                  <motion.div
+                    className="tarot-question-panel"
+                    data-variant="prompt-sheet"
+                    layoutId={mobile ? "tarot-question-sheet" : undefined}
+                    transition={{
+                      duration: reduced ? 0 : 0.24,
+                      ease: PAPER_EASE,
+                    }}
+                  >
                     <Leaf />
-                    <h2>今天，想问些什么？</h2>
+                    <h2>
+                      {mobile
+                        ? "写下此刻最想知道的事"
+                        : "今天，想问些什么？"}
+                    </h2>
                     <p className="tarot-paper-subtitle">
-                      关于选择、关系，或一个悬而未决的念头。
+                      {mobile
+                        ? "不必组织得很完整，一句话就够。"
+                        : "关于选择、关系，或一个悬而未决的念头。"}
                     </p>
                     <form
                       onSubmit={(event) => {
@@ -346,8 +577,12 @@ export function TarotPage({ onBack }: { onBack: () => void }) {
                       </label>
                       <textarea
                         id="tarot-question"
-                        placeholder="最近，我在犹豫…"
-                        rows={5}
+                        placeholder={
+                          mobile
+                            ? "例如：这段关系接下来会怎样？"
+                            : "最近，我在犹豫…"
+                        }
+                        rows={mobile ? 3 : 5}
                         value={state.question}
                         disabled={working}
                         onChange={(event) => {
@@ -355,23 +590,40 @@ export function TarotPage({ onBack }: { onBack: () => void }) {
                             round.setQuestion(event.target.value);
                         }}
                       />
-                      <div className="tarot-input-count">
-                        {[...state.question].length} / 300
+                      <div className="tarot-question-actions">
+                        <span className="tarot-input-count">
+                          {[...state.question].length} / 300
+                        </span>
+                        <button
+                          className="tarot-primary"
+                          type="submit"
+                          data-ready={!!state.question.trim()}
+                          disabled={!state.question.trim() || working}
+                        >
+                          {working
+                            ? "正在整理心绪…"
+                            : mobile
+                              ? "让牌回应"
+                              : "开始这一页"}
+                          <ArrowUpRight size={17} />
+                        </button>
                       </div>
-                      <button
-                        className="tarot-primary"
-                        type="submit"
-                        disabled={!state.question.trim() || working}
-                      >
-                        {working ? "正在整理心绪…" : "开始这一页"}
-                        <ArrowUpRight size={17} />
-                      </button>
-                      <p className="tarot-disclosure">
-                        问题会发送给 TypeSafe
-                        用于选择牌阵，并发送给当前聊天模型用于解读。请勿输入敏感信息。
-                      </p>
+                      {mobile ? (
+                        <details className="tarot-disclosure">
+                          <summary>问题仅用于选牌与解读</summary>
+                          <p>
+                            问题会发送给 TypeSafe
+                            用于选择牌阵，并发送给当前聊天模型用于解读。请勿输入敏感信息。
+                          </p>
+                        </details>
+                      ) : (
+                        <p className="tarot-disclosure">
+                          问题会发送给 TypeSafe
+                          用于选择牌阵，并发送给当前聊天模型用于解读。请勿输入敏感信息。
+                        </p>
+                      )}
                     </form>
-                  </div>
+                  </motion.div>
                 ) : !state.draw ? (
                   <>
                     <Leaf />
@@ -454,7 +706,9 @@ export function TarotPage({ onBack }: { onBack: () => void }) {
                             : "解读完成"}
                       </span>
                     </div>
-                    <h2>这一组牌，想对你说</h2>
+                    <h2>
+                      这一组牌，想对你说 {mobile && <Leaf />}
+                    </h2>
                     <div
                       className="tarot-reading"
                       tabIndex={0}
@@ -465,17 +719,37 @@ export function TarotPage({ onBack }: { onBack: () => void }) {
                         <ReactMarkdown
                           skipHtml
                           disallowedElements={["img"]}
-                          components={{
-                            a: ({ children, href }) => (
-                              <a
-                                href={href}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                {children}
-                              </a>
-                            ),
-                          }}
+                          components={
+                            mobile
+                              ? {
+                                  h1: ReadingSectionHeading,
+                                  h2: ReadingSectionHeading,
+                                  h3: ReadingSectionHeading,
+                                  h4: ReadingSectionHeading,
+                                  h5: ReadingSectionHeading,
+                                  h6: ReadingSectionHeading,
+                                  a: ({ children, href }) => (
+                                    <a
+                                      href={href}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      {children}
+                                    </a>
+                                  ),
+                                }
+                              : {
+                                  a: ({ children, href }) => (
+                                    <a
+                                      href={href}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      {children}
+                                    </a>
+                                  ),
+                                }
+                          }
                         >
                           {state.content}
                         </ReactMarkdown>
@@ -526,9 +800,11 @@ export function TarotPage({ onBack }: { onBack: () => void }) {
             </AnimatePresence>
           </aside>
         </div>
-        <p className="tarot-bottom-note">
-          仅供娱乐与自我整理，不构成医疗、法律或财务建议。
-        </p>
+        {(!mobile || questionReady) && (
+          <p className="tarot-bottom-note">
+            仅供娱乐与自我整理，不构成医疗、法律或财务建议。
+          </p>
+        )}
       </main>
     </div>
   );

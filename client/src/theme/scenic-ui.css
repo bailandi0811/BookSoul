@@ -1252,15 +1252,22 @@ summary::-webkit-details-marker {
   border-radius: 16px 18px 15px 17px;
   transform: rotate(0.8deg);
 }
+.landing-rooms,
 .landing-promises {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1px;
   overflow: hidden;
   border: 1px solid var(--scene-line);
   border-radius: 24px;
   background: var(--scene-line);
 }
+.landing-rooms {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.landing-promises {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.landing-rooms article,
 .landing-promises article {
   min-height: 126px;
   display: flex;
@@ -1269,11 +1276,13 @@ summary::-webkit-details-marker {
   padding: 24px 28px;
   background: rgb(var(--card) / 0.72);
 }
+.landing-rooms h2,
 .landing-promises h2 {
   font-size: 22px;
   font-weight: 500;
   line-height: 1.5;
 }
+.landing-rooms p,
 .landing-promises p {
   margin-top: 5px;
   color: rgb(var(--muted-foreground));
@@ -2689,9 +2698,11 @@ summary::-webkit-details-marker {
   .landing-upload-card h2 {
     font-size: 15px;
   }
+  .landing-rooms,
   .landing-promises {
     grid-template-columns: minmax(0, 1fr);
   }
+  .landing-rooms article,
   .landing-promises article {
     min-height: 102px;
   }
@@ -2872,19 +2883,23 @@ summary::-webkit-details-marker {
   .landing-upload-card h2 {
     font-size: 15px;
   }
+  .landing-rooms,
   .landing-promises {
     border-radius: 18px;
     scroll-margin-top: 16px;
   }
+  .landing-rooms article,
   .landing-promises article {
     min-height: 0;
     padding: 18px;
     gap: 14px;
   }
+  .landing-rooms article > svg,
   .landing-promises article > svg {
     width: 26px;
     flex-shrink: 0;
   }
+  .landing-rooms h2,
   .landing-promises h2 {
     font-size: 19px;
   }

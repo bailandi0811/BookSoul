@@ -45,6 +45,8 @@ server/prisma/*.sqlite-journal
 # Local tooling and agent state
 .superpowers/
 .claude/settings.local.json
+.edge-tarot-cdp/
+.edge-tarot-preview/
 
 # Editor and IDE settings
 .vscode/

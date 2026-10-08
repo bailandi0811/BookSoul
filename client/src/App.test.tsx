@@ -145,7 +145,7 @@ describe("session restoration recovery", () => {
     const root = createRoot(container);
     try {
       await act(async () => root.render(<StrictMode><App /></StrictMode>));
-      expect(container.textContent).toContain("把小说放进一间会记得进度的书房");
+      expect(container.textContent).toContain("把小说放进一间记得每本进度的书房");
       await act(async () => {
         [...container.querySelectorAll("button")]
           .find((button) => button.textContent?.includes("开始阅读"))!
@@ -194,7 +194,7 @@ describe("session restoration recovery", () => {
     const root = createRoot(container);
     try {
       await act(async () => root.render(<App />));
-      expect(container.textContent).toContain("把小说放进一间会记得进度的书房");
+      expect(container.textContent).toContain("把小说放进一间记得每本进度的书房");
       expect(container.querySelector('[role="alert"]')).toBeNull();
       await act(async () => {
         [...container.querySelectorAll("button")]
@@ -235,7 +235,7 @@ describe("landing entry", () => {
     try {
       await act(async () => root.render(<App />));
       await vi.waitFor(() => {
-        expect(container.textContent).toContain("把小说放进一间会记得进度的书房");
+        expect(container.textContent).toContain("把小说放进一间记得每本进度的书房");
       });
       expect(container.querySelector('input[type="email"]')).toBeNull();
 
@@ -271,7 +271,7 @@ describe("landing entry", () => {
     try {
       await act(async () => root.render(<App />));
       await vi.waitFor(() => {
-        expect(container.textContent).toContain("把小说放进一间会记得进度的书房");
+        expect(container.textContent).toContain("把小说放进一间记得每本进度的书房");
       });
 
       await act(async () => {
@@ -291,7 +291,7 @@ describe("landing entry", () => {
       });
 
       await vi.waitFor(() => {
-        expect(container.textContent).toContain("把小说放进一间会记得进度的书房");
+        expect(container.textContent).toContain("把小说放进一间记得每本进度的书房");
       });
       expect(container.querySelector('input[type="email"]')).toBeNull();
     } finally {
@@ -328,7 +328,7 @@ describe("landing entry", () => {
     try {
       await act(async () => root.render(<App />));
       await vi.waitFor(() => {
-        expect(container.textContent).toContain("把小说放进一间会记得进度的书房");
+        expect(container.textContent).toContain("把小说放进一间记得每本进度的书房");
       });
       await vi.waitFor(() => {
         expect(container.querySelector(".library-room")).toBeNull();
@@ -377,7 +377,7 @@ describe("landing entry", () => {
     try {
       await act(async () => root.render(<App />));
       await vi.waitFor(() => {
-        expect(container.textContent).toContain("把小说放进一间会记得进度的书房");
+        expect(container.textContent).toContain("把小说放进一间记得每本进度的书房");
       });
 
       await act(async () => {
@@ -397,7 +397,7 @@ describe("landing entry", () => {
       });
 
       await vi.waitFor(() => {
-        expect(container.textContent).toContain("把小说放进一间会记得进度的书房");
+        expect(container.textContent).toContain("把小说放进一间记得每本进度的书房");
       });
       await vi.waitFor(() => {
         expect(container.querySelector(".library-room")).toBeNull();

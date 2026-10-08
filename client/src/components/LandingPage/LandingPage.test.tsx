@@ -43,6 +43,20 @@ describe("LandingPage", () => {
     expect(container.querySelector(".landing-page-strip")).toBeNull();
   });
 
+  it("introduces the public lounge and tarot room beside the private study", async () => {
+    container = document.createElement("div");
+    document.body.append(container);
+    root = createRoot(container);
+
+    await act(async () => root!.render(<LandingPage onEnter={vi.fn()} />));
+
+    const rooms = container.querySelector(".landing-rooms");
+    expect(rooms?.textContent).toContain("书友客厅");
+    expect(rooms?.textContent).toContain("私人书籍、助手对话和记忆留在书房里");
+    expect(rooms?.textContent).toContain("心绪塔罗");
+    expect(rooms?.textContent).toContain("不写入书架、单书对话或阅读记忆");
+  });
+
   it("lets the continue reading preview enter the app flow", async () => {
     const onEnter = vi.fn();
     container = document.createElement("div");

@@ -1,10 +1,23 @@
 import { BookCover } from "@/components/BookCover";
 import { BookSoulMark } from "@/components/BookSoulMark";
-import { ArrowRight, FileText, LockKeyhole, Quote, ShieldCheck, UploadCloud } from "lucide-react";
+import { ArrowRight, FileText, Layers, LockKeyhole, MessagesSquare, Quote, ShieldCheck, UploadCloud } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { useState } from "react";
 
 let landingIntroduced = false;
+
+const roomItems = [
+  {
+    icon: MessagesSquare,
+    title: "书友客厅",
+    copy: "先加入，再和书友聊阅读与心情。私人书籍、助手对话和记忆留在书房里。",
+  },
+  {
+    icon: Layers,
+    title: "心绪塔罗",
+    copy: "给心里的问题留一次占卜。牌局和解读不写入书架、单书对话或阅读记忆。",
+  },
+];
 
 const promiseItems = [
   {
@@ -40,7 +53,7 @@ export function LandingPage({ onEnter }: { onEnter: () => void }) {
         <div className="landing-brand">
           <BookSoulMark active />
           <span className="landing-brand-name">BookSoul</span>
-          <span className="landing-brand-caption">私人小说阅读助手</span>
+          <span className="landing-brand-caption">你的专属AI书房</span>
         </div>
         <button
           type="button"
@@ -64,10 +77,10 @@ export function LandingPage({ onEnter }: { onEnter: () => void }) {
           <p className="landing-kicker">属于你的小说书房</p>
           <h1 id="landing-title" className="font-display">
             BookSoul
-            <span>私人小说阅读助手</span>
+            <span>只属于你的AI书房</span>
           </h1>
           <p className="landing-lead">
-            把小说放进一间会记得进度的书房。每本书都有独立助手，只围绕你已经读到的地方回答。
+            把小说放进一间记得每本进度的书房。每本书都有独立助手，只依据你已经读到的原文回答。离开书页时，可以去书友客厅坐坐，或在心绪塔罗问问心里的事。
           </p>
           <div className="landing-actions">
             <button
@@ -146,6 +159,18 @@ export function LandingPage({ onEnter }: { onEnter: () => void }) {
             </div>
           </section>
         </motion.div>
+      </section>
+
+      <section className="landing-rooms" aria-label="书房之外">
+        {roomItems.map(({ icon: Icon, title, copy }) => (
+          <article key={title}>
+            <Icon size={31} strokeWidth={1.35} />
+            <div>
+              <h2>{title}</h2>
+              <p>{copy}</p>
+            </div>
+          </article>
+        ))}
       </section>
 
       <section
