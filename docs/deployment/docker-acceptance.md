@@ -1,5 +1,19 @@
 # Docker 部署验收记录
 
+## ACR 发布工具实现（2026-10-09）
+
+本节仅记录仓库内工具和离线测试，没有登录 ACR、推送或拉取真实镜像、连接服务器、修改生产配置、执行迁移或切换流量。
+
+| 检查 | 当前状态 | 证据/限制 |
+| --- | --- | --- |
+| 发布/部署脚本行为 | PASS | `node --test deploy/preflight.test.mjs deploy/release-scripts.test.mjs`：39/39；使用临时 fixture、假 Git/npm/Docker 和假 flock，无网络或真实 Docker。覆盖 push 失败、脏镜像输入、Git SHA 不匹配、远端 tag 已存在、本地并发发布互斥、digest 固定、migration profile 拉取、prepare 无切换、健康后更新 current、激活失败保留旧 current 并提示核对部分切换、路径穿越和 Bash 委托 |
+| 脚本语法 | PASS | Node `--check`、PowerShell parser、Git Bash `-n` 均退出 0 |
+| client 质量门 | PASS | 沙箱外串行复跑 `npm run check` 退出 0：60 files / 270 tests、lint、typecheck、build；首次与 server 并行运行时一个既有 5 秒测试超时，隔离该文件 5/5 后串行全量通过；保留既有 Browserslist 数据过期和 Vite plugin timings 提示 |
+| server 质量门 | PASS | 沙箱外 `npm run check` 退出 0：115 suites / 746 tests、typecheck、build；45 条既有 lint warning、0 errors |
+| ACR 个人版实例、仓库和凭据 | NOT RUN | 需要用户在控制台创建/确认实际实例、三个私有仓库、公网与 VPC 端点以及最小权限身份 |
+| 真实 build/push/digest | NOT RUN | 未调用本机 Docker daemon 或外部 Registry；待 ACR 信息确认并取得真实外部写入授权后执行 |
+| 服务器 prepare/activate | NOT RUN | 未连接服务器；先只执行 prepare，80/443、TLS、当前 release 和活动任务重新核对并单独授权后才允许 activate |
+
 日期：2026-10-07。范围：部署准备；没有上线，没有连接真实数据库/向量目标，没有迁移或发送合成小说到模型服务。
 
 | 检查 | 当前状态 | 证据/限制 |

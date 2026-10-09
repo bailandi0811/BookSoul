@@ -51,7 +51,23 @@ docker run --rm --network none --entrypoint ./node_modules/.bin/prisma booksoul-
 
 Windows 上若 Docker Desktop 已配置代理、普通镜像拉取成功，但构建在 `auth.docker.io` 获取令牌时超时，先独立验证代理连通性。本次环境中，为启动构建命令的 PowerShell 会话设置 `HTTP_PROXY`、`HTTPS_PROXY` 后通过；两者使用实际本地 HTTP 代理地址，例如 `http://127.0.0.1:端口`。这些会话变量供构建客户端联网使用，不是应用配置，也不要把宿主机的 127.0.0.1 代理作为容器 RUN 的代理地址。关闭该 PowerShell 窗口即可结束会话变量；不修改 .env 或持久系统环境变量。
 
-如暂不选镜像仓库，可传递本地镜像归档：
+正常发布使用阿里云 ACR 私有仓库。2024 年 9 月后创建的个人版实例使用控制台分配的 `crpi-...personal.cr.aliyuncs.com` 独享端点；不要根据地域手拼旧版 `registry.cn-...` 地址。个人版本身无 SLA，只适合作为当前小规模阶段的发布通道，最近一个已验证的归档和服务器旧镜像仍需保留。服务器是轻量应用服务器，同地域不自动证明 ACR VPC 端点可达；先实际解析、登录和拉取，VPC 端点不可达时使用控制台给出的公网端点。
+
+先在 ACR 创建三个私有仓库 `booksoul-api`、`booksoul-web`、`booksoul-migration`。本地构建身份使用 push 权限，服务器尽量使用独立只读 RAM 身份。执行 `docker login` 与部署命令的 Linux 身份必须一致；普通用户登录后再用 `sudo docker compose` 会读取另一份 Docker 凭证。固定密码不写脚本、release 文件或仓库，登录时使用控制台给出的完整命令。
+
+发布标识使用 `rYYYYMMDDTHHMMSSZ-<Git 短 SHA>`，例如 `r20261009T120000Z-c9996337`。UTC 时间让同一源码在部分 push 失败后能用新标识安全重试，已成功上传的孤立 tag 不覆盖、不部署，后续按显式清理流程处理。相关镜像输入必须没有未提交改动；根目录旧 tar 的变化不会进入镜像输入检查。登录 ACR 后，在仓库根执行：
+
+```powershell
+pwsh scripts/publish-acr.ps1 `
+  -Release r20261009T120000Z-c9996337 `
+  -Registry crpi-实际实例.cn-hangzhou.personal.cr.aliyuncs.com/booksoul
+```
+
+脚本依次运行两个包现有质量门、构建三个 `linux/amd64` 镜像、执行无网络镜像检查、逐个 push，并检查每条原生命令的退出码。只有三次 push 都返回 digest 后，才在 Git 忽略的 `.superpowers/releases/` 生成三条 digest 固定的镜像坐标。脚本不登录 ACR、不读取密码、不 SSH 到服务器，也不覆盖已有 release 清单。同一工作区的发布由本地文件锁串行化；跨工作区或跨机器仍必须保证同一 ACR namespace 同时只有一个发布者，并为每次尝试使用新的 release ID。若 ACR 实例支持 tag 不可变策略，应同时启用，不能把“先检查 tag、再 push”视为远端原子操作。
+
+使用 digest 坐标在服务器创建完整的 `/etc/booksoul/releases/<release-id>.env`。从当前 release 复制时只替换 `WEB_IMAGE`、`API_IMAGE`、`MIGRATION_IMAGE`，保留并核对 `APP_ENV_FILE`、`UPLOAD_HOST_DIR`、`TLS_HOST_DIR` 三个实际绝对路径；首次部署则以 `deploy/release.env.example` 为结构模板填写。release 文件不得包含 Registry 密码。
+
+ACR 不可用或尚未开通时，可使用镜像归档作为离线备用方案：
 
 ```bash
 docker save -o booksoul-release-001.tar booksoul-api:release-001 booksoul-migration:release-001 booksoul-web:release-001
@@ -116,11 +132,19 @@ api 根路径探针代表进程响应，不能证明模型、向量或数据库�
 
 ## 5. 更新和回退
 
-无数据库结构变化时：记录当前镜像与版本 → 验证新版本 → 传递镜像 → 预检 → 修改服务器 release 的三个镜像版本 → 重建 → 验收。
+无数据库结构变化时：记录当前镜像与版本 → 发布并记录 digest → 在服务器创建新的完整 release 文件 → prepare → 经切流量授权后 activate → 验收。部署工具默认从 `/etc/booksoul/releases` 读取版本文件并把成功版本写入 `/etc/booksoul/current.env`；可分别用 `BOOKSOUL_RELEASE_DIR`、`BOOKSOUL_CURRENT_ENV`、`BOOKSOUL_COMPOSE_FILE` 覆盖路径。
 
 ```bash
-docker compose --env-file /etc/booksoul/release.env -f deploy/compose.yaml up -d --wait --force-recreate web api
+# 只预检、拉取和核对镜像；不启动服务、不改变 current.env
+bash deploy/booksoul-deploy.sh prepare r20261009T120000Z-c9996337
+
+# 明确切换：会重建 web/api，并占用 Compose 声明的 80/443
+bash deploy/booksoul-deploy.sh activate r20261009T120000Z-c9996337
 ```
+
+`prepare` 运行仓库预检、Compose config、pull 和三个 digest 镜像 inspect。`activate` 重复这些安全检查，待 `up -d --wait --force-recreate web api` 和 `ps` 全部成功后，才原子更新 `current.env`；失败不会把 current 文件指向候选版本。注意 Compose 更新不是事务：`up` 返回失败前可能已经替换部分容器，此时 `current.env` 仍是旧值，但不代表旧版本仍完整运行。先用 `docker compose ... ps` 和 `docker inspect` 核对实际容器 digest，再根据数据库兼容性修复后重试候选版本或重新 activate 旧 release，不能只根据 `current.env` 判断或盲目自动回退。包装脚本使用 `flock` 拒绝并发部署。它不执行数据库迁移，也不自动回退运行容器，因为迁移后的旧应用未必仍与 schema 兼容。
+
+当前 Compose web 直接发布 80/443。在宿主 Nginx 仍占用这些端口或尚未明确切流量时，只能执行 `prepare`，不得执行 `activate`。若服务器实际部署状态已经变化，先重新核对端口、TLS、当前 release 和活动任务，不沿用本手册的历史状态推断。
 
 同时重建 web 以确保代理配置生效；Nginx 还通过 Docker DNS 动态解析 api。更新会短暂中断活动连接，后端重启丢失塔罗临时状态。选择低峰，先等待活动索引与聊天尽可能结束；120 秒停机宽限不是无损或零停机承诺。
 
@@ -128,7 +152,7 @@ docker compose --env-file /etc/booksoul/release.env -f deploy/compose.yaml up -d
 
 原文挂载和数据服务不随镜像替换。严禁 `down -v`、清理带卷的 prune、reset 或重建/清空数据库。
 
-没有不兼容数据库迁移时，将三个镜像配置切回已记录的旧版本，再运行上面的重建命令并验收。回退应用不回写数据库、向量和源文件。
+没有不兼容数据库迁移时，对旧 release ID 再执行一次 `activate` 并验收。旧 release 文件必须仍使用已记录的 digest，不能临时把新 tag 改成旧 tag。回退应用不回写数据库、向量和源文件；有迁移时先按下一节判断旧应用兼容性。
 
 ## 6. 数据库迁移
 

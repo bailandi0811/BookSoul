@@ -23,6 +23,7 @@
 !server/prisma/migrations/**/migration.sql
 **/*.dump
 **/*.sqlite*
+**/*.tar
 server/uploads
 server/chat_histories
 server/memories
