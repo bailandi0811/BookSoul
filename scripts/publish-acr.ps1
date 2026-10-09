@@ -37,6 +37,7 @@ if ($Registry -match '://' -or $Registry -notmatch '^[a-z0-9][a-z0-9.-]+(?::[0-9
 }
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$npmCommand = if ($IsWindows) { 'npm.cmd' } else { 'npm' }
 $lockDirectory = Join-Path $repositoryRoot '.superpowers'
 New-Item -ItemType Directory -Path $lockDirectory -Force | Out-Null
 $lockPath = Join-Path $lockDirectory 'publish-acr.lock'
@@ -87,8 +88,8 @@ try {
     }
 
     Write-Host "==> Running repository quality gates"
-    $null = Invoke-NativeCommand npm @('--prefix', 'client', 'run', 'check')
-    $null = Invoke-NativeCommand npm @('--prefix', 'server', 'run', 'check')
+    $null = Invoke-NativeCommand -FilePath $npmCommand -Arguments @('--prefix', 'client', 'run', 'check')
+    $null = Invoke-NativeCommand -FilePath $npmCommand -Arguments @('--prefix', 'server', 'run', 'check')
 
     Write-Host "==> Building API image"
     $null = Invoke-NativeCommand docker @('build', '--platform', 'linux/amd64', '-f', 'server/Dockerfile', '--target', 'runtime', '-t', $images.API_IMAGE, '.')

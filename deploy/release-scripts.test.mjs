@@ -27,6 +27,7 @@ async function fakeCommands(directory) {
   if (process.platform === 'win32') {
     await executable(join(directory, 'git.cmd'), `@echo off\r\necho git %*>>"%FAKE_COMMAND_LOG%"\r\nif "%1"=="status" if not "%FAKE_GIT_STATUS%"=="" echo %FAKE_GIT_STATUS%\r\nif "%1"=="rev-parse" if "%2"=="--short=8" echo %FAKE_GIT_REVISION:~0,8%& exit /b 0\r\nif "%1"=="rev-parse" echo %FAKE_GIT_REVISION%\r\nexit /b 0\r\n`);
     await executable(join(directory, 'docker.cmd'), `@echo off\r\necho docker %*>>"%FAKE_COMMAND_LOG%"\r\necho %*| findstr /c:"%FAKE_DOCKER_FAIL_MATCH%" >nul 2>nul && exit /b 23\r\nif "%1"=="manifest" if "%2"=="inspect" (\r\n  if "%FAKE_MANIFEST_EXISTS%"=="1" exit /b 0\r\n  echo manifest unknown 1>&2\r\n  exit /b 1\r\n)\r\nif "%1"=="push" echo digest: ${digest} size: 1234\r\nexit /b 0\r\n`);
+    await executable(join(directory, 'npm.ps1'), 'Write-Error "npm PowerShell shim must not be invoked dynamically"\nexit 61\n');
     await executable(join(directory, 'npm.cmd'), '@echo off\r\necho npm %*>>"%FAKE_COMMAND_LOG%"\r\nexit /b 0\r\n');
     await executable(join(directory, 'flock.cmd'), '@exit /b 0\r\n');
     await executable(join(directory, 'flock'), '#!/usr/bin/env sh\nexit 0\n');
