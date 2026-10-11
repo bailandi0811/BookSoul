@@ -10,6 +10,7 @@ import { IngestionLeaseLostError } from './ingestion-job.types';
 
 describe('IngestionJobRepository', () => {
   let tx: {
+    $queryRaw: jest.Mock;
     ingestionJob: {
       findMany: jest.Mock;
       findFirst: jest.Mock;
@@ -54,11 +55,22 @@ describe('IngestionJobRepository', () => {
 
   beforeEach(() => {
     tx = {
+      $queryRaw: jest.fn().mockImplementation((sql: TemplateStringsArray) => {
+        if (
+          sql.join('').includes('pg_advisory_xact_lock') &&
+          !sql.join('').includes('::text')
+        ) {
+          throw Object.assign(new Error('Unsupported void result'), {
+            code: 'P2010',
+          });
+        }
+        return Promise.resolve([]);
+      }),
       ingestionJob: {
         findMany: jest.fn(),
         findFirst: jest.fn(),
         findUnique: jest.fn(),
-        count: jest.fn(),
+        count: jest.fn().mockResolvedValue(0),
         updateMany: jest.fn(),
         update: jest.fn(),
       },
@@ -124,7 +136,9 @@ describe('IngestionJobRepository', () => {
       expect.objectContaining({
         where: {
           status: IngestionJobStatus.QUEUED,
-          book: { status: { not: BookStatus.DELETING } },
+          book: expect.objectContaining({
+            status: { not: BookStatus.DELETING },
+          }),
         },
         orderBy: { createdAt: 'asc' },
       }),
@@ -171,6 +185,7 @@ describe('IngestionJobRepository', () => {
     tx.ingestionJob.findUnique.mockResolvedValue({
       id: 'job-a',
       bookId: 'book-a',
+      leaseToken: 'lease-a',
       book: {
         ownerId: 'user-a',
         visibility: 'PRIVATE',
@@ -182,6 +197,7 @@ describe('IngestionJobRepository', () => {
     await expect(
       repository.claimNextDeletion(retryBefore, now),
     ).resolves.toEqual({
+      leaseToken: 'lease-a',
       jobId: 'job-a',
       bookId: 'book-a',
       ownerScope: 'user-a',
@@ -219,9 +235,9 @@ describe('IngestionJobRepository', () => {
     tx.ingestionJob.updateMany.mockResolvedValue({ count: 1 });
     tx.book.updateMany.mockResolvedValue({ count: 0 });
 
-    await expect(
-      repository.markChunking('job-a', 'book-a'),
-    ).rejects.toBeInstanceOf(IngestionLeaseLostError);
+    await expect(repository.markChunking(claimedJob())).rejects.toBeInstanceOf(
+      IngestionLeaseLostError,
+    );
     expect(tx.book.updateMany).toHaveBeenCalledWith({
       where: { id: 'book-a', status: { not: BookStatus.DELETING } },
       data: { status: BookStatus.CHUNKING, statusProgress: 25 },
@@ -274,7 +290,12 @@ describe('IngestionJobRepository', () => {
       }),
     });
     expect(tx.ingestionJob.updateMany).toHaveBeenCalledWith({
-      where: { id: 'job-a', status: IngestionJobStatus.RUNNING },
+      where: {
+        id: 'job-a',
+        bookId: 'book-a',
+        leaseToken: 'lease-a',
+        status: IngestionJobStatus.RUNNING,
+      },
       data: expect.objectContaining({
         heartbeatAt: expect.any(Date),
         lastError: null,
@@ -325,7 +346,12 @@ describe('IngestionJobRepository', () => {
       }),
     });
     expect(tx.ingestionJob.updateMany).toHaveBeenCalledWith({
-      where: { id: 'job-a', status: IngestionJobStatus.RUNNING },
+      where: {
+        id: 'job-a',
+        bookId: 'book-a',
+        leaseToken: 'lease-a',
+        status: IngestionJobStatus.RUNNING,
+      },
       data: expect.objectContaining({
         status: IngestionJobStatus.SUCCEEDED,
         lockedAt: null,
@@ -376,8 +402,61 @@ describe('IngestionJobRepository', () => {
     );
   });
 
+  it('rejects an old executor before replacing any persisted chapters', async () => {
+    tx.ingestionJob.updateMany.mockResolvedValue({ count: 0 });
+    await expect(
+      repository.completeParsing({
+        job: claimedJob(),
+        parsed: { title: 'synthetic', sections: [] },
+        sections: [],
+        chunks: [],
+      }),
+    ).rejects.toBeInstanceOf(IngestionLeaseLostError);
+    expect(tx.bookSection.deleteMany).not.toHaveBeenCalled();
+    expect(tx.ingestionJob.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          leaseToken: 'lease-a',
+          bookId: 'book-a',
+        }),
+      }),
+    );
+  });
+
+  it('does not publish or fail a book for a reclaimed lease', async () => {
+    tx.ingestionJob.updateMany.mockResolvedValue({ count: 0 });
+    await expect(
+      repository.completeEmbedding(claimedJob()),
+    ).rejects.toBeInstanceOf(IngestionLeaseLostError);
+    await repository.fail(claimedJob(), 'INTERNAL_PROCESSING_ERROR', 'failed');
+    expect(tx.book.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('enforces the shared global ingestion limit before selecting another job', async () => {
+    tx.ingestionJob.count.mockResolvedValue(4);
+    await expect(repository.claimNext()).resolves.toBeNull();
+    expect(tx.$queryRaw).toHaveBeenCalled();
+    expect(tx.ingestionJob.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('only heartbeats the current lease and refuses deleted books', async () => {
+    prisma.ingestionJob.updateMany.mockResolvedValue({ count: 0 });
+    await expect(repository.heartbeat(claimedJob())).rejects.toBeInstanceOf(
+      IngestionLeaseLostError,
+    );
+    expect(prisma.ingestionJob.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          leaseToken: 'lease-a',
+          book: { status: { not: BookStatus.DELETING } },
+        }),
+      }),
+    );
+  });
+
   function claimedJob(): ClaimedIngestionJob {
     return {
+      leaseToken: 'lease-a',
       jobId: 'job-a',
       bookId: 'book-a',
       storageKey: 'private/user-a/book-a/source.txt',

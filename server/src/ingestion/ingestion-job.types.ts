@@ -1,4 +1,5 @@
 export interface ClaimedIngestionJob {
+  leaseToken: string;
   jobId: string;
   bookId: string;
   storageKey: string;
@@ -7,6 +8,7 @@ export interface ClaimedIngestionJob {
 }
 
 export interface ClaimedDeletionJob {
+  leaseToken: string;
   jobId: string;
   bookId: string;
   ownerScope: string;

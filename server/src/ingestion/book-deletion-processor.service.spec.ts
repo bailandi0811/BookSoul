@@ -54,6 +54,7 @@ describe('BookDeletionProcessorService', () => {
 
   function job(): ClaimedDeletionJob {
     return {
+      leaseToken: 'lease-a',
       jobId: 'job-a',
       bookId: 'book-a',
       ownerScope: 'user-a',

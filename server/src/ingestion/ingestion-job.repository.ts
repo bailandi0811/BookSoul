@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import {
   BookStatus,
   BookVisibility,
@@ -53,6 +54,7 @@ export class IngestionJobRepository {
             status: IngestionJobStatus.QUEUED,
             lockedAt: null,
             heartbeatAt: null,
+            leaseToken: null,
           },
         });
         if (result.count === 0) continue;
@@ -68,20 +70,48 @@ export class IngestionJobRepository {
 
   async claimNext(now = new Date()): Promise<ClaimedIngestionJob | null> {
     return this.prisma.$transaction(async (tx) => {
+      // A short, shared admission lock makes the global and owner limits atomic across processes.
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(71420261011::bigint)::text`;
+      if (
+        (await tx.ingestionJob.count({
+          where: {
+            status: IngestionJobStatus.RUNNING,
+            book: { status: { not: BookStatus.DELETING } },
+          },
+        })) >= 4
+      )
+        return null;
       const next = await tx.ingestionJob.findFirst({
         where: {
           status: IngestionJobStatus.QUEUED,
-          book: { status: { not: BookStatus.DELETING } },
+          book: {
+            status: { not: BookStatus.DELETING },
+            OR: [
+              { ownerId: null },
+              {
+                owner: {
+                  books: {
+                    none: {
+                      ingestionJob: { status: IngestionJobStatus.RUNNING },
+                    },
+                  },
+                },
+              },
+            ],
+          },
         },
         orderBy: { createdAt: 'asc' },
         select: { id: true, bookId: true },
       });
       if (!next) return null;
 
+      const leaseToken = randomUUID();
+
       const claimed = await tx.ingestionJob.updateMany({
         where: { id: next.id, status: IngestionJobStatus.QUEUED },
         data: {
           status: IngestionJobStatus.RUNNING,
+          leaseToken,
           attempt: { increment: 1 },
           lockedAt: now,
           heartbeatAt: now,
@@ -106,6 +136,7 @@ export class IngestionJobRepository {
             status: IngestionJobStatus.QUEUED,
             lockedAt: null,
             heartbeatAt: null,
+            leaseToken: null,
           },
         });
         return null;
@@ -124,12 +155,19 @@ export class IngestionJobRepository {
         },
       });
       if (!job) return null;
+      // Isolate external writes/cleanup from earlier executors without changing the vector schema.
+      const embeddingVersion = `${job.book.embeddingVersion.split(':run:')[0].slice(0, 85)}:run:${leaseToken}`;
+      await tx.book.update({
+        where: { id: job.bookId },
+        data: { embeddingVersion },
+      });
       return {
+        leaseToken,
         jobId: job.id,
         bookId: job.bookId,
         storageKey: job.book.storageKey,
         originalFileName: job.book.originalFileName,
-        embeddingVersion: job.book.embeddingVersion,
+        embeddingVersion,
       };
     });
   }
@@ -168,6 +206,7 @@ export class IngestionJobRepository {
         },
         data: {
           status: IngestionJobStatus.RUNNING,
+          leaseToken: randomUUID(),
           attempt: { increment: 1 },
           lockedAt: now,
           heartbeatAt: now,
@@ -200,6 +239,7 @@ export class IngestionJobRepository {
         throw new Error('Private deleting book is missing its owner');
       }
       return {
+        leaseToken: job.leaseToken!,
         jobId: job.id,
         bookId: job.bookId,
         ownerScope,
@@ -208,16 +248,16 @@ export class IngestionJobRepository {
     });
   }
 
-  async markChunking(jobId: string, bookId: string): Promise<void> {
+  async markChunking(job: ClaimedIngestionJob): Promise<void> {
     const now = new Date();
     await this.prisma.$transaction(async (tx) => {
       const lease = await tx.ingestionJob.updateMany({
-        where: { id: jobId, status: IngestionJobStatus.RUNNING },
+        where: this.leaseWhere(job),
         data: { heartbeatAt: now },
       });
       if (lease.count === 0) throw new IngestionLeaseLostError();
       const book = await tx.book.updateMany({
-        where: { id: bookId, status: { not: BookStatus.DELETING } },
+        where: { id: job.bookId, status: { not: BookStatus.DELETING } },
         data: { status: BookStatus.CHUNKING, statusProgress: 25 },
       });
       if (book.count === 0) throw new IngestionLeaseLostError();
@@ -233,10 +273,11 @@ export class IngestionJobRepository {
     const { job, parsed, sections, chunks } = input;
     await this.prisma.$transaction(
       async (tx) => {
-        const activeLease = await tx.ingestionJob.count({
-          where: { id: job.jobId, status: IngestionJobStatus.RUNNING },
+        const activeLease = await tx.ingestionJob.updateMany({
+          where: this.leaseWhere(job),
+          data: { heartbeatAt: new Date() },
         });
-        if (activeLease === 0) throw new IngestionLeaseLostError();
+        if (activeLease.count === 0) throw new IngestionLeaseLostError();
 
         await tx.bookSection.deleteMany({ where: { bookId: job.bookId } });
         await this.createInBatches(
@@ -280,8 +321,7 @@ export class IngestionJobRepository {
         if (book.count === 0) throw new IngestionLeaseLostError();
         const heartbeat = await tx.ingestionJob.updateMany({
           where: {
-            id: job.jobId,
-            status: IngestionJobStatus.RUNNING,
+            ...this.leaseWhere(job),
           },
           data: {
             heartbeatAt: new Date(),
@@ -299,9 +339,7 @@ export class IngestionJobRepository {
   ): Promise<BookVectorizationContext> {
     const active = await this.prisma.ingestionJob.findFirst({
       where: {
-        id: job.jobId,
-        bookId: job.bookId,
-        status: IngestionJobStatus.RUNNING,
+        ...this.leaseWhere(job),
         book: { status: BookStatus.EMBEDDING },
       },
       select: {
@@ -365,9 +403,7 @@ export class IngestionJobRepository {
   async assertEmbeddingLease(job: ClaimedIngestionJob): Promise<void> {
     const active = await this.prisma.ingestionJob.count({
       where: {
-        id: job.jobId,
-        bookId: job.bookId,
-        status: IngestionJobStatus.RUNNING,
+        ...this.leaseWhere(job),
         book: { status: BookStatus.EMBEDDING },
       },
     });
@@ -382,7 +418,7 @@ export class IngestionJobRepository {
     const progress = Math.min(95, 30 + Math.floor((completed / total) * 65));
     await this.prisma.$transaction(async (tx) => {
       const lease = await tx.ingestionJob.updateMany({
-        where: { id: job.jobId, status: IngestionJobStatus.RUNNING },
+        where: this.leaseWhere(job),
         data: { heartbeatAt: new Date() },
       });
       if (lease.count === 0) throw new IngestionLeaseLostError();
@@ -396,6 +432,11 @@ export class IngestionJobRepository {
 
   async completeEmbedding(job: ClaimedIngestionJob): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
+      const lease = await tx.ingestionJob.updateMany({
+        where: this.leaseWhere(job),
+        data: { heartbeatAt: new Date() },
+      });
+      if (!lease.count) throw new IngestionLeaseLostError();
       const activeBook = await tx.book.findFirst({
         where: { id: job.bookId, status: BookStatus.EMBEDDING },
         select: {
@@ -453,7 +494,7 @@ export class IngestionJobRepository {
         });
       }
       const completed = await tx.ingestionJob.updateMany({
-        where: { id: job.jobId, status: IngestionJobStatus.RUNNING },
+        where: this.leaseWhere(job),
         data: {
           status: IngestionJobStatus.SUCCEEDED,
           lockedAt: null,
@@ -467,10 +508,11 @@ export class IngestionJobRepository {
 
   async completeDeletion(job: ClaimedDeletionJob): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
-      const active = await tx.ingestionJob.count({
-        where: { id: job.jobId, status: IngestionJobStatus.RUNNING },
+      const active = await tx.ingestionJob.updateMany({
+        where: this.leaseWhere(job),
+        data: { heartbeatAt: new Date() },
       });
-      if (active === 0) throw new IngestionLeaseLostError();
+      if (active.count === 0) throw new IngestionLeaseLostError();
       const deleted = await tx.book.deleteMany({
         where: { id: job.bookId, status: BookStatus.DELETING },
       });
@@ -480,7 +522,7 @@ export class IngestionJobRepository {
 
   async failDeletion(job: ClaimedDeletionJob): Promise<void> {
     await this.prisma.ingestionJob.updateMany({
-      where: { id: job.jobId, status: IngestionJobStatus.RUNNING },
+      where: this.leaseWhere(job),
       data: {
         status: IngestionJobStatus.FAILED,
         lockedAt: null,
@@ -497,7 +539,7 @@ export class IngestionJobRepository {
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const failed = await tx.ingestionJob.updateMany({
-        where: { id: job.jobId, status: IngestionJobStatus.RUNNING },
+        where: this.leaseWhere(job),
         data: {
           status: IngestionJobStatus.FAILED,
           lockedAt: null,
@@ -516,6 +558,36 @@ export class IngestionJobRepository {
         },
       });
     });
+  }
+
+  async heartbeat(
+    job: ClaimedIngestionJob | ClaimedDeletionJob,
+  ): Promise<void> {
+    const updated = await this.prisma.ingestionJob.updateMany({
+      where: {
+        ...this.leaseWhere(job),
+        book: {
+          status:
+            'ownerScope' in job
+              ? BookStatus.DELETING
+              : { not: BookStatus.DELETING },
+        },
+      },
+      data: { heartbeatAt: new Date() },
+    });
+    if (!updated.count) throw new IngestionLeaseLostError();
+  }
+
+  private leaseWhere(
+    job: ClaimedIngestionJob | ClaimedDeletionJob,
+  ): Prisma.IngestionJobWhereInput {
+    if (!job.leaseToken) throw new IngestionLeaseLostError();
+    return {
+      id: job.jobId,
+      bookId: job.bookId,
+      leaseToken: job.leaseToken,
+      status: IngestionJobStatus.RUNNING,
+    };
   }
 
   private async createInBatches<T>(

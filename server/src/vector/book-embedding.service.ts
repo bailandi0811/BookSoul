@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OpenAIEmbeddings } from '@langchain/openai';
 import { setTimeout as wait } from 'node:timers/promises';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { IngestionError } from '../ingestion/errors/ingestion-error';
 
 const DASHSCOPE_EMBEDDING_BATCH_LIMIT = 10;
@@ -13,6 +14,9 @@ export class BookEmbeddingService {
   private readonly vectorDim: number;
   private readonly maxAttempts: number;
   private readonly retryBaseMs: number;
+  private readonly requestSignal = new AsyncLocalStorage<
+    AbortSignal | undefined
+  >();
 
   constructor(configService: ConfigService) {
     const configuredBatchSize =
@@ -38,6 +42,18 @@ export class BookEmbeddingService {
       maxRetries: 0,
       configuration: {
         baseURL: baseUrl,
+        fetch: (input, init) => {
+          const signal = this.requestSignal.getStore();
+          return fetch(input, {
+            ...init,
+            signal: signal
+              ? AbortSignal.any([
+                  signal,
+                  ...(init?.signal ? [init.signal] : []),
+                ])
+              : init?.signal,
+          });
+        },
       },
     });
   }
@@ -66,7 +82,9 @@ export class BookEmbeddingService {
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       this.assertActive(signal);
       try {
-        const vectors = await this.client.embedDocuments(texts);
+        const vectors = await this.requestSignal.run(signal, () =>
+          this.client.embedDocuments(texts),
+        );
         this.assertActive(signal);
         this.validateVectors(vectors, texts.length);
         return vectors;

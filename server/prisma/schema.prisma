@@ -19,6 +19,7 @@ model User {
   refreshTokens   RefreshToken[]
   authChallenges  AuthChallenge[]
   books           Book[]
+  bookUploads     BookUploadSession[]
   bookAssistants  BookAssistant[]
   readingProgress ReadingProgress[]
   readingPositions BookReadingPosition[]
@@ -385,11 +386,47 @@ model IngestionJob {
   attempt     Int                @default(0)
   lockedAt    DateTime?
   heartbeatAt DateTime?
+  leaseToken  String?
   lastError   String?
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
 
   @@index([status, updatedAt])
+}
+
+enum BookUploadStatus {
+  UPLOADING
+  FINALIZING
+  COMMITTED
+  CANCELLED
+  EXPIRED
+}
+
+model BookUploadSession {
+  id               String @id @default(uuid())
+  ownerId          String
+  owner            User @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  requestId        String
+  originalFileName String
+  declaredBytes    Int
+  declaredHash     String
+  mimeType         String
+  stagingKey       String @unique
+  multipartId      String?
+  partSize         Int?
+  status           BookUploadStatus @default(UPLOADING)
+  expiresAt        DateTime
+  leaseToken       String?
+  leaseExpiresAt   DateTime?
+  bookId           String?
+  cleanupKeys      String[] @default([])
+  cleanedAt        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([ownerId, requestId])
+  @@index([ownerId, status, expiresAt])
+  @@index([expiresAt, cleanedAt])
 }
 
 model CommunityRoom {

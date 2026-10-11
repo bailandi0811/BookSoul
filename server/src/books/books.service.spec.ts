@@ -58,7 +58,10 @@ function txtFile(content = '第一章\n故事开始'): UploadedBookFile {
 
 describe('BooksService', () => {
   let prisma: {
+    $queryRaw: jest.Mock;
+    bookUploadSession: { findMany: jest.Mock };
     book: {
+      aggregate: jest.Mock;
       findFirst: jest.Mock;
       findMany: jest.Mock;
       create: jest.Mock;
@@ -79,7 +82,10 @@ describe('BooksService', () => {
 
   beforeEach(() => {
     prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 'user-a' }]),
+      bookUploadSession: { findMany: jest.fn().mockResolvedValue([]) },
       book: {
+        aggregate: jest.fn().mockResolvedValue({ _sum: { fileSizeBytes: 0n } }),
         findFirst: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn(),

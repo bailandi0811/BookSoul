@@ -5,9 +5,14 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { safeErrorCode } from '../common/safe-error-code';
 import { BookDeletionProcessorService } from './book-deletion-processor.service';
 import { IngestionJobRepository } from './ingestion-job.repository';
 import { IngestionProcessorService } from './ingestion-processor.service';
+import type {
+  ClaimedIngestionJob,
+  ClaimedDeletionJob,
+} from './ingestion-job.types';
 
 @Injectable()
 export class IngestionWorkerService implements OnModuleInit, OnModuleDestroy {
@@ -19,6 +24,8 @@ export class IngestionWorkerService implements OnModuleInit, OnModuleDestroy {
   private timer: NodeJS.Timeout | null = null;
   private activeTick: Promise<boolean> | null = null;
   private running = false;
+  private activeAbort: AbortController | null = null;
+  private stopping = false;
 
   constructor(
     private readonly repository: IngestionJobRepository,
@@ -46,13 +53,15 @@ export class IngestionWorkerService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy(): Promise<void> {
+    this.stopping = true;
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+    this.activeAbort?.abort();
     if (this.activeTick) await this.activeTick;
   }
 
   async runOnce(): Promise<boolean> {
-    if (this.running) return false;
+    if (this.running || this.stopping) return false;
     this.running = true;
     try {
       const staleBefore = new Date(Date.now() - this.staleMs);
@@ -64,16 +73,21 @@ export class IngestionWorkerService implements OnModuleInit, OnModuleDestroy {
         new Date(Date.now() - this.deletionRetryMs),
       );
       if (deletion) {
-        await this.deletionProcessor.process(deletion);
+        await this.withHeartbeat(deletion, (signal) =>
+          this.deletionProcessor.process(deletion, signal),
+        );
         return true;
       }
       const job = await this.repository.claimNext();
       if (!job) return false;
-      await this.processor.process(job);
+      await this.withHeartbeat(job, (signal) =>
+        this.processor.process(job, signal),
+      );
       return true;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Book ingestion worker tick failed: ${message}`);
+    } catch (error: unknown) {
+      this.logger.error(
+        `Book ingestion worker tick failed [${safeErrorCode(error)}]. For P2021/P2022, check pending database migrations.`,
+      );
       return false;
     } finally {
       this.running = false;
@@ -85,5 +99,38 @@ export class IngestionWorkerService implements OnModuleInit, OnModuleDestroy {
     this.activeTick = this.runOnce().finally(() => {
       this.activeTick = null;
     });
+  }
+
+  private async withHeartbeat(
+    job: ClaimedIngestionJob | ClaimedDeletionJob,
+    operation: (signal: AbortSignal) => Promise<void>,
+  ): Promise<void> {
+    const controller = new AbortController();
+    if (this.stopping) controller.abort();
+    this.activeAbort = controller;
+    const heartbeats = new Set<Promise<void>>();
+    const timer = setInterval(
+      () => {
+        if (heartbeats.size) return;
+        const pending = this.repository
+          .heartbeat(job)
+          .catch(() => {
+            controller.abort();
+          })
+          .finally(() => {
+            heartbeats.delete(pending);
+          });
+        heartbeats.add(pending);
+      },
+      Math.max(1000, Math.min(30_000, Math.floor(this.staleMs / 3))),
+    );
+    timer.unref();
+    try {
+      await operation(controller.signal);
+    } finally {
+      clearInterval(timer);
+      await Promise.all(heartbeats);
+      this.activeAbort = null;
+    }
   }
 }

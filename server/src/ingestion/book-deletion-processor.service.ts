@@ -17,13 +17,16 @@ export class BookDeletionProcessorService {
     private readonly storage: BookFileStorageService,
   ) {}
 
-  async process(job: ClaimedDeletionJob): Promise<void> {
+  async process(job: ClaimedDeletionJob, signal?: AbortSignal): Promise<void> {
     try {
+      signal?.throwIfAborted();
       await this.vectorStore.deleteBook(job.ownerScope, job.bookId);
+      signal?.throwIfAborted();
       await this.storage.deleteByKey(job.storageKey);
+      signal?.throwIfAborted();
       await this.repository.completeDeletion(job);
     } catch (error) {
-      if (error instanceof IngestionLeaseLostError) {
+      if (error instanceof IngestionLeaseLostError || signal?.aborted) {
         this.logger.warn(`Deletion lease lost for book ${job.bookId}`);
         return;
       }

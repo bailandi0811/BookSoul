@@ -1,4 +1,5 @@
 import { AppHeader } from "@/components/AppHeader";
+import { BookUploadTasks } from './BookUploadTasks';
 import { BookCover } from "@/components/BookCover";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
@@ -70,6 +71,8 @@ export function Entrance({ onBackHome }: { onBackHome: () => void }) {
     isUploading,
     uploadFileName,
     uploadProgress,
+    uploadStage,
+    pauseUpload,
     mutatingBookIds,
     error,
     fetchBooks,
@@ -114,6 +117,11 @@ export function Entrance({ onBackHome }: { onBackHome: () => void }) {
     books[0] ??
     null;
   const uploadPercent = uploadProgress?.percent ?? 0;
+  const uploadStatus = uploadStage === "preparing"
+    ? "正在准备文件"
+    : uploadStage === "confirming"
+      ? "正在确认入库"
+      : `${formatBytes(uploadProgress?.loadedBytes ?? 0)} / ${formatBytes(uploadProgress?.totalBytes ?? 0)}`;
   const readingCount = books.filter(
     (book) =>
       book.status === "READY" && book.readingProgress?.mode === "IN_PROGRESS",
@@ -324,9 +332,13 @@ export function Entrance({ onBackHome }: { onBackHome: () => void }) {
                   />
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {formatBytes(uploadProgress?.loadedBytes ?? 0)} /{" "}
-                  {formatBytes(uploadProgress?.totalBytes ?? 0)}{" "}
-                  <span className="float-right tabular-nums">
+                  <span role="status">{uploadStatus}</span>{" "}
+                  <span className="float-right inline-flex items-center gap-2 tabular-nums">
+                    {uploadStage === "uploading" && (
+                      <button type="button" className="relative z-10 underline" onClick={pauseUpload}>
+                        暂停
+                      </button>
+                    )}
                     {uploadPercent}%
                   </span>
                 </p>
@@ -340,6 +352,7 @@ export function Entrance({ onBackHome }: { onBackHome: () => void }) {
               </p>
             )}
           </div>
+          <BookUploadTasks uploading={isUploading} />
           {(fileError || error) && (
             <div
               role="alert"

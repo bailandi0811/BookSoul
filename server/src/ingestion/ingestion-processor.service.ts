@@ -28,8 +28,9 @@ export class IngestionProcessorService {
     private readonly vectorization: BookVectorizationService,
   ) {}
 
-  async process(job: ClaimedIngestionJob): Promise<void> {
+  async process(job: ClaimedIngestionJob, signal?: AbortSignal): Promise<void> {
     try {
+      signal?.throwIfAborted();
       const parsed = await this.storage.withLocalPath(
         job.storageKey,
         (filePath) =>
@@ -37,12 +38,15 @@ export class IngestionProcessorService {
             filePath,
             originalFileName: job.originalFileName,
           }),
+        signal,
       );
-      await this.repository.markChunking(job.jobId, job.bookId);
+      signal?.throwIfAborted();
+      await this.repository.markChunking(job);
 
       const sections: PreparedSection[] = [];
       const chunks: PreparedChunk[] = [];
       for (const parsedSection of parsed.sections) {
+        signal?.throwIfAborted();
         const sectionId = randomUUID();
         sections.push({
           id: sectionId,
@@ -70,9 +74,10 @@ export class IngestionProcessorService {
         sections,
         chunks,
       });
-      await this.vectorization.vectorize(job);
+      signal?.throwIfAborted();
+      await this.vectorization.vectorize(job, signal);
     } catch (error) {
-      if (error instanceof IngestionLeaseLostError) {
+      if (error instanceof IngestionLeaseLostError || signal?.aborted) {
         this.logger.warn(`Ingestion lease lost for book ${job.bookId}`);
         return;
       }

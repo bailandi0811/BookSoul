@@ -13,6 +13,11 @@ import { BookReaderPositionService } from './book-reader-position.service';
 import { BooksController } from './books.controller';
 import { BooksService } from './books.service';
 import { SystemBookMigrationService } from './system-book-migration.service';
+import { BookObjectStorageService } from './book-object-storage.service';
+import { BookUploadsService } from './book-uploads.service';
+import { BookUploadsController } from './book-uploads.controller';
+import { BookUploadCleanupService } from './book-upload-cleanup.service';
+import { LegacyBookUploadLimitInterceptor } from './legacy-book-upload-limit.interceptor';
 
 @Module({
   imports: [
@@ -29,12 +34,17 @@ import { SystemBookMigrationService } from './system-book-migration.service';
     }),
   ],
   controllers: [
+    BookUploadsController,
     BooksController,
     BookAssistantsController,
     BookReadingController,
     BookReaderController,
   ],
   providers: [
+    BookObjectStorageService,
+    BookUploadsService,
+    BookUploadCleanupService,
+    LegacyBookUploadLimitInterceptor,
     BooksService,
     BookFileStorageService,
     BookAssistantsService,

@@ -21,10 +21,12 @@ import { assignBookCoverBindings, type CoverVariant } from "@/lib/book-cover";
 import { ensureBookChat } from "@/lib/book-workspace-navigation";
 import { bindConfirmedReadingProgress, useReaderStore } from "./useReaderStore";
 import { useAuthStore } from "./useAuthStore";
+import type { BookUploadStage } from '@/lib/book-direct-upload';
 
 export type BooksView = "library" | "book" | "reader" | "workspace";
 let navigationGeneration = 0;
 let metadataAbort = new AbortController();
+let uploadAbort: AbortController | null = null;
 
 interface BooksState {
   view: BooksView;
@@ -34,6 +36,7 @@ interface BooksState {
   isUploading: boolean;
   uploadFileName: string | null;
   uploadProgress: BookUploadProgress | null;
+  uploadStage: BookUploadStage | null;
   mutatingBookIds: string[];
   error: string | null;
   currentBook: BookView | null;
@@ -44,6 +47,7 @@ interface BooksState {
   workspaceError: string | null;
   fetchBooks: () => Promise<void>;
   uploadBook: (file: File) => Promise<boolean>;
+  pauseUpload: () => void;
   retryBook: (bookId: string) => Promise<void>;
   deleteBook: (bookId: string) => Promise<void>;
   openBook: (bookId: string, target?: Exclude<BooksView, "library">) => Promise<void>;
@@ -83,6 +87,7 @@ export const useBooksStore = create<BooksState>((set, get) => ({
   isUploading: false,
   uploadFileName: null,
   uploadProgress: null,
+  uploadStage: null,
   mutatingBookIds: [],
   error: null,
   currentBook: null,
@@ -109,8 +114,14 @@ export const useBooksStore = create<BooksState>((set, get) => ({
   },
 
   uploadBook: async (file) => {
+    if (get().isUploading) return false;
+    const controller = new AbortController();
+    uploadAbort = controller;
+    const generation = useAuthStore.getState().authGeneration;
+    const current = () => uploadAbort === controller && generation === useAuthStore.getState().authGeneration && !controller.signal.aborted;
     set({
       isUploading: true,
+      uploadStage: 'preparing',
       uploadFileName: file.name,
       uploadProgress: {
         loadedBytes: 0,
@@ -121,10 +132,11 @@ export const useBooksStore = create<BooksState>((set, get) => ({
     });
     try {
       const book = await uploadBookRequest(file, (uploadProgress) => {
-        set({ uploadProgress });
-      });
+        if (current()) set({ uploadProgress });
+      }, { signal: controller.signal, onStage: uploadStage => { if (current()) set({ uploadStage }); } });
+      if (!current()) return false;
       set((state) => {
-        const books = [book, ...state.books];
+        const books = [book, ...state.books.filter(item => item.id !== book.id)];
         return {
           books,
           coverBindings: assignBookCoverBindings(books, state.coverBindings),
@@ -132,16 +144,20 @@ export const useBooksStore = create<BooksState>((set, get) => ({
       });
       return true;
     } catch (error) {
-      set({ error: errorMessage(error) });
+      if (current()) set({ error: errorMessage(error) });
       return false;
     } finally {
-      set({
+      if (uploadAbort === controller && generation === useAuthStore.getState().authGeneration) set({
         isUploading: false,
+        uploadStage: null,
         uploadFileName: null,
         uploadProgress: null,
       });
+      if (uploadAbort === controller) uploadAbort = null;
     }
   },
+
+  pauseUpload: () => { uploadAbort?.abort(); set({ error: '上传已暂停，重新选择原文件可继续上传' }); },
 
   retryBook: async (bookId) => {
     set((state) => ({
@@ -300,6 +316,7 @@ export const useBooksStore = create<BooksState>((set, get) => ({
   },
 
   clearPrivateState: () => {
+    uploadAbort?.abort(); uploadAbort = null;
     navigationGeneration++; metadataAbort.abort();
     useReaderStore.getState().clearPrivateState();
     useChatStore.getState().resetBookChat();
@@ -311,6 +328,7 @@ export const useBooksStore = create<BooksState>((set, get) => ({
       isUploading: false,
       uploadFileName: null,
       uploadProgress: null,
+      uploadStage: null,
       mutatingBookIds: [],
       error: null,
       currentBook: null,

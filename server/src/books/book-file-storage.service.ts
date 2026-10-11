@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { mkdir, rmdir, unlink, writeFile } from 'fs/promises';
 import * as path from 'path';
@@ -6,6 +6,7 @@ import {
   requireSafePathSegment,
   resolveWithinRoot,
 } from '../auth/auth-context';
+import { BookObjectStorageService } from './book-object-storage.service';
 
 const STORAGE_KEY_PATTERN =
   /^(?:private\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+|system\/[A-Za-z0-9_-]+)\/source\.(epub|txt)$/;
@@ -14,7 +15,10 @@ const STORAGE_KEY_PATTERN =
 export class BookFileStorageService {
   private readonly root: string;
 
-  constructor(configService: ConfigService) {
+  constructor(
+    configService: ConfigService,
+    @Optional() private readonly objects?: BookObjectStorageService,
+  ) {
     this.root = path.resolve(
       configService.get<string>('books.uploadDir') || 'uploads/books',
     );
@@ -54,6 +58,11 @@ export class BookFileStorageService {
   }
 
   async deleteByKey(storageKey: string): Promise<void> {
+    if (storageKey.startsWith('oss:')) {
+      if (!this.objects) throw new Error('Book object storage is unavailable');
+      await this.objects.delete(storageKey.slice(4));
+      return;
+    }
     const absolutePath = this.resolveStorageKey(storageKey);
     try {
       await unlink(absolutePath);
@@ -68,7 +77,17 @@ export class BookFileStorageService {
   async withLocalPath<T>(
     storageKey: string,
     operation: (absolutePath: string) => Promise<T>,
+    signal?: AbortSignal,
   ): Promise<T> {
+    if (storageKey.startsWith('oss:')) {
+      if (!this.objects) throw new Error('Book object storage is unavailable');
+      return this.objects.withFile(
+        storageKey.slice(4),
+        (file) => operation(file.path),
+        signal,
+      );
+    }
+    signal?.throwIfAborted();
     return operation(this.resolveStorageKey(storageKey));
   }
 

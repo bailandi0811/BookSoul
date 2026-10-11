@@ -89,6 +89,25 @@ describe('BookEmbeddingService', () => {
     expect(embedDocuments).toHaveBeenCalledTimes(1);
   });
 
+  it('propagates cancellation to the underlying HTTP transport', async () => {
+    const realClient = createService({ 'openai.apiKey': 'synthetic-key', 'openai.baseUrl': 'https://provider.example.invalid/v1' });
+    const controller = new AbortController();
+    let started: (signal: AbortSignal) => void = () => undefined;
+    const transport = new Promise<AbortSignal>(resolve => { started = resolve; });
+    const fetcher = jest.spyOn(globalThis, 'fetch').mockImplementation((_input, init) => {
+      const signal = init?.signal as AbortSignal;
+      started(signal);
+      return new Promise<Response>((_resolve, reject) => { signal.addEventListener('abort', () => reject(new DOMException('cancelled', 'AbortError')), { once: true }); });
+    });
+    try {
+      const running = realClient.embedBatch(['synthetic input'], controller.signal);
+      const signal = await transport;
+      controller.abort();
+      await expect(running).rejects.toMatchObject({ name: 'AbortError' });
+      expect(signal.aborted).toBe(true); expect(fetcher).toHaveBeenCalledTimes(1);
+    } finally { fetcher.mockRestore(); }
+  });
+
   it('retries a transient failure and rejects invalid dimensions safely', async () => {
     embedDocuments
       .mockRejectedValueOnce(new Error('temporary upstream failure'))

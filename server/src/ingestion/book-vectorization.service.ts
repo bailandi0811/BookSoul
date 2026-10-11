@@ -25,14 +25,20 @@ export class BookVectorizationService {
       configService.get<number>('books.embeddingBatchSize') || 32;
   }
 
-  async vectorize(job: ClaimedIngestionJob): Promise<void> {
+  async vectorize(
+    job: ClaimedIngestionJob,
+    signal?: AbortSignal,
+  ): Promise<void> {
     let context: BookVectorizationContext | null = null;
     try {
+      signal?.throwIfAborted();
       context = await this.repository.getVectorizationContext(job);
       await this.vectorStore.replaceVersionStart(context);
 
       let completed = 0;
       while (completed < context.totalChunks) {
+        signal?.throwIfAborted();
+        await this.repository.assertEmbeddingLease(job);
         const chunks = await this.repository.listVectorChunks(
           context,
           completed,
@@ -43,7 +49,9 @@ export class BookVectorizationService {
         }
         const vectors = await this.embeddings.embedBatch(
           chunks.map((chunk) => chunk.content),
+          signal,
         );
+        signal?.throwIfAborted();
         await this.repository.assertEmbeddingLease(job);
         const records: BookVectorRecord[] = chunks.map((chunk, index) => ({
           id: chunk.id,
@@ -65,6 +73,7 @@ export class BookVectorizationService {
       }
 
       await this.vectorStore.flush();
+      signal?.throwIfAborted();
       const vectorCount = await this.vectorStore.countVersion(context);
       if (vectorCount !== context.totalChunks) {
         throw new IngestionError(
@@ -72,6 +81,7 @@ export class BookVectorizationService {
           '小说索引校验失败，请稍后重试',
         );
       }
+      signal?.throwIfAborted();
       await this.repository.completeEmbedding(job);
     } catch (error) {
       if (context) {

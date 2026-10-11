@@ -18,6 +18,7 @@ import { CurrentAuth } from '../auth/decorators/auth-context.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { BookView, UploadedBookFile } from './books.types';
 import { BooksService } from './books.service';
+import { LegacyBookUploadLimitInterceptor } from './legacy-book-upload-limit.interceptor';
 
 @Controller('api/books')
 @UseGuards(JwtAuthGuard)
@@ -26,7 +27,7 @@ export class BooksController {
 
   @Post()
   @Throttle({ default: { limit: 6, ttl: 60_000 } })
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(LegacyBookUploadLimitInterceptor, FileInterceptor('file'))
   @HttpCode(HttpStatus.ACCEPTED)
   async upload(
     @UploadedFile() file: UploadedBookFile | undefined,

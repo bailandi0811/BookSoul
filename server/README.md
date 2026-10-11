@@ -67,7 +67,17 @@ npm run test:db
 
 ## 书籍处理生命周期
 
-上传只保存文件并创建持久任务。worker 依次执行解析、分节、切块、批量 Embedding、Milvus 写入和一致性核对，成功后书籍进入 `READY`。失败会保留稳定错误码并支持重试；进程重启后会回收超时租约。
+新客户端通过 `/api/books/uploads` 创建私有 OSS 上传会话，小于 10 MiB 单次直传，10–50 MiB 使用 5 MiB 分片、最多三片并发；中断后重新选择原文件可恢复。确认阶段固定独立源对象、流式核验真实大小和 SHA-256，事务内幂等创建书籍与任务，同用户重复文件返回已有书籍。新上传需要既有成组 OSS 配置；未配置时明确不可用，不自动回退。本地旧源文件和旧 multipart API 保留兼容，旧接口在接收文件前限制单进程最多两路、同用户一路，并执行存储配额检查。
+
+每用户最多两个有效上传会话、源文件与在途预留合计最多 1 GiB；确认阶段全局最多四路。worker 依次执行解析、分节、切块、批量 Embedding、Milvus 写入和一致性核对，全部成功后进入 `READY`。单进程处理一个任务，数据库短事务锁限制全局最多四个导入任务、同用户一个；超时租约回收后新执行者使用独立 token 和向量版本，旧执行者不能提交新状态。失败仍支持整书重试，本次未实现持久批次检查点。
+
+独立 worker 入口为 `npm run start:worker`，构建后使用 `npm run start:worker:prod`，不监听 HTTP 端口。拆分部署时 API 使用既有 `BOOK_INGESTION_WORKER_ENABLED=false`，worker 进程保持启用；本次只提供入口，不修改真实部署配置或启动后台进程。混合新旧版本 worker 不支持租约隔离，上线必须先停止旧 worker 再迁移和启动新版本。
+
+上传会话有效期 24 小时，授权有效期最多 5 分钟。worker 启用时每分钟清理已结束或过期的会话暂存对象、未完成分片和未提交候选源；清理等待至少十分钟以避开有效签名与在途请求，失败保留记录供重试。正式源文件由书籍删除流程清理，不对既有本地文件做批量迁移。OSS 必须私有，浏览器 CORS 允许 POST/PUT 和 Content-Type；服务端需要列分片、合并、复制、读取、删除和中止分片权限。V4 分片授权绑定实际 Content-Length。运维细节、迁移顺序与验收范围见[小说上传实施方案](../docs/superpowers/specs/2026-10-11-book-upload-reliability-design.md)。
+
+数据库并发验收使用 `npm run test:db:uploads`，必须显式提供隔离的 `TEST_DATABASE_URL` 与用于目标比对的 `DATABASE_URL`，满足 `*_test` 数据库、`test_*` schema 且与应用数据库隔离。该测试要求专用 schema 不含既有书籍，不清空任何表，仅清理本次创建的合成记录。默认 `npm test` / `npm run check` 不发现该测试。
+
+本次 OSS 上传版本的镜像发布、停旧 worker、迁移及上线验收顺序见[小说上传部署说明](../docs/deployment/novel-upload.md)。
 
 单书问答采用 Milvus 向量召回与服务端 BM25 混合检索。BM25 仅使用 PostgreSQL `BookChunk` 中当前书籍、当前版本及阅读上限内的正文计算统计；无需补建索引、重新上传或在 Milvus 保存正文。融合策略、资源预算、验证结果与限制见[混合检索验收记录](../docs/hybrid-retrieval-acceptance.md)。
 

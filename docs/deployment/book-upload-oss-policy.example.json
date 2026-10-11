@@ -1,0 +1,21 @@
+{
+  "Version": "1",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "oss:GetObject",
+        "oss:PutObject",
+        "oss:DeleteObject",
+        "oss:ListParts",
+        "oss:AbortMultipartUpload"
+      ],
+      "Resource": ["acs:oss:*:*:<OSS_BUCKET>/booksoul/books/staging/*"]
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["oss:GetObject", "oss:PutObject", "oss:DeleteObject"],
+      "Resource": ["acs:oss:*:*:<OSS_BUCKET>/booksoul/books/sources/*"]
+    }
+  ]
+}

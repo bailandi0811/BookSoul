@@ -72,12 +72,13 @@ describe('IngestionProcessorService', () => {
     expect(storage.withLocalPath).toHaveBeenCalledWith(
       job.storageKey,
       expect.any(Function),
+      undefined,
     );
     expect(parser.parse).toHaveBeenCalledWith({
       filePath: 'trusted-source.txt',
       originalFileName: 'book.txt',
     });
-    expect(repository.markChunking).toHaveBeenCalledWith('job-a', 'book-a');
+    expect(repository.markChunking).toHaveBeenCalledWith(job);
     expect(repository.completeParsing).toHaveBeenCalledWith(
       expect.objectContaining({
         job,
@@ -99,7 +100,7 @@ describe('IngestionProcessorService', () => {
       }),
     );
     expect(repository.fail).not.toHaveBeenCalled();
-    expect(vectorization.vectorize).toHaveBeenCalledWith(job);
+    expect(vectorization.vectorize).toHaveBeenCalledWith(job, undefined);
   });
 
   it('stores parser failures using their stable public code', async () => {
@@ -159,6 +160,7 @@ describe('IngestionProcessorService', () => {
 
   function claimedJob(): ClaimedIngestionJob {
     return {
+      leaseToken: 'lease-a',
       jobId: 'job-a',
       bookId: 'book-a',
       storageKey: 'private/user-a/book-a/source.txt',

@@ -5,6 +5,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -21,13 +22,15 @@ import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 import { BookFileStorageService } from './book-file-storage.service';
 import type { BookView, UploadedBookFile } from './books.types';
+import { lockAuthUser } from '../auth/auth-user-lock';
+import { assertBookStorageQuota } from './book-storage-quota';
 
 type BookWithPersonalization = Book & {
   assistants: Pick<BookAssistant, 'id' | 'name' | 'responseDepth' | 'tone'>[];
   readingProgress: Pick<ReadingProgress, 'mode' | 'currentSectionOrder'>[];
 };
 
-interface ValidatedUpload {
+export interface ValidatedUpload {
   extension: 'epub' | 'txt';
   canonicalMimeType: 'application/epub+zip' | 'text/plain';
   originalFileName: string;
@@ -83,25 +86,30 @@ export class BooksService {
     );
 
     try {
-      const book = await this.prisma.book.create({
-        data: {
-          id: bookId,
-          ownerId,
-          visibility: BookVisibility.PRIVATE,
-          title: upload.title,
-          originalFileName: upload.originalFileName,
-          storageKey,
-          mimeType: upload.canonicalMimeType,
-          fileSizeBytes: BigInt(upload.size),
-          contentHash: upload.contentHash,
-          status: BookStatus.QUEUED,
-          statusProgress: 0,
-          parserVersion: this.parserVersion,
-          embeddingVersion: this.embeddingVersion,
-          ingestionJob: {
-            create: {},
+      const book = await this.prisma.$transaction(async (tx) => {
+        if (!(await lockAuthUser(tx, ownerId)))
+          throw new UnauthorizedException();
+        await assertBookStorageQuota(tx, ownerId, upload.size);
+        return tx.book.create({
+          data: {
+            id: bookId,
+            ownerId,
+            visibility: BookVisibility.PRIVATE,
+            title: upload.title,
+            originalFileName: upload.originalFileName,
+            storageKey,
+            mimeType: upload.canonicalMimeType,
+            fileSizeBytes: BigInt(upload.size),
+            contentHash: upload.contentHash,
+            status: BookStatus.QUEUED,
+            statusProgress: 0,
+            parserVersion: this.parserVersion,
+            embeddingVersion: this.embeddingVersion,
+            ingestionJob: {
+              create: {},
+            },
           },
-        },
+        });
       });
       return this.toBookView({
         ...book,
@@ -285,7 +293,20 @@ export class BooksService {
     if (!file?.buffer || !Buffer.isBuffer(file.buffer)) {
       throw new BadRequestException('请选择要上传的小说文件');
     }
-    const size = file.buffer.length;
+    return this.describeSource(
+      file.originalname,
+      file.buffer.length,
+      file.buffer,
+      createHash('sha256').update(file.buffer).digest('hex'),
+    );
+  }
+
+  describeSource(
+    fileName: string,
+    size: number,
+    prefix: Buffer,
+    contentHash: string,
+  ): ValidatedUpload {
     if (size === 0) {
       throw new BadRequestException('上传文件不能为空');
     }
@@ -296,7 +317,7 @@ export class BooksService {
       });
     }
 
-    const originalFileName = this.safeDisplayFileName(file.originalname);
+    const originalFileName = this.safeDisplayFileName(fileName);
     const rawExtension = path.extname(originalFileName).toLowerCase();
     if (rawExtension !== '.epub' && rawExtension !== '.txt') {
       throw new BadRequestException({
@@ -306,13 +327,13 @@ export class BooksService {
     }
 
     const extension = rawExtension.slice(1) as 'epub' | 'txt';
-    if (extension === 'epub' && !this.hasZipSignature(file.buffer)) {
+    if (extension === 'epub' && !this.hasZipSignature(prefix)) {
       throw new BadRequestException({
         message: 'EPUB 文件格式无效',
         code: 'INVALID_EPUB',
       });
     }
-    if (extension === 'txt' && this.looksBinary(file.buffer)) {
+    if (extension === 'txt' && this.looksBinary(prefix)) {
       throw new BadRequestException({
         message: 'TXT 文件包含无法识别的二进制内容',
         code: 'UNSUPPORTED_FORMAT',
@@ -334,7 +355,7 @@ export class BooksService {
       originalFileName,
       title,
       size,
-      contentHash: createHash('sha256').update(file.buffer).digest('hex'),
+      contentHash,
     };
   }
 

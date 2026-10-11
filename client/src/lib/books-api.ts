@@ -1,9 +1,9 @@
 import {
   apiFetch,
-  apiUpload,
   readApiError,
   type ApiUploadProgress,
 } from "@/lib/api";
+import { uploadBookDirect, type DirectBookUploadOptions } from './book-direct-upload';
 
 export type BookUploadProgress = ApiUploadProgress;
 
@@ -92,12 +92,9 @@ export async function getBook(bookId: string): Promise<BookView> {
 export async function uploadBook(
   file: File,
   onProgress?: (progress: BookUploadProgress) => void,
+  options: Omit<DirectBookUploadOptions, 'onProgress'> = {},
 ): Promise<BookView> {
-  const body = new FormData();
-  body.append("file", file);
-  return readData<BookView>(
-    await apiUpload("/api/books", body, onProgress),
-  );
+  return uploadBookDirect(file, { ...options, onProgress });
 }
 
 export async function retryBook(bookId: string): Promise<BookView> {

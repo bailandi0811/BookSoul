@@ -113,6 +113,7 @@ describe('BookVectorizationService', () => {
 
   function job(): ClaimedIngestionJob {
     return {
+      leaseToken: 'lease-a',
       jobId: 'job-a',
       bookId: 'book-a',
       storageKey: 'private/user-a/book-a/source.txt',
