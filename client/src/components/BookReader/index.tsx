@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowLeft, Bookmark, ShieldCheck, CloudCheck } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { beginCoverFlightFrom } from "@/lib/book-cover-flight";
+import { useCoverFlightAnimating } from "@/lib/use-cover-flight-animating";
 import { PAPER_EASE, PANEL_DURATION } from "@/lib/ui-motion";
 import { useBooksStore } from "@/store/useBooksStore";
 import { useReaderStore } from "@/store/useReaderStore";
@@ -27,6 +28,7 @@ export default function BookReader() {
   const [contents, setContents] = useState(() => window.matchMedia("(min-width: 1280px)").matches);
   const assistantButton = useRef<HTMLButtonElement>(null), contentsButton = useRef<HTMLButtonElement>(null);
   const reducedMotion = useReducedMotion();
+  const coverFlying = useCoverFlightAnimating();
   const bookId = book?.id;
   useEffect(() => {
     if (bookId && sections.length) void useReaderStore.getState().openReader(bookId, sections);
@@ -64,7 +66,7 @@ export default function BookReader() {
         {desktop && <ReaderSidebar book={book} contentsOpen={contents} onToggleContents={toggleContents} onCloseContents={closeContents} />}
         <div className="reader-column">
           <div className="reader-topbar">
-            <div className="reader-mobile-book-info"><button className="reader-back" aria-label="返回本书空间" onClick={() => { beginCoverFlightFrom(book.id, "reader"); void useBooksStore.getState().switchBookView("book"); }}><ArrowLeft size={16} /></button><p className="reader-book-title font-reading">{book.title}</p></div>
+            <div className="reader-mobile-book-info"><button type="button" className="reader-back" disabled={coverFlying} aria-disabled={coverFlying} aria-label="返回本书空间" onClick={() => { beginCoverFlightFrom(book.id, "reader"); void useBooksStore.getState().switchBookView("book"); }}><ArrowLeft size={16} /></button><p className="reader-book-title font-reading">{book.title}</p></div>
             <ReaderChapterNavigation /><Bookmark size={20} strokeWidth={1.5} className="reader-navigation-mark" aria-hidden="true" />
           </div>
       {(notice || error || readerError || workspaceError || preview) && <div className="reader-status-row">

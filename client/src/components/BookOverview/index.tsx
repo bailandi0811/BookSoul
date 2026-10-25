@@ -6,8 +6,10 @@ import { useBooksStore } from "@/store/useBooksStore";
 import { useReaderStore } from "@/store/useReaderStore";
 import { beginCoverFlightFrom } from "@/lib/book-cover-flight";
 import { preloadReader, preloadChat } from "@/lib/book-page-loaders";
+import { useCoverFlightAnimating } from "@/lib/use-cover-flight-animating";
 
 export default function BookOverview() {
+  const coverFlying = useCoverFlightAnimating();
   const book = useBooksStore(s => s.currentBook);
   const sections = useBooksStore(s => s.sections);
   const progress = useBooksStore(s => s.readingProgress);
@@ -33,7 +35,7 @@ export default function BookOverview() {
   return <div className="book-space-page">
     <AppHeader caption="本书空间" />
     <main className="book-space-main">
-      <button className="reader-back" onClick={() => { beginCoverFlightFrom(book.id, "overview"); useBooksStore.getState().backToLibrary(); }}><ArrowLeft size={16} /> 我的书库</button>
+      <button type="button" className="reader-back" disabled={coverFlying} aria-disabled={coverFlying} onClick={() => { beginCoverFlightFrom(book.id, "overview"); useBooksStore.getState().backToLibrary(); }}><ArrowLeft size={16} /> 我的书库</button>
       <div className="book-space-heading"><h1 className="font-reading">本书空间</h1><p>接着读，也可以聊聊这本书。</p></div>
       <article className="book-space-volume">
         <div className="book-space-cover"><BookCover bookId={book.id} title={book.title} slot="overview" bookmarked={progress?.mode === "IN_PROGRESS"} /></div>

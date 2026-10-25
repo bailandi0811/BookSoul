@@ -4,6 +4,7 @@ import {
   beginCoverFlightFrom,
   cancelCoverFlight,
   findLandingCover,
+  isCoverFlightAnimating,
   landCoverFlight,
   readRotate,
   watchCoverFlight,
@@ -42,6 +43,15 @@ afterEach(() => {
   resetTransitionBudgetForTests();
   document.body.replaceChildren();
   vi.restoreAllMocks();
+});
+
+it("reports cover flight animation while a flyer is on screen", () => {
+  expect(isCoverFlightAnimating()).toBe(false);
+  const source = stubCover("shelf");
+  beginCoverFlight(source);
+  expect(isCoverFlightAnimating()).toBe(true);
+  cancelCoverFlight();
+  expect(isCoverFlightAnimating()).toBe(false);
 });
 
 it("freezes only title and imprint styles and holds the flight budget", () => {

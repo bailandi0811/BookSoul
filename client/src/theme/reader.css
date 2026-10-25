@@ -1,6 +1,7 @@
 .book-space-page, .book-reader-page { color: rgb(var(--foreground)); }
 .book-space-main { width: min(1120px, calc(100% - 64px)); margin: 48px auto 60px; padding: 30px 40px; border: 1px solid var(--scene-line); border-radius: 26px; background: var(--scene-surface); }
 .reader-back { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 14px; border: 1px solid var(--scene-line); border-radius: 999px; background: rgb(var(--card) / .76); box-shadow: 0 7px 18px rgb(30 49 55 / .06); font-size: 13px; font-weight: 500; color: rgb(var(--foreground) / .78); white-space: nowrap; }
+.reader-back:disabled { cursor: default; opacity: .52; box-shadow: none; transform: none; }
 .book-space-heading { padding: 28px 0; border-bottom: 1px solid var(--scene-line); }
 .book-space-heading h1 { font-size: clamp(28px, 3vw, 40px); }
 .book-space-heading p, .book-space-author { margin-top: 10px; color: rgb(var(--muted-foreground)); font-size: 14px; }

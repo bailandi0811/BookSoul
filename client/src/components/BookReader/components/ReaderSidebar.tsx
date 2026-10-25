@@ -3,6 +3,7 @@ import { ArrowLeft, Bookmark, ChevronRight, List, X } from "lucide-react";
 import { BookCover } from "@/components/BookCover";
 import type { BookView } from "@/lib/books-api";
 import { beginCoverFlightFrom } from "@/lib/book-cover-flight";
+import { useCoverFlightAnimating } from "@/lib/use-cover-flight-animating";
 import { PAPER_EASE } from "@/lib/ui-motion";
 import { useBooksStore } from "@/store/useBooksStore";
 import { useReaderStore } from "@/store/useReaderStore";
@@ -27,11 +28,12 @@ export function ReaderSidebar({ book, contentsOpen, onToggleContents, onCloseCon
   const progress = useBooksStore(s => s.readingProgress);
   const section = sections.find(s => s.id === sectionId);
   const reducedMotion = useReducedMotion();
+  const coverFlying = useCoverFlightAnimating();
   const transition = { duration: reducedMotion ? 0 : .24, ease: PAPER_EASE };
   return <aside className="reader-sidebar" aria-label="本书与目录">
     <section className="reader-book-card">
       <div className="reader-book-cover book-cover-paint-slot" data-book-cover={book.id} data-cover-slot="reader"><BookCover bookId={book.id} title={book.title} bookmarked={progress?.mode === "IN_PROGRESS"} /></div>
-      <div className="reader-book-details"><h1 className="font-reading">{book.title}</h1>{book.author && <p>{book.author}</p>}<button className="reader-back" onClick={() => { beginCoverFlightFrom(book.id, "reader"); void useBooksStore.getState().switchBookView("book"); }}><ArrowLeft size={15} />本书空间</button></div>
+      <div className="reader-book-details"><h1 className="font-reading">{book.title}</h1>{book.author && <p>{book.author}</p>}<button type="button" className="reader-back" disabled={coverFlying} aria-disabled={coverFlying} onClick={() => { beginCoverFlightFrom(book.id, "reader"); void useBooksStore.getState().switchBookView("book"); }}><ArrowLeft size={15} />本书空间</button></div>
     </section>
     <section className={`reader-directory ${contentsOpen ? "reader-directory-expanded" : ""}`} aria-label="章节目录">
       {contentsOpen ? <div className="reader-directory-heading"><h2 className="font-reading">目录</h2><span className="reader-count-pill">{sections.length} 章</span><button aria-label="关闭目录" onClick={onCloseContents}><X size={16} /></button></div> : <button className="reader-directory-summary" aria-expanded={false} onClick={onToggleContents}><List size={20} /><span>目录</span><small>{section ? `第 ${section.order} 章 / ${sections.length}` : `${sections.length} 章`}</small><ChevronRight size={16} /></button>}

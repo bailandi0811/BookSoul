@@ -1812,6 +1812,12 @@ summary::-webkit-details-marker {
   outline: 2px solid rgb(var(--ring));
   outline-offset: 3px;
 }
+.workspace-back-link:disabled {
+  cursor: default;
+  opacity: 0.52;
+  box-shadow: none;
+  transform: none;
+}
 .current-volume {
   border: 1px solid rgb(var(--border));
   background: rgb(var(--card) / 0.96);

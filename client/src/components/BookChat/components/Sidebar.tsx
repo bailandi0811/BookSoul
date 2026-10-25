@@ -3,6 +3,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { beginCoverFlightFrom } from "@/lib/book-cover-flight";
+import { useCoverFlightAnimating } from "@/lib/use-cover-flight-animating";
 import { useBooksStore } from "@/store/useBooksStore";
 import { useChatStore } from "@/store/useChatStore";
 import { ArrowLeft, History, PanelLeftClose, Plus, Trash2 } from "lucide-react";
@@ -32,6 +33,7 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
     title: string;
   } | null>(null);
   const [progressOpen, setProgressOpen] = useState(false);
+  const coverFlying = useCoverFlightAnimating();
 
   const mode = readingProgress?.mode ?? "NOT_STARTED";
   const currentSectionOrder = readingProgress?.currentSectionOrder ?? 1;
@@ -49,6 +51,8 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
         <div className="flex items-start justify-between gap-3">
           <button
             type="button"
+            disabled={!!currentBook && coverFlying}
+            aria-disabled={!!currentBook && coverFlying}
             onClick={() => { if (currentBook) { beginCoverFlightFrom(currentBook.id, "chat"); void useBooksStore.getState().switchBookView("book"); } else backToLibrary(); }}
             className="workspace-back-link tap-spring"
           >

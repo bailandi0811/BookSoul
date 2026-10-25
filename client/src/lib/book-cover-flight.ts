@@ -202,6 +202,26 @@ const PAGE: Record<string, string> = {
 
 let active: Flight | null = null;
 let flightToken = 0;
+const coverFlightListeners = new Set<() => void>();
+
+function notifyCoverFlightChange() {
+  for (const listener of coverFlightListeners) {
+    listener();
+  }
+}
+
+/** True while a cover is mid-air (departure, flight, or settle). */
+export function isCoverFlightAnimating() {
+  if (typeof document === "undefined") return false;
+  return active !== null || document.querySelector(`.${FLYER}`) !== null;
+}
+
+export function subscribeCoverFlight(onStoreChange: () => void) {
+  coverFlightListeners.add(onStoreChange);
+  return () => {
+    coverFlightListeners.delete(onStoreChange);
+  };
+}
 
 export function readRotate(transform: string): number {
   if (!transform || transform === "none") return 0;
@@ -349,6 +369,7 @@ export function cancelCoverFlight() {
   document.querySelectorAll(`.${FLYER}`).forEach((element) => element.remove());
   document.querySelectorAll(`.${HIDDEN}`).forEach((element) => element.classList.remove(HIDDEN));
   releaseFlightBudget();
+  notifyCoverFlightChange();
 }
 
 export function beginCoverFlight(cover: HTMLElement | null | undefined) {
@@ -377,6 +398,7 @@ export function beginCoverFlight(cover: HTMLElement | null | undefined) {
   active = { bookId, flyer, from, paint, launchBox: null, departing: false };
   holdFlightBudget();
   startDepartureLoop(flightToken);
+  notifyCoverFlightChange();
 }
 
 export function beginCoverFlightFrom(bookId: string, slot: CoverSlot) {
@@ -397,6 +419,7 @@ export function landCoverFlight(target: HTMLElement) {
     target.classList.remove(HIDDEN);
     flight.flyer.remove();
     releaseFlightBudget();
+    notifyCoverFlightChange();
   };
   if (typeof flight.flyer.animate !== "function" || to.width < 8) {
     finish();
