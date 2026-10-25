@@ -4,12 +4,12 @@
 
 ## 1. 本地发布镜像
 
-先提交客户端、服务端等镜像输入，再确认 Docker Desktop 使用 Linux 容器，并按 ACR 控制台命令登录。PowerShell 7 中，在仓库根目录运行，Registry 替换为现有实际地址：
+先提交客户端、服务端等镜像输入，再确认 Docker Desktop 使用 Linux 容器，并按 ACR 控制台命令登录。Windows 自带的 PowerShell 5.1 或 PowerShell 7 中，在仓库根目录运行，Registry 替换为现有实际地址：
 
 ```powershell
 $revision = git rev-parse --short=8 HEAD
 $release = 'r' + [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ') + '-' + $revision
-pwsh scripts/publish-acr.ps1 -Release $release -Registry '<实际 ACR 域名>/<实际命名空间>'
+& .\scripts\publish-acr.ps1 -Release $release -Registry '<实际 ACR 域名>/<实际命名空间>'
 ```
 
 发布脚本会重新检查、构建并推送 API、web、migration 三个镜像。成功后在 `.superpowers/releases/<release>.env` 生成三个 digest 坐标；这不是完整的服务器 release 配置。把新版本所需的部署脚本同步至服务器，在 `/etc/booksoul/releases/<release>.env` 创建完整版本文件，使用新 digest，保留并核对当前 `APP_ENV_FILE`、`UPLOAD_HOST_DIR` 和 `TLS_HOST_DIR`。不要覆盖当前版本文件或泄露应用凭据。

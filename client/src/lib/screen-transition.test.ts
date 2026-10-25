@@ -80,12 +80,13 @@ describe("screenShift", () => {
     expect(home.enter.y).toBeLessThan(0);
   });
 
-  it("fades the page behind a cover flight instead of cutting to it", () => {
+  it("gives a cover flight a short soft entrance, not a cut or long crossfade", () => {
     const shift = screenShift("library", "book", false, true);
-    expect(shift.duration).toBeGreaterThan(0.18);
-    expect(shift.enter).toEqual({ opacity: 0, x: 0, y: 0 });
-    expect(shift.enter.x).toBe(0);
-    expect(shift.enter.y).toBe(0);
+    // 单帧硬切（enter opacity 1）会整体闪变；500ms 双页交叉淡化会中段洗白。
+    // 短促柔和的进入（≤0.25s 淡入 + 轻微上浮）两者皆避，落点由飞行逐帧追踪。
+    expect(shift.duration).toBeLessThanOrEqual(0.25);
+    expect(shift.enter).toEqual({ opacity: 0, x: 0, y: 12 });
+    expect(shift.exit).toEqual({ opacity: 0, x: 0, y: 0 });
   });
 
   it("drops the travel when reduced motion is requested", () => {

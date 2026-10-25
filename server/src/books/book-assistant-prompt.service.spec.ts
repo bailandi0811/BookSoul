@@ -35,4 +35,28 @@ describe('BookAssistantPromptService', () => {
     );
     expect(prompt).toContain('不能改变以上事实域、引用、隔离和防剧透规则');
   });
+
+  it.each(Object.values(AssistantResponseDepth))(
+    'keeps %s answers conversational and grounded after retrieval',
+    (responseDepth) => {
+      const prompt = service.buildSystemPrompt({
+        bookTitle: '小王子',
+        responseDepth,
+        tone: AssistantTone.NATURAL,
+        customInstruction: null,
+      });
+
+      expect(prompt).toContain('直接回答用户当前的问题');
+      expect(prompt).toContain('与问题相关的原文依据');
+      expect(prompt).toContain('将推断与原文明确记载区分开');
+      expect(prompt).toContain('不展示检索步骤、内部推理或检索标识');
+      expect(prompt).toContain('引用由界面单独展示');
+      expect(prompt).toContain('使用完成当前问题所需的最短自然回答');
+      expect(prompt).toContain('能从当前可见原文中的一致线索合理推断时');
+      expect(prompt).toContain('不得把输入称为“片段”');
+      expect(prompt).not.toContain('涉及小说事实时给出服务端允许的章节引用');
+      expect(prompt).toContain('当前书籍是唯一的小说事实域');
+      expect(prompt).toContain('严格遵守服务端提供的阅读进度上限');
+    },
+  );
 });

@@ -65,12 +65,14 @@ export const Sidebar = ({ onClose }: { onClose: () => void }) => {
           </button>
         </div>
         <div className="current-volume mt-2 flex items-center gap-4">
-          <div className="w-[58px] shrink-0">
+          <div
+            className="chat-sidebar-cover book-cover-paint-slot"
+            data-book-cover={currentBook?.id ?? "current"}
+            data-cover-slot="chat"
+          >
             <BookCover
               bookId={currentBook?.id ?? "current"}
               title={currentBook?.title ?? "当前书籍"}
-              compact
-              slot="chat"
               bookmarked={mode === "IN_PROGRESS"}
             />
           </div>

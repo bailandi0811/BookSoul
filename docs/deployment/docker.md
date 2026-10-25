@@ -58,12 +58,14 @@ Windows 上若 Docker Desktop 已配置代理、普通镜像拉取成功，但�
 发布标识使用 `rYYYYMMDDTHHMMSSZ-<Git 短 SHA>`，例如 `r20261009T120000Z-c9996337`。UTC 时间让同一源码在部分 push 失败后能用新标识安全重试，已成功上传的孤立 tag 不覆盖、不部署，后续按显式清理流程处理。相关镜像输入必须没有未提交改动；根目录旧 tar 的变化不会进入镜像输入检查。登录 ACR 后，在仓库根执行：
 
 ```powershell
-pwsh scripts/publish-acr.ps1 `
+powershell -NoProfile -File scripts/publish-acr.ps1 `
   -Release r20261009T120000Z-c9996337 `
   -Registry crpi-实际实例.cn-hangzhou.personal.cr.aliyuncs.com/booksoul
 ```
 
-脚本依次运行两个包现有质量门、构建三个 `linux/amd64` 镜像、执行无网络镜像检查、逐个 push，并检查每条原生命令的退出码。只有三次 push 都返回 digest 后，才在 Git 忽略的 `.superpowers/releases/` 生成三条 digest 固定的镜像坐标。脚本不登录 ACR、不读取密码、不 SSH 到服务器，也不覆盖已有 release 清单。同一工作区的发布由本地文件锁串行化；跨工作区或跨机器仍必须保证同一 ACR namespace 同时只有一个发布者，并为每次尝试使用新的 release ID。若 ACR 实例支持 tag 不可变策略，应同时启用，不能把“先检查 tag、再 push”视为远端原子操作。
+Windows 自带的 PowerShell 5.1 可直接执行以上命令，无需安装 PowerShell 7；已有 PowerShell 7 的环境也可使用 `pwsh -NoProfile -File`。脚本兼容两种版本的原生命令退出码处理，并生成无 BOM 的 UTF-8 release 清单。
+
+脚本依次运行两个包现有质量门、构建三个 `linux/amd64` 镜像、执行无网络镜像检查、逐个 push，并检查每条原生命令的退出码。构建显式关闭 BuildKit provenance/SBOM attestation，以兼容不接受 OCI attestation manifest 的 ACR 个人版；源码提交仍由 release ID 记录，部署坐标仍固定到 Registry 返回的镜像 digest。只有三次 push 都返回 digest 后，才在 Git 忽略的 `.superpowers/releases/` 生成三条 digest 固定的镜像坐标。脚本不登录 ACR、不读取密码、不 SSH 到服务器，也不覆盖已有 release 清单。同一工作区的发布由本地文件锁串行化；跨工作区或跨机器仍必须保证同一 ACR namespace 同时只有一个发布者，并为每次尝试使用新的 release ID。若 ACR 实例支持 tag 不可变策略，应同时启用，不能把“先检查 tag、再 push”视为远端原子操作。
 
 使用 digest 坐标在服务器创建完整的 `/etc/booksoul/releases/<release-id>.env`。从当前 release 复制时只替换 `WEB_IMAGE`、`API_IMAGE`、`MIGRATION_IMAGE`，保留并核对 `APP_ENV_FILE`、`UPLOAD_HOST_DIR`、`TLS_HOST_DIR` 三个实际绝对路径；首次部署则以 `deploy/release.env.example` 为结构模板填写。release 文件不得包含 Registry 密码。
 

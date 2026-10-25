@@ -17,16 +17,29 @@ function Invoke-NativeCommand {
         [string]$FilePath,
 
         [Parameter(Mandatory = $true)]
-        [string[]]$Arguments
+        [string[]]$Arguments,
+
+        [switch]$AllowFailure
     )
 
-    $output = @(& $FilePath @Arguments 2>&1)
-    $exitCode = $LASTEXITCODE
-    foreach ($line in $output) { Write-Host $line }
-    if ($exitCode -ne 0) {
+    $command = @(Get-Command -Name $FilePath -CommandType Application -ErrorAction Stop)[0]
+    $previousPreference = $ErrorActionPreference
+    try {
+        # Windows PowerShell turns native stderr into ErrorRecord objects. Judge
+        # native failures by exit code, including the expected "manifest unknown".
+        $ErrorActionPreference = 'Continue'
+        $output = @(& $command.Source @Arguments 2>&1)
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousPreference
+    }
+    if (-not $AllowFailure) {
+        foreach ($line in $output) { Write-Host $line }
+    }
+    if ($exitCode -ne 0 -and -not $AllowFailure) {
         throw "$FilePath failed with exit code $exitCode"
     }
-    return $output
+    return [pscustomobject]@{ Output = $output; ExitCode = $exitCode }
 }
 
 if ($Release -notmatch '^r[0-9]{8}T[0-9]{6}Z-[0-9a-f]{7,8}$') {
@@ -37,7 +50,7 @@ if ($Registry -match '://' -or $Registry -notmatch '^[a-z0-9][a-z0-9.-]+(?::[0-9
 }
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$npmCommand = if ($IsWindows) { 'npm.cmd' } else { 'npm' }
+$npmCommand = if ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) { 'npm.cmd' } else { 'npm' }
 $lockDirectory = Join-Path $repositoryRoot '.superpowers'
 New-Item -ItemType Directory -Path $lockDirectory -Force | Out-Null
 $lockPath = Join-Path $lockDirectory 'publish-acr.lock'
@@ -54,14 +67,13 @@ try {
 
 Push-Location $repositoryRoot
 try {
-    $dirty = @(& git status --porcelain -- client server deploy/nginx.conf .dockerignore 2>&1)
-    if ($LASTEXITCODE -ne 0) { throw "git status failed with exit code $LASTEXITCODE" }
+    $dirty = @((Invoke-NativeCommand git @('status', '--porcelain', '--', 'client', 'server', 'deploy/nginx.conf', '.dockerignore')).Output)
     if ($dirty.Count -gt 0) {
         throw "Refusing to publish with uncommitted image inputs:`n$($dirty -join "`n")"
     }
 
-    $sourceRevision = @(& git rev-parse --short=8 HEAD 2>&1)
-    if ($LASTEXITCODE -ne 0 -or $sourceRevision.Count -ne 1) {
+    $sourceRevision = @((Invoke-NativeCommand git @('rev-parse', '--short=8', 'HEAD')).Output)
+    if ($sourceRevision.Count -ne 1) {
         throw "Unable to determine the source revision"
     }
     $releaseRevision = $Release.Substring($Release.LastIndexOf('-') + 1)
@@ -77,8 +89,9 @@ try {
 
     $null = Invoke-NativeCommand docker @('info')
     foreach ($image in $images.Values) {
-        $inspectOutput = @(& docker manifest inspect $image 2>&1)
-        $inspectExitCode = $LASTEXITCODE
+        $inspection = Invoke-NativeCommand docker @('manifest', 'inspect', $image) -AllowFailure
+        $inspectOutput = $inspection.Output
+        $inspectExitCode = $inspection.ExitCode
         if ($inspectExitCode -eq 0) {
             throw "Refusing to overwrite existing remote tag: $image"
         }
@@ -92,13 +105,13 @@ try {
     $null = Invoke-NativeCommand -FilePath $npmCommand -Arguments @('--prefix', 'server', 'run', 'check')
 
     Write-Host "==> Building API image"
-    $null = Invoke-NativeCommand docker @('build', '--platform', 'linux/amd64', '-f', 'server/Dockerfile', '--target', 'runtime', '-t', $images.API_IMAGE, '.')
+    $null = Invoke-NativeCommand docker @('build', '--platform', 'linux/amd64', '--provenance=false', '--sbom=false', '-f', 'server/Dockerfile', '--target', 'runtime', '-t', $images.API_IMAGE, '.')
 
     Write-Host "==> Building migration image"
-    $null = Invoke-NativeCommand docker @('build', '--platform', 'linux/amd64', '-f', 'server/Dockerfile', '--target', 'migration', '-t', $images.MIGRATION_IMAGE, '.')
+    $null = Invoke-NativeCommand docker @('build', '--platform', 'linux/amd64', '--provenance=false', '--sbom=false', '-f', 'server/Dockerfile', '--target', 'migration', '-t', $images.MIGRATION_IMAGE, '.')
 
     Write-Host "==> Building web image"
-    $null = Invoke-NativeCommand docker @('build', '--platform', 'linux/amd64', '-f', 'client/Dockerfile', '-t', $images.WEB_IMAGE, '.')
+    $null = Invoke-NativeCommand docker @('build', '--platform', 'linux/amd64', '--provenance=false', '--sbom=false', '-f', 'client/Dockerfile', '-t', $images.WEB_IMAGE, '.')
 
     Write-Host "==> Checking images without network access"
     $null = Invoke-NativeCommand docker @('run', '--rm', '--network', 'none', '--entrypoint', 'node', $images.API_IMAGE, '-e', "require('@prisma/client'); require('sharp'); require('fs').accessSync('dist/main.js')")
@@ -107,7 +120,7 @@ try {
     $digests = [ordered]@{}
     foreach ($entry in $images.GetEnumerator()) {
         Write-Host "==> Pushing $($entry.Value)"
-        $pushOutput = Invoke-NativeCommand docker @('push', $entry.Value)
+        $pushOutput = (Invoke-NativeCommand docker @('push', $entry.Value)).Output
         $digestMatch = [regex]::Match(($pushOutput -join "`n"), 'digest:\s*(sha256:[0-9a-f]{64})')
         if (-not $digestMatch.Success) {
             throw "docker push did not report a digest for $($entry.Value)"
@@ -135,7 +148,7 @@ try {
             "API_IMAGE=$($digests.API_IMAGE)"
             "MIGRATION_IMAGE=$($digests.MIGRATION_IMAGE)"
         ) -join "`n"
-        Set-Content -LiteralPath $temporaryPath -Value $content -Encoding utf8NoBOM -NoNewline
+        [System.IO.File]::WriteAllText($temporaryPath, $content, [System.Text.UTF8Encoding]::new($false))
         Move-Item -LiteralPath $temporaryPath -Destination $manifestPath
     } finally {
         if (Test-Path -LiteralPath $temporaryPath) {

@@ -113,9 +113,19 @@ export function screenShift(
   coverFlight = false,
 ): ScreenShift {
   if (reducedMotion) return fade(0.01);
-  // Keep the cover as the moving object, and let the page fade in behind it.
-  // An instant swap flashes the new layout; sliding the page as well throws the landing box off.
-  if (coverFlight) return fade(0.5);
+  // The cover flight is the transition's main actor; the page behind must be
+  // neither a long crossfade nor a hard cut. A 500ms double-fade washes both
+  // pages translucent over the scenery; an instant swap changes the whole
+  // content region in one frame — both read as a flash. A short soft
+  // entrance (~220ms fade + slight rise) avoids both, and the flight's
+  // per-frame landing tracking follows the moving slot without error.
+  if (coverFlight)
+    return {
+      enter: { opacity: 0, x: 0, y: 12 },
+      exit: { opacity: 0, x: 0, y: 0 },
+      duration: 0.22,
+      ease: PAPER_EASE,
+    };
   if (from === to || from === "loading" || to === "loading") return fade(0.32);
 
   const fromDoor = doorRank(from);

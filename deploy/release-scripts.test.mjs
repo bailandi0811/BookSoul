@@ -82,8 +82,9 @@ function completedProcess(file, args, options) {
   });
 }
 
-test('publisher pushes three images and writes immutable digest coordinates', async (t) => {
-  const pwsh = commandPath('pwsh');
+for (const shellName of ['pwsh', ...(process.platform === 'win32' ? ['powershell'] : [])]) {
+test(`${shellName}: publisher pushes three images and writes immutable digest coordinates`, async (t) => {
+  const pwsh = commandPath(shellName);
   if (!pwsh) return t.skip('pwsh is unavailable');
   await temporaryFixture(async ({ directory, log, env }) => {
     const output = join(directory, 'releases');
@@ -102,10 +103,12 @@ test('publisher pushes three images and writes immutable digest coordinates', as
     assert.match(commands, /docker build --platform linux\/amd64 .*--target runtime/);
     assert.match(commands, /docker build --platform linux\/amd64 .*--target migration/);
     assert.match(commands, /docker build --platform linux\/amd64 .*client\/Dockerfile/);
+    assert.equal((commands.match(/docker build --platform linux\/amd64 --provenance=false --sbom=false/g) ?? []).length, 3);
     assert.equal((commands.match(/docker manifest inspect /g) ?? []).length, 3);
     assert.equal((commands.match(/docker push /g) ?? []).length, 3);
 
     const manifest = await readFile(join(output, 'r20261009T120000Z-c9996337.env'), 'utf8');
+    assert.notEqual(manifest.charCodeAt(0), 0xfeff, 'release env must not contain a UTF-8 BOM');
     assert.match(manifest, new RegExp(`API_IMAGE=.*booksoul-api@${digest}`));
     assert.match(manifest, new RegExp(`WEB_IMAGE=.*booksoul-web@${digest}`));
     assert.match(manifest, new RegExp(`MIGRATION_IMAGE=.*booksoul-migration@${digest}`));
@@ -113,8 +116,8 @@ test('publisher pushes three images and writes immutable digest coordinates', as
   });
 });
 
-test('publisher stops on a failed push without writing a release manifest', async (t) => {
-  const pwsh = commandPath('pwsh');
+test(`${shellName}: publisher stops on a failed push without writing a release manifest`, async (t) => {
+  const pwsh = commandPath(shellName);
   if (!pwsh) return t.skip('pwsh is unavailable');
   await temporaryFixture(async ({ directory, env }) => {
     const output = join(directory, 'releases');
@@ -127,13 +130,14 @@ test('publisher stops on a failed push without writing a release manifest', asyn
     ], { cwd: root, env, encoding: 'utf8' });
 
     assert.notEqual(result.status, 0);
+    assert.match(`${result.stdout}\n${result.stderr}`, /docker failed with exit code 23/);
     const manifest = spawnSync(process.execPath, ['-e', `require('fs').accessSync(${JSON.stringify(join(output, 'r20261009T120000Z-c9996337.env'))})`]);
     assert.notEqual(manifest.status, 0);
   });
 });
 
-test('publisher rejects relevant uncommitted source before invoking Docker', async (t) => {
-  const pwsh = commandPath('pwsh');
+test(`${shellName}: publisher rejects relevant uncommitted source before invoking Docker`, async (t) => {
+  const pwsh = commandPath(shellName);
   if (!pwsh) return t.skip('pwsh is unavailable');
   await temporaryFixture(async ({ directory, log, env }) => {
     env.FAKE_GIT_STATUS = ' M client/src/App.tsx';
@@ -150,8 +154,8 @@ test('publisher rejects relevant uncommitted source before invoking Docker', asy
   });
 });
 
-test('publisher rejects a release whose revision does not match HEAD', async (t) => {
-  const pwsh = commandPath('pwsh');
+test(`${shellName}: publisher rejects a release whose revision does not match HEAD`, async (t) => {
+  const pwsh = commandPath(shellName);
   if (!pwsh) return t.skip('pwsh is unavailable');
   await temporaryFixture(async ({ directory, log, env }) => {
     const result = spawnSync(pwsh, [
@@ -167,8 +171,8 @@ test('publisher rejects a release whose revision does not match HEAD', async (t)
   });
 });
 
-test('publisher refuses to overwrite an existing remote tag', async (t) => {
-  const pwsh = commandPath('pwsh');
+test(`${shellName}: publisher refuses to overwrite an existing remote tag`, async (t) => {
+  const pwsh = commandPath(shellName);
   if (!pwsh) return t.skip('pwsh is unavailable');
   await temporaryFixture(async ({ directory, log, env }) => {
     env.FAKE_MANIFEST_EXISTS = '1';
@@ -185,8 +189,8 @@ test('publisher refuses to overwrite an existing remote tag', async (t) => {
   });
 });
 
-test('publisher rejects a release revision longer than the documented short SHA', async (t) => {
-  const pwsh = commandPath('pwsh');
+test(`${shellName}: publisher rejects a release revision longer than the documented short SHA`, async (t) => {
+  const pwsh = commandPath(shellName);
   if (!pwsh) return t.skip('pwsh is unavailable');
   await temporaryFixture(async ({ directory, log, env }) => {
     const result = spawnSync(pwsh, [
@@ -201,8 +205,8 @@ test('publisher rejects a release revision longer than the documented short SHA'
   });
 });
 
-test('publisher serializes concurrent releases from the same checkout', async (t) => {
-  const pwsh = commandPath('pwsh');
+test(`${shellName}: publisher serializes concurrent releases from the same checkout`, async (t) => {
+  const pwsh = commandPath(shellName);
   if (!pwsh) return t.skip('pwsh is unavailable');
   await temporaryFixture(async ({ directory, env }) => {
     const common = [
@@ -223,6 +227,8 @@ test('publisher serializes concurrent releases from the same checkout', async (t
     assert.match(`${failed.stdout}\n${failed.stderr}`, /Another BookSoul ACR publish is already running/);
   });
 });
+
+}
 
 async function deploymentFiles(directory) {
   const upload = join(directory, 'books');

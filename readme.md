@@ -73,7 +73,7 @@ Embedding 模型必须输出 1024 维向量。
 - PostgreSQL
 - OpenAI API 兼容的 Chat 与 Embedding 服务
 - Milvus 或 Zilliz Cloud
-- Redis：多个 API 实例共享 Agent 并发门禁时必需。单实例开发可使用本地模式
+- Redis：`AGENT_ADMISSION_MODE=redis` 时必需，启动后端前必须先可达。多个 API 实例必须用 redis 模式。仅单实例开发可设为 `local`，此时不连 Redis
 
 ## 快速开始
 
@@ -111,13 +111,13 @@ MILVUS_ADDRESS=localhost:19530
 MILVUS_TOKEN=root:Milvus
 ```
 
-其余选项见 `server/.env.example`。可选能力：
+`AGENT_ADMISSION_MODE=redis` 时还要有可连的 `REDIS_URL`，并按第 4 节先启动 Redis。其余选项见 `server/.env.example`。可选能力：
 
 | 能力 | 需要的配置 |
 | --- | --- |
 | 注册验证、找回密码、阅读笔记邮件 | `SMTP_USER`、`SMTP_PASS`、`SMTP_FROM`；新注册和找回密码还需 `AUTH_CHALLENGE_SECRET`、`AUTH_PUBLIC_BASE_URL` |
 | 联网资料检索 | `TAVILY_API_KEY`。须在单次问答中主动授权；正文、笔记、历史和账号信息不会进入搜索请求 |
-| 多实例并发门禁 | `AGENT_ADMISSION_MODE=redis` 与 `REDIS_URL`。单实例开发保持 `local` |
+| Agent 并发门禁 | 单实例可用 `AGENT_ADMISSION_MODE=local`。已设为 `redis` 时必须同时有可连的 `REDIS_URL`（示例 `redis://127.0.0.1:6379`），并先启动 Redis；连不上不会改成 local |
 | 头像与个人壁纸 | 成组填写 OSS 配置。未配置时仍可修改名称和系统壁纸 |
 | 小说直传与续传 | 使用同组私有 OSS 配置；需审核书籍对象前缀权限、POST/PUT CORS 与暂存生命周期。旧本地源文件继续可读，详见 [服务端上传说明](server/README.md) |
 
@@ -137,25 +137,22 @@ npm run prisma:migrate:deploy
 
 ### 4. 启动
 
-启动顺序：依赖服务 → 后端 → 前端。
-
-确认 PostgreSQL、Milvus 或 Zilliz，以及 Chat / Embedding 配置可连接。`AGENT_ADMISSION_MODE=redis` 时先启动 `REDIS_URL` 对应的 Redis；本机 WSL Redis 的检查方式见 [服务端说明](server/README.md#agent-并发准入)。
+先开 Redis，再开后端，最后开前端。已有 `server/.env` 保持原样。
 
 ```powershell
-# 终端 1
+# Redis（WSL）
+wsl -d Ubuntu -- sudo service redis-server start
+
+# 后端
 cd server
-npm run start:dev
-```
+npm run start
 
-看到 `Nest application successfully started` 和 `Server is running on http://localhost:3000` 后，保持该终端运行。端口以 `PORT` 和实际提示为准。
-
-```powershell
-# 终端 2
+# 前端
 cd client
 npm run dev
 ```
 
-看到 `Local: http://localhost:5173/` 后保持该终端运行。开发代理把 `/api` 转发到 `http://localhost:3000`；后端改端口时，同步核对 `client/vite.config.ts`。
+后端地址 [http://localhost:3000](http://localhost:3000)，前端地址 [http://localhost:5173](http://localhost:5173)。开发时代理把 `/api` 转到后端；需要热重载时后端改用 `npm run start:dev`。
 
 ### 5. 打开书房
 
@@ -182,7 +179,7 @@ docs/       产品设计、部署说明与验收记录
 
 | 现象 | 排查 |
 | --- | --- |
-| `Redis admission store connection error` | 检查 Redis、WSL 会话和 `REDIS_URL`，恢复后重启后端 |
+| `Redis admission store connection error` | 先执行 `wsl -d Ubuntu -- sudo service redis-server start`，再启动后端 |
 | 编译已通过，但没有启动成功提示 | 继续查看数据库、Redis 或 Milvus 连接日志 |
 | 页面停在“正在恢复会话” | 用上面的两个 `curl` 检查后端和代理，修复后点“重试”或刷新 |
 | `EADDRINUSE`，或 Vite 改用 5174 | 确认占用进程属于本项目后，在对应终端 `Ctrl+C` 再启动。默认开发端口是 5173 / 3000 |

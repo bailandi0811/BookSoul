@@ -23,11 +23,6 @@
 .reader-book-card, .reader-directory, .reader-bookmark-card, .reader-topbar { background: var(--reader-card); border: 1px solid var(--reader-edge); box-shadow: var(--reader-shadow); border-radius: 26px; }
 .reader-book-card { display: flex; align-items: center; gap: 18px; padding: 22px 18px; flex-shrink: 0; }
 .reader-book-cover { width: 76px; flex-shrink: 0; }
-.reader-book-cover .book-cover-title { font-size: 11px; left: 14px; right: 8px; }
-.reader-book-cover .book-cover-imprint { display: none; }
-.reader-book-cover .book-cover::after { inset: 10px 6px 10px 14px; }
-.reader-book-cover .book-cover-pages { width: 6px; right: -3px; }
-.reader-book-cover .book-cover-spine { width: 10px; }
 .reader-book-details { min-width: 0; flex: 1; }
 .reader-book-details h1 { font-size: 22px; line-height: 1.45; font-weight: 600; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .reader-book-details > p { font-size: 11px; color: rgb(var(--muted-foreground)); margin-top: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

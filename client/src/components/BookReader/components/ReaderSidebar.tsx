@@ -24,12 +24,13 @@ function ReaderBookmarkCard() {
 
 export function ReaderSidebar({ book, contentsOpen, onToggleContents, onCloseContents }: { book: BookView; contentsOpen: boolean; onToggleContents: () => void; onCloseContents: () => void }) {
   const sections = useReaderStore(s => s.sections), sectionId = useReaderStore(s => s.sectionId);
+  const progress = useBooksStore(s => s.readingProgress);
   const section = sections.find(s => s.id === sectionId);
   const reducedMotion = useReducedMotion();
   const transition = { duration: reducedMotion ? 0 : .24, ease: PAPER_EASE };
   return <aside className="reader-sidebar" aria-label="本书与目录">
     <section className="reader-book-card">
-      <div className="reader-book-cover"><BookCover bookId={book.id} title={book.title} slot="reader" /></div>
+      <div className="reader-book-cover book-cover-paint-slot" data-book-cover={book.id} data-cover-slot="reader"><BookCover bookId={book.id} title={book.title} bookmarked={progress?.mode === "IN_PROGRESS"} /></div>
       <div className="reader-book-details"><h1 className="font-reading">{book.title}</h1>{book.author && <p>{book.author}</p>}<button className="reader-back" onClick={() => { beginCoverFlightFrom(book.id, "reader"); void useBooksStore.getState().switchBookView("book"); }}><ArrowLeft size={15} />本书空间</button></div>
     </section>
     <section className={`reader-directory ${contentsOpen ? "reader-directory-expanded" : ""}`} aria-label="章节目录">

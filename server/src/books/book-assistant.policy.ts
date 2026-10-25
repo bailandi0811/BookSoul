@@ -18,7 +18,7 @@ export const RESPONSE_DEPTH_INSTRUCTION: Record<
 > = {
   [AssistantResponseDepth.BRIEF]: '回答简洁，优先给出结论和最必要的依据。',
   [AssistantResponseDepth.BALANCED]:
-    '回答详略适中，说明结论、依据和必要的上下文。',
+    '自然回答当前问题，仅在有助于理解时补充必要依据和上下文。',
   [AssistantResponseDepth.DEEP]:
     '可以深入分析人物、叙事和伏笔，但每个小说事实仍必须有可核验依据。',
 };

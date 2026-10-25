@@ -559,13 +559,15 @@
   position: relative;
   width: 100%;
   aspect-ratio: 3/4;
-  border-radius: 2px 6px 6px 2px;
+  /* 圆角用百分比等比（横向按宽、纵向按高换算成圆形），随尺寸缩放；
+     cqw 在元素自身属性上会错误解析到视口，故不用。 */
+  border-radius: 1.05% 3.16% 3.16% 1.05% / 0.79% 2.37% 2.37% 0.79%;
   color: #f5f4ec;
   isolation: isolate;
-  box-shadow:
-    inset -1px 0 0 rgb(255 255 255 / 0.16),
-    7px 8px 12px -6px rgb(var(--shadow-color) / 0.4),
-    0 20px 24px -20px rgb(var(--shadow-color) / 0.7);
+  /* 封面内部排版全部使用 cqw（以自身宽度为基准），使每个尺寸的封面
+     都是同一设计的等比缩放副本，跨页飞行的落点不会"换脸"。
+     注意：cqw 只对后代/伪元素生效，元素自身的等比属性只能用 % 或移到伪元素。 */
+  container-type: inline-size;
   transform-origin: left center;
   transition:
     transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -576,43 +578,42 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background-image:
-    repeating-linear-gradient(
-      0deg,
-      transparent 0 2px,
-      rgb(255 255 255 / 0.045) 2px 3px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      transparent 0 3px,
-      rgb(0 0 0 / 0.06) 3px 4px
-    ),
-    linear-gradient(
-      110deg,
-      rgb(255 255 255 / 0.12),
-      transparent 45%,
-      rgb(0 0 0 / 0.15)
-    );
+  /* 阴影与发丝线放在伪元素上：cqw 对子级/伪元素解析到 .book-cover 容器，
+     对元素自身则错误落到视口。全部等比保证飞行收尾时（缩放态 flyer →
+     原生落点）阴影、线宽、明暗过渡都不发生跳变。
+     注意：不要在此使用 repeating-linear-gradient 等周期性细纹——周期在
+     缩放后落入亚像素区间时，原生渲染与 GPU 缩放渲染会产生不同的摩尔纹，
+     落定瞬间"纹理变化"无可避免；只用平滑渐变（缩放不变）。 */
+  box-shadow:
+    inset -0.53cqw 0 0 rgb(255 255 255 / 0.16),
+    3.7cqw 4.2cqw 6.3cqw -3.2cqw rgb(var(--shadow-color) / 0.4),
+    0 10.5cqw 12.6cqw -10.5cqw rgb(var(--shadow-color) / 0.7);
+  background-image: linear-gradient(
+    110deg,
+    rgb(255 255 255 / 0.12),
+    transparent 45%,
+    rgb(0 0 0 / 0.15)
+  );
   pointer-events: none;
 }
 .book-cover::after {
   content: "";
   position: absolute;
-  inset: 14px 12px 13px 21px;
-  border: 1px solid rgb(222 211 180 / 0.46);
-  border-radius: 39% 39% 1px 1px;
+  inset: 7.4cqw 6.3cqw 6.8cqw 11cqw;
+  border: 0.53cqw solid rgb(222 211 180 / 0.46);
+  border-radius: 39% 39% 0.5cqw 0.5cqw;
   pointer-events: none;
 }
 .book-cover[data-cover-tone="1"]::after {
-  border-radius: 1px;
-  outline: 1px solid rgb(222 211 180 / 0.17);
-  outline-offset: -5px;
+  border-radius: 0.5cqw;
+  outline: 0.53cqw solid rgb(222 211 180 / 0.17);
+  outline-offset: -2.6cqw;
 }
 .book-cover[data-cover-tone="2"]::after {
-  border-radius: 50% 50% 2px 2px;
+  border-radius: 50% 50% 0.5cqw 0.5cqw;
 }
 .book-cover[data-cover-tone="3"]::after {
-  inset: 20px 17px 17px 23px;
+  inset: 10.5cqw 9cqw 9cqw 12cqw;
   border-radius: 0;
   border-left: 0;
   border-right: 0;
@@ -620,20 +621,27 @@
 .book-cover-pages {
   position: absolute;
   z-index: -1;
-  top: 4px;
-  bottom: -3px;
-  right: -5px;
-  width: 10px;
-  border-radius: 0 5px 5px 0;
-  background: repeating-linear-gradient(90deg, #dedbcf 0 1px, #f7f4e9 1px 3px);
-  box-shadow: 1px 1px 1px rgb(var(--shadow-color) / 0.12);
+  top: 2.1cqw;
+  bottom: -1.6cqw;
+  right: -2.6cqw;
+  width: 5.3cqw;
+  border-radius: 0 2.6cqw 2.6cqw 0;
+  /* 纯色页边：repeating 细条纹在缩放后落入亚像素区间时，原生与 GPU
+     缩放两条渲染路径的摩尔纹不同，落定会闪（同 ::before 注释）。 */
+  background: linear-gradient(
+    90deg,
+    #dedbcf 0 12%,
+    #f7f4e9 12% 88%,
+    #dedbcf 88%
+  );
+  box-shadow: 0.53cqw 0.53cqw 0.53cqw rgb(var(--shadow-color) / 0.12);
 }
 .book-cover-spine {
   position: absolute;
   top: 0;
   bottom: 0;
   left: 0;
-  width: 14px;
+  width: 7.4cqw;
   border-radius: 2px 0 0 2px;
   background: linear-gradient(
     90deg,
@@ -641,14 +649,16 @@
     rgb(255 255 255 / 0.08) 30%,
     transparent 75%
   );
-  border-right: 1px solid rgb(0 0 0 / 0.2);
+  border-right: 0.53cqw solid rgb(0 0 0 / 0.2);
 }
 .book-cover-title {
   position: absolute;
-  left: 23px;
-  right: 17px;
+  left: 12cqw;
+  right: 9cqw;
   bottom: 23%;
-  font-size: 22px;
+  /* 纯等比字号：飞行收尾时 flyer（源样式缩放）与落点封面逐像素重合，
+     200ms crossfade 不会出现文字换行/大小跳变。 */
+  font-size: 11.6cqw;
   line-height: 1.45;
   font-weight: 400;
   overflow-wrap: anywhere;
@@ -657,16 +667,16 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-align: center;
-  text-shadow: 0 1px 1px rgb(0 0 0 / 0.2);
+  text-shadow: 0 0.53cqw 0.53cqw rgb(0 0 0 / 0.2);
 }
 .book-cover-imprint {
   position: absolute;
   bottom: 10%;
-  left: 20px;
-  right: 13px;
-  font:
-    8px/1.4 Georgia,
-    serif;
+  left: 10.5cqw;
+  right: 6.8cqw;
+  font-family: Georgia, serif;
+  font-size: 4.2cqw;
+  line-height: 1.4;
   letter-spacing: 0.06em;
   text-align: center;
   color: #d4cbb7;
@@ -682,10 +692,10 @@
 }
 .book-cover-bookmark {
   position: absolute;
-  right: 24px;
+  right: 12.6cqw;
   top: -1px;
-  width: 13px;
-  height: 38px;
+  width: 6.8cqw;
+  height: 20cqw;
   background: #b6a77d;
   clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 83%, 0 100%);
 }
@@ -706,7 +716,29 @@
   width: 8px;
   height: 23px;
 }
-.book-cover.book-cover-flyer {
+/* Reader/chat slots keep a 76/105/58px hole in the layout, but paint the
+   cover at the overview size (192px) and scale it down. The flyer is the
+   same large cover GPU-scaled, so lines/texture/brightness do not restroke
+   at the small native size on landing. */
+.book-cover-paint-slot {
+  position: relative;
+  aspect-ratio: 3/4;
+  container-type: inline-size;
+}
+.chat-sidebar-cover {
+  width: 58px;
+  flex-shrink: 0;
+}
+.book-cover-paint-slot > .book-cover {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 192px;
+  transform: scale(calc(100cqw / 192px));
+  transform-origin: top left;
+  transition: none;
+}
+.book-cover-flyer {
   position: fixed;
   z-index: 40;
   margin: 0;
@@ -716,10 +748,6 @@
   transform-origin: center center;
   transition: none !important;
   visibility: visible !important;
-  will-change: transform;
-  box-shadow:
-    inset -1px 0 0 rgb(255 255 255 / 0.16),
-    0 14px 24px -16px rgb(0 0 0 / 0.42);
 }
 .book-cover-flight-hidden {
   visibility: hidden !important;

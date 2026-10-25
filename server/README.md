@@ -105,7 +105,7 @@ npm run test:db
 
 `AGENT_ADMISSION_MODE=local` 仅供单个 API 实例开发或部署，计数不跨进程。多个 API 实例必须使用 `redis`，并配置仅服务端可访问的 `REDIS_URL`。Redis 中只保存带 TTL 的 `ownerId`、`sessionId` 和 `runId` 租约键，不保存问题、回答、原文或邮箱；PostgreSQL `AgentRun` 只保存运行作用域、状态和时间。Redis 不可用时请求默认失败，不会绕过并发门禁。
 
-Redis 模式启动时最多等待 5 秒，包含客户端重连；连接失败后关闭客户端并返回脱敏错误，终止启动。出现 `Redis admission store connection error` 时先检查现有 Redis 服务是否运行及配置端口是否可达；使用 WSL 内 Redis 时先启动对应发行版，并保持 WSL 会话运行，避免发行版退出后本机端口转发消失。重启 API 前确认 3000 端口没有遗留后端进程占用。运行期间 Redis 断开仍拒绝并发准入，不自动切换本地模式。
+Redis 模式启动时最多等待 5 秒，包含客户端重连；连接失败后关闭客户端并返回脱敏错误，终止启动。出现 `Redis admission store connection error` 时先检查现有 Redis 服务是否运行及配置端口是否可达；使用 WSL 内 Redis 时先启动对应发行版，并保持 WSL 会话运行，避免发行版退出后本机端口转发消失。本机启动命令见[根 README](../readme.md#4-启动)。重启 API 前确认 3000 端口没有遗留后端进程占用。运行期间 Redis 断开仍拒绝并发准入，不自动切换本地模式。
 
 默认每用户最多 2 个、全局最多 20 个活动 Run。`AGENT_MAX_CONCURRENT_PER_USER`、`AGENT_MAX_CONCURRENT_GLOBAL`、`AGENT_RUN_LEASE_TTL_MS`、`AGENT_RUN_HEARTBEAT_MS` 和 `AGENT_RETRY_AFTER_SECONDS` 可按模型 RPM/TPM 与压测结果调整；心跳间隔必须小于租约时长的一半。修改真实部署配置前先核对模型配额、数据库连接池和预期峰值，不要把 `REDIS_URL` 写入日志或提交仓库。
 

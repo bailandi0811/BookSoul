@@ -378,11 +378,15 @@ export default function BookChat() {
                     <div className="assistant-welcome-layout">
                       <div className="assistant-welcome w-full">
                         <div className="welcome-volume">
-                          <div className="assistant-welcome-cover">
+                          <div
+                            className="assistant-welcome-cover book-cover-paint-slot"
+                            data-book-cover={currentBook.id}
+                            data-cover-slot="chat-welcome"
+                          >
                             <BookCover
                               bookId={currentBook.id}
                               title={currentBook.title}
-                              slot="chat-welcome"
+                              bookmarked={readingProgress?.mode === "IN_PROGRESS"}
                             />
                           </div>
                           <div>

@@ -36,7 +36,7 @@ export default function BookOverview() {
       <button className="reader-back" onClick={() => { beginCoverFlightFrom(book.id, "overview"); useBooksStore.getState().backToLibrary(); }}><ArrowLeft size={16} /> 我的书库</button>
       <div className="book-space-heading"><h1 className="font-reading">本书空间</h1><p>接着读，也可以聊聊这本书。</p></div>
       <article className="book-space-volume">
-        <div className="book-space-cover"><BookCover bookId={book.id} title={book.title} slot="overview" /></div>
+        <div className="book-space-cover"><BookCover bookId={book.id} title={book.title} slot="overview" bookmarked={progress?.mode === "IN_PROGRESS"} /></div>
         <div className="book-space-details">
           <p className="reader-eyebrow">{book.visibility === "SYSTEM" ? "系统藏书" : "私人藏书"} · {book.sectionCount} 节</p>
           <h2 className="font-reading">{book.title}</h2>

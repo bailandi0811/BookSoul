@@ -1427,9 +1427,6 @@ summary::-webkit-details-marker {
   width: 168px;
   transform: rotate(-5deg);
 }
-.library-feature .book-cover-title {
-  font-size: 22px;
-}
 .library-reading-mark {
   margin-top: 14px;
 }
@@ -1629,9 +1626,6 @@ summary::-webkit-details-marker {
   width: min(100%, 196px);
   margin: auto;
 }
-.bookshelf-item .book-cover-title {
-  font-size: 24px;
-}
 .bookshelf-display {
   position: relative;
   display: grid;
@@ -1639,7 +1633,6 @@ summary::-webkit-details-marker {
   padding: 1px 0 16px;
   margin-bottom: 15px;
   border-bottom: 1px solid var(--scene-line);
-  perspective: 700px;
 }
 .bookshelf-display::after {
   content: "";
@@ -2050,17 +2043,6 @@ summary::-webkit-details-marker {
   width: 105px;
   margin: auto;
   transform: rotate(-4deg);
-}
-.assistant-welcome-cover .book-cover-title {
-  font-size: 15px;
-  left: 14px;
-  right: 9px;
-}
-.assistant-welcome-cover .book-cover-imprint {
-  font-size: 6px;
-}
-.assistant-welcome-cover .book-cover::after {
-  inset: 9px 7px 9px 13px;
 }
 .assistant-prompts {
   display: grid;
@@ -2558,7 +2540,11 @@ summary::-webkit-details-marker {
   height: 1px;
 }
 @media (hover: hover) and (pointer: fine) {
+  /* origin 与父级透视必须与 book-cover-flight 的 flyer 复刻条件一致：
+     flyer 强制 center origin 且无法继承祖先 perspective，否则悬停倾斜的
+     书在起飞瞬间投影会跳变（实测约 4/11px 偏移 + 20px 尺寸差）。 */
   .bookshelf-open:not(:disabled):hover .book-cover {
+    transform-origin: center center;
     transform: perspective(650px) translateY(-3px) rotateY(-10deg);
   }
   .bookshelf-delete {
@@ -3090,14 +3076,6 @@ summary::-webkit-details-marker {
     padding: 0 12px;
     font-size: 13px;
   }
-  .library-feature .book-cover-title {
-    font-size: 14px;
-    left: 15px;
-    right: 8px;
-  }
-  .library-feature .book-cover-imprint {
-    font-size: 5px;
-  }
   .reading-overview {
     padding: 13px 15px;
     border-radius: 12px;
@@ -3181,25 +3159,6 @@ summary::-webkit-details-marker {
   .bookshelf-meta,
   .bookshelf-status {
     font-size: 11px;
-  }
-  .bookshelf-item .book-cover-title {
-    font-size: 18px;
-    left: 16px;
-    right: 10px;
-  }
-  .book-cover::after {
-    inset: 10px 8px 10px 15px;
-  }
-  .book-cover[data-cover-tone="3"]::after {
-    inset: 15px 12px 12px 18px;
-  }
-  .book-cover-bookmark {
-    width: 8px;
-    height: 27px;
-    right: 17px;
-  }
-  .book-cover-imprint {
-    font-size: 6px;
   }
   .bookshelf-delete {
     width: 30px;
@@ -3291,11 +3250,6 @@ summary::-webkit-details-marker {
     width: 76px;
     margin: 3px auto 23px;
   }
-  .assistant-welcome-cover .book-cover-title {
-    font-size: 11px;
-    left: 12px;
-    right: 7px;
-  }
   .welcome-volume h2 {
     font-size: 25px;
   }
@@ -3377,9 +3331,6 @@ summary::-webkit-details-marker {
   .bookshelf-item {
     padding-left: 7px;
     padding-right: 7px;
-  }
-  .bookshelf-item .book-cover-title {
-    font-size: 18px;
   }
   .bookshelf-title {
     font-size: 17px;
