@@ -1,5 +1,7 @@
 # Docker 单机部署手册
 
+需要按步骤执行的命令清单见 **[上线流程](launch-guide.md)**。下文为完整说明、宿主服务接入与故障排查。
+
 此部署保留本地 Vite/NestJS 开发流程。生产仅运行一个后端实例，API 和 ingestion worker 同进程；前端由 Nginx 提供，并代理 API、SSE 和 WebSocket。数据库、向量服务和上传原文独立保存。
 
 当前已知：阿里云轻量应用服务器为 Ubuntu 24.04.2、x86_64、2 核/2 GiB 内存/40 GiB 系统盘；已使用既有 Ubuntu 软件源安装 Docker 29.1.3 与 Compose 2.40.3。三个 release-001 镜像已在本地 Docker Desktop 构建，通过基础检查并经上传校验导入服务器；服务器 API 依赖/UID 检查通过。已有 systemd 管理的旧 BookSoul、占用 80 的宿主 Nginx、宿主 PostgreSQL 16 和 Redis；向量服务在云端。服务器 `booksoul/public` 的 User、Book、ChatSessionRecord、MemoryRecord 计数均为 0，已成功应用仓库前五个迁移；文件配置的脱敏目标与该数据库一致，同机数据库/旧配置备份已确认。不能将四表为空当作整个数据库可丢弃。

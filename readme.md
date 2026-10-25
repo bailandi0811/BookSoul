@@ -4,7 +4,7 @@
 
 BookSoul（书魂） 是一间AI私人小说书房。登录后上传 EPUB 或 TXT，系统异步解析并建立索引；你可以在自己的书库里阅读、续读，也可以让每本书的独立助手只围绕已经读到的原文回答。支持BM25+AgenticRAG混合检索，使用Jev做意图识别，还有聊天室，塔罗室等有趣功能。
 
-[界面](#界面) · [功能](#功能) · [亮点](#亮点) · [难点](#难点) · [技术栈](#技术栈) · [环境要求](#环境要求) · [快速开始](#快速开始) · [项目结构](#项目结构) · [开发](#开发) · [测试](#测试) · [文档](#文档)
+[界面](#界面) · [功能](#功能) · [亮点](#亮点) · [难点](#难点) · [技术栈](#技术栈) · [环境要求](#环境要求) · [快速开始](#快速开始) · [项目结构](#项目结构) · [开发](#开发) · [测试](#测试) · [上线](#上线) · [文档](#文档)
 
 ## 界面
 
@@ -32,7 +32,7 @@ BookSoul（书魂） 是一间AI私人小说书房。登录后上传 EPUB 或 TX
 | 心绪塔罗 | 登录后从顶栏进入的独立页面。牌局和解读不写入单书聊天、阅读记忆或数据库 |
 | 账号与外观 | 邮箱验证、找回密码、亮暗主题，以及书房背景 |
 
-生产容器部署见 [Docker 部署手册](docs/deployment/docker.md)，验证状态见 [部署验收记录](docs/deployment/docker-acceptance.md)。
+生产发版按步骤见 **[上线流程](docs/deployment/launch-guide.md)**（命令与执行位置）；细节与故障排查见 [Docker 部署手册](docs/deployment/docker.md)，验证状态见 [部署验收记录](docs/deployment/docker-acceptance.md)。
 
 ## 亮点
 
@@ -228,6 +228,17 @@ npm run test:e2e:reader
 
 默认 `npm test` 与 `npm run check` 不连接开发库。数据库集成测试必须显式提供隔离的 `TEST_DATABASE_URL`，规则见 [服务端说明](server/README.md)。
 
+## 上线
+
+生产环境使用 Docker Compose：Nginx 提供前端并代理 API/SSE/WebSocket，单实例 API 内嵌索引 worker。完整步骤（本地推 ACR → 服务器配置 → `prepare` → 迁移 → `activate` → 验收）见 **[上线流程](docs/deployment/launch-guide.md)**。
+
+| 文档 | 内容 |
+| --- | --- |
+| [上线流程](docs/deployment/launch-guide.md) | 按顺序的命令清单与本地/服务器分工 |
+| [Docker 部署手册](docs/deployment/docker.md) | 架构、宿主 DB/Redis、证书、回退与排错 |
+| [部署验收记录](docs/deployment/docker-acceptance.md) | 已跑/未跑检查项 |
+| [小说 OSS 上传版本部署](docs/deployment/novel-upload.md) | 含上传会话迁移时的发版补充 |
+
 ## 隐私与数据边界
 
 - 私人上传按用户和书籍隔离，源文件不通过 API 返回。
@@ -240,6 +251,7 @@ npm run test:e2e:reader
 
 | 文档 | 内容 |
 | --- | --- |
+| [上线流程](docs/deployment/launch-guide.md) | 生产发版命令顺序（见上文 [上线](#上线) 专节） |
 | [客户端说明](client/README.md) | 书房界面、回答模式、账号与阅读页 |
 | [服务端说明](server/README.md) | API、索引生命周期、配置、迁移与门禁 |
 | [阅读器设计](docs/superpowers/specs/2026-10-03-novel-reader-design.md) | 正文阅读与续读位置 |
