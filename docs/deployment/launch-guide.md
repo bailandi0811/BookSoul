@@ -44,17 +44,21 @@
 docker login crpi-<你的实例>.personal.cr.aliyuncs.com
 ```
 
-3. 生成 release ID 并发布（Registry 换成你的命名空间）：
+3. 生成 release ID 并发布。**`-Registry` 必须是「ACR 公网域名 + `/` + 命名空间」**，不要 `https://`，不要只写域名：
 
 ```powershell
 $revision = git rev-parse --short=8 HEAD
 $release = 'r' + [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ') + '-' + $revision
+Write-Host "Release ID: $release"
 powershell -NoProfile -File scripts/publish-acr.ps1 `
   -Release $release `
   -Registry crpi-<你的实例>.personal.cr.aliyuncs.com/booksoul
 ```
 
-4. 成功后打开 `.superpowers/releases/<release>.env`，复制其中的三条 **`仓库@sha256:...`** 坐标；下一步写入服务器 release 文件。
+正确示例：`crpi-abc123.cn-hangzhou.personal.cr.aliyuncs.com/booksoul`  
+错误示例：只有 `...personal.cr.aliyuncs.com`（缺 `/booksoul`）或含 `crpi-<占位符>`。
+
+4. 成功后打开 `.superpowers/releases/<release>.env`，复制其中的三条 **`仓库@sha256:...`** 坐标；下一步写入服务器 release 文件。终端应出现 `Published <release>` 与 `Image coordinates: ...`。
 
 若 ACR 暂时不可用，可改用 `docker save` / `docker load` 离线传镜像，流程见 [Docker 部署手册 §2](docker.md#2-构建发布版本)。
 
@@ -73,11 +77,25 @@ WEB_IMAGE=<ACR>/booksoul-web@sha256:...
 API_IMAGE=<ACR>/booksoul-api@sha256:...
 MIGRATION_IMAGE=<ACR>/booksoul-migration@sha256:...
 APP_ENV_FILE=/etc/booksoul/app.env
-UPLOAD_HOST_DIR=/srv/booksoul/books
+UPLOAD_HOST_DIR=/home/admin/booksoul-data/books
 TLS_HOST_DIR=/etc/booksoul/tls
 ```
 
+`UPLOAD_HOST_DIR` 用服务器上**真实**上传目录绝对路径（示例为常见轻量机布局；与 `deploy/release.env.example` 中的 `/srv/...` 二选一，以实际为准）。
+
 首次部署以 [deploy/release.env.example](../../deploy/release.env.example) 为模板；**更新版本**时只替换三个 `*_IMAGE`，保留并核对 `APP_ENV_FILE`、`UPLOAD_HOST_DIR`、`TLS_HOST_DIR`。
+
+**权限（用 `admin` 跑 preflight/prepare 时必做）**：`/etc/booksoul` 若仅为 `700 root:root`，`admin` 读不到 release、TLS 或写不了 `current.env`。建议：
+
+```bash
+sudo chown root:admin /etc/booksoul /etc/booksoul/releases /etc/booksoul/tls
+sudo chmod 750 /etc/booksoul /etc/booksoul/releases /etc/booksoul/tls
+sudo chmod 640 /etc/booksoul/releases/*.env /etc/booksoul/app.env
+sudo chmod 640 /etc/booksoul/tls/fullchain.pem /etc/booksoul/tls/privkey.pem
+sudo chown root:admin /etc/booksoul/tls/fullchain.pem /etc/booksoul/tls/privkey.pem
+```
+
+核对：`cat /etc/booksoul/releases/<release>.env | wc -l` 应为 **6**（不要用无 `sudo` 的 `cat` 误判权限）。release 文件内无密钥，但仍保持 `640`。
 
 ### 2.2 应用环境文件
 
@@ -107,7 +125,8 @@ REDIS_URL=redis://:<密码>@host.docker.internal:6379
 - `AGENT_ADMISSION_MODE=redis` 时须配置容器可达的 `REDIS_URL`；勿因连不上静默改 `local`（多实例也不支持 local）。
 - 启用注册/找回密码邮件时增加 `AUTH_CHALLENGE_SECRET` 与 `AUTH_PUBLIC_BASE_URL=https://booksoul.fun` 及 SMTP 相关项。
 - 启用 OSS 直传时增加 OSS 字段并核对 Bucket/CORS，见 [novel-upload.md](novel-upload.md)。
-- Docker `--env-file` 为 raw 读取：值里不要包多余双引号（会导致 Milvus 集合名等读错）。
+- Docker `--env-file` 与 preflight 均要求 **无引号** 的 `KEY=value`；带引号的值（如 `SMTP_FROM="..."`）会报 `APP_ENV_FILE: must be a readable env file`。邮件 From 可写成 `SMTP_FROM=noreply@你的域名` 或无外层引号的显示名。
+- Docker raw 读取不会去掉引号，Milvus 等键若带字面双引号会导致容器启动失败。
 
 权限：release 与 app 文件仅部署管理员可读；TLS 目录只读挂载进 Nginx。
 
@@ -115,7 +134,17 @@ REDIS_URL=redis://:<密码>@host.docker.internal:6379
 
 **位置：服务器**
 
-将本仓库中的 `deploy/`、`scripts/`（若需）同步到服务器固定目录（例如 `~/booksoul`），后续命令中的 `-f deploy/compose.yaml` 相对于该目录。
+后续 `cd` 的目录必须同时包含：
+
+- `deploy/compose.yaml`
+- `deploy/preflight.mjs`
+- `deploy/booksoul-deploy.sh`、`deploy/booksoul-deploy.mjs`
+
+仅含 `compose.yaml` + `preflight.mjs` 的旧包（例如历史上的 `booksoul-deploy-001`）**不够**，需从本仓库 **手动上传** 上述两个脚本，或 `git clone` 完整仓库到固定目录（GitHub 不通时可 Gitee 或只传 `deploy/`）。
+
+注意：`~/booksoul` 若只有 `client/`、`server/` 而没有 `deploy/`，那是旧 systemd 源码树，**不能**在该目录跑 Compose 发版。
+
+部署用户需能访问 Docker：`sudo usermod -aG docker <用户>` 后重新登录，或 `prepare`/`activate` 中对 docker 使用与 `docker login` 一致的 `sudo`。
 
 ---
 
@@ -128,24 +157,32 @@ REDIS_URL=redis://:<密码>@host.docker.internal:6379
 ```bash
 export RELEASE='<release>'
 export RELEASE_FILE="/etc/booksoul/releases/${RELEASE}.env"
-export REPO_ROOT="$HOME/booksoul"   # 改成你的实际路径
-cd "$REPO_ROOT"
+export DEPLOY_ROOT="/home/admin/booksoul-deploy-001"   # 含完整 deploy/ 的目录，按实际修改
+cd "$DEPLOY_ROOT"
 ```
 
-1. 配置预检（不连库、不启动服务）：
+1. 登录 ACR（与后续 `docker compose` / `docker pull` 使用同一 Linux 用户；若用 `sudo docker`，则 `sudo docker login`）：
+
+```bash
+docker login crpi-<你的实例>.personal.cr.aliyuncs.com
+```
+
+2. 配置预检（不连库、不启动服务）。成功时输出 `PASS: deployment files checked...`：
 
 ```bash
 node deploy/preflight.mjs --release "$RELEASE_FILE"
 docker compose --env-file "$RELEASE_FILE" -f deploy/compose.yaml config --quiet
 ```
 
-2. 拉取并核对 digest（**不**改 `current.env`、**不**占 80/443）：
+3. 拉取并核对 digest（**不**改 `current.env`、**不**替换已在跑的容器）：
 
 ```bash
 bash deploy/booksoul-deploy.sh prepare "$RELEASE"
 ```
 
-若宿主 Nginx 或旧服务仍占用 80/443，**只能停在本步**，先完成 DNS/TLS 与端口交接计划。
+成功时最后一行：`Prepared <release>; no services or current release were changed.`
+
+若已有旧 Compose 占 80/443，**prepare 仍可执行**；只有 **activate** 会重建 web/api。若宿主 Nginx 与 Compose web **同时**抢 80/443，须在 activate 前停掉宿主 Nginx。
 
 ---
 
@@ -189,13 +226,26 @@ docker compose --env-file "$RELEASE_FILE" -f deploy/compose.yaml \
 
 ### 4.4 激活新版本
 
+**推荐**用 root 执行 activate，以便写入 `/etc/booksoul/current.env`（线上版本指针）：
+
 ```bash
-bash deploy/booksoul-deploy.sh activate "$RELEASE"
+sudo docker login crpi-<你的实例>.personal.cr.aliyuncs.com   # 若平时 pull 用 sudo docker
+sudo bash deploy/booksoul-deploy.sh activate "$RELEASE"
 docker compose --env-file "$RELEASE_FILE" -f deploy/compose.yaml ps
 docker compose --env-file "$RELEASE_FILE" -f deploy/compose.yaml exec web nginx -t
 ```
 
-成功后会更新 `/etc/booksoul/current.env`。若 `activate` 失败，用 `docker compose ps` 与 `docker inspect` 看实际运行的镜像 digest，**不能**只看 `current.env` 判断线上版本。
+`docker compose ps` 中 api/web 的 IMAGE 应带本次 release 的 `@sha256:...`，且 STATUS 为 **healthy**。
+
+成功时脚本会输出 `Activated <release>; current release updated...`。若容器已 healthy 但脚本报 **`EACCES ... current.env`**，说明指针未写入、**不等于**回滚；补写：
+
+```bash
+sudo cp "/etc/booksoul/releases/${RELEASE}.env" /etc/booksoul/current.env
+sudo chown root:admin /etc/booksoul/current.env
+sudo chmod 640 /etc/booksoul/current.env
+```
+
+任何 activate 失败时，用 `docker compose ps` 与 `docker inspect` 看实际运行的镜像 digest，**不能**只看 `current.env` 判断线上版本。
 
 ---
 
@@ -229,7 +279,7 @@ DATABASE_URL='postgresql://...' npm run community:moderator -- --member-id=<公�
 
 1. **本地**：§1 生成新 `<release>` 并 push。
 2. **服务器**：新建 `/etc/booksoul/releases/<新 release>.env`（只换三个 digest）。
-3. **服务器**：`prepare` → 低峰 `activate` → §5 抽检。
+3. **服务器**：`prepare` → 低峰 **`sudo bash deploy/booksoul-deploy.sh activate ...`** → §5 抽检。
 
 **有 Prisma 迁移**
 
@@ -237,7 +287,22 @@ DATABASE_URL='postgresql://...' npm run community:moderator -- --member-id=<公�
 
 ---
 
-## 7. 禁止事项
+## 7. 常见报错速查
+
+| 现象 | 原因 | 处理 |
+| --- | --- | --- |
+| `Registry must be a registry host and one namespace` | `-Registry` 缺 `/命名空间` 或含占位符 | 使用 `域名/booksoul` |
+| `release: must be a readable env file` | `/etc/booksoul` 为 `700`，admin 进不去 | §2.1 权限；或 `sudo node deploy/preflight.mjs` |
+| `TLS_HOST_DIR: must already exist with required access` | TLS 目录或 pem 对 admin 不可读 | §2.1 对 `tls/` 与证书 `640` |
+| `APP_ENV_FILE: must be a readable env file` | app.env 含引号/重复键/非法行 | 去掉值外层引号；用 §2.2 诊断思路自查格式 |
+| `docker.sock: permission denied` | 用户不在 `docker` 组 | `sudo usermod -aG docker admin` 重登，或 `sudo` 跑 deploy |
+| `booksoul-deploy.sh: No such file` | deploy 目录不完整 | §2.3 补脚本或 clone 完整仓库 |
+| `EACCES ... current.env` | admin 无法在 `/etc/booksoul` 创建文件 | §4.4 用 `sudo activate` 或手动 `sudo cp` |
+| migrate 有 Pending 仍 activate | 跳过迁移 | 先 §4.3 `migrate deploy` 再 activate |
+
+---
+
+## 8. 禁止事项
 
 - 不要把生产 `app.env`、release 文件或 Registry 密码提交 Git、贴进聊天或打进镜像。
 - 不要对生产库执行 `migrate reset`、全表 `deleteMany`、或 `docker compose down -v`。
@@ -246,7 +311,7 @@ DATABASE_URL='postgresql://...' npm run community:moderator -- --member-id=<公�
 
 ---
 
-## 8. 相关文档
+## 9. 相关文档
 
 | 文档 | 用途 |
 | --- | --- |
