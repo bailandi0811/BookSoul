@@ -5,6 +5,7 @@ import {
   Get,
   Logger,
   Param,
+  Query,
   Post,
   Body,
   Res,
@@ -45,6 +46,33 @@ export class ChatController {
     return {
       success: true,
       data: await this.sessions.listAll(auth.userId),
+    };
+  }
+
+  @Get('history/:sessionId/messages')
+  async getSessionHistoryMessages(
+    @Param('sessionId') sessionId: string,
+    @CurrentAuth() auth: AuthContext,
+    @Query('before') beforeRaw?: string,
+    @Query('limit') limitRaw?: string,
+  ) {
+    if (!sessionId) throw new BadRequestException('Session ID is required');
+    const before =
+      beforeRaw === undefined || beforeRaw === ''
+        ? undefined
+        : Number(beforeRaw);
+    const limit =
+      limitRaw === undefined || limitRaw === ''
+        ? undefined
+        : Number(limitRaw);
+    return {
+      success: true,
+      data: await this.sessions.getHistoryMessages(
+        auth.userId,
+        sessionId,
+        before,
+        limit,
+      ),
     };
   }
 

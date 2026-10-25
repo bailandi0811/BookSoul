@@ -1,5 +1,10 @@
 import { create } from "zustand";
 import { apiFetch, readApiError } from "@/lib/api";
+import {
+  createClientMessageId,
+  type HistoryMessagePage,
+  type HistoryMessagePageItem,
+} from "@/lib/chat-history-page";
 import { useMemoryStore } from "@/store/useMemoryStore";
 import type { EmailDraft } from "@/lib/email-draft";
 
@@ -27,7 +32,10 @@ export interface HistorySession {
   updatedAt: string;
 }
 
+export type NewMessage = Omit<Message, "id"> & { id?: string };
+
 export interface Message {
+  id: string;
   responseStatus?: "failed" | "cancelled";
   runSummary?: DeepRunSummary;
   role: "user" | "assistant";
@@ -65,13 +73,17 @@ interface ChatState {
   lastStopNotice: string | null;
   pendingEmailDraft: EmailDraft | null;
   messages: Message[];
+  historyCursor: number | null;
+  hasOlderMessages: boolean;
+  isOlderMessagesLoading: boolean;
+  olderMessagesError: string | null;
   isLoading: boolean;
   sessionId: string | null;
   sessions: HistorySession[];
   isSessionsLoading: boolean;
   abortController: AbortController | null;
   activeRequestId: string | null;
-  addMessage: (message: Message) => void;
+  addMessage: (message: NewMessage) => void;
   updateStreamingContent: (content: string, requestId?: string) => void;
   finishStreaming: (requestId?: string) => void;
   setThinking: (isThinking: boolean, text?: string, requestId?: string) => void;
@@ -85,6 +97,7 @@ interface ChatState {
   fetchSessions: (bookId?: string) => Promise<void>;
   startNewSession: (bookId?: string) => Promise<string | null>;
   loadSession: (sessionId: string) => Promise<void>;
+  loadOlderMessages: () => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
   sendMessage: (
     content: string,
@@ -95,7 +108,76 @@ interface ChatState {
 }
 
 const CHAT_INACTIVITY_TIMEOUT_MS = 30_000;
+const HISTORY_PAGE_SIZE = 30;
 let latestSessionLoadRequest = 0;
+let latestOlderMessagesRequest = 0;
+
+function mapHistoryItem(item: HistoryMessagePageItem): Message {
+  return {
+    id: item.id,
+    role: item.role,
+    content: item.content,
+  };
+}
+
+function historyMessagesUrl(sessionId: string, before?: number | null) {
+  const params = new URLSearchParams({ limit: String(HISTORY_PAGE_SIZE) });
+  if (before != null) params.set("before", String(before));
+  return `/api/chat/history/${sessionId}/messages?${params}`;
+}
+
+type LegacyHistoryMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+function sliceLegacyHistoryPage(
+  sessionId: string,
+  legacy: LegacyHistoryMessage[],
+  before?: number | null,
+): HistoryMessagePage {
+  const total = legacy.length;
+  let endExclusive = total;
+  if (before != null) {
+    if (!Number.isInteger(before) || before < 0 || before > total) {
+      throw new Error("消息游标无效");
+    }
+    endExclusive = before;
+  }
+  if (endExclusive === 0) {
+    return { items: [], nextCursor: null, hasMore: false };
+  }
+  const start = Math.max(0, endExclusive - HISTORY_PAGE_SIZE);
+  const items = legacy.slice(start, endExclusive).map((message, offset) => {
+    const position = start + offset;
+    return {
+      id: `${sessionId}:${position}`,
+      position,
+      role: message.role,
+      content: message.content,
+    };
+  });
+  const hasMore = start > 0;
+  return {
+    items,
+    nextCursor: hasMore ? start : null,
+    hasMore,
+  };
+}
+
+async function fetchHistoryPage(
+  sessionId: string,
+  before?: number | null,
+): Promise<HistoryMessagePage> {
+  const response = await apiFetch(historyMessagesUrl(sessionId, before));
+  if (response.status === 404) {
+    const legacy = await readData<LegacyHistoryMessage[]>(
+      await apiFetch(`/api/chat/history/${sessionId}`),
+    );
+    return sliceLegacyHistoryPage(sessionId, legacy, before);
+  }
+  return readData<HistoryMessagePage>(response);
+}
 
 async function readData<T>(response: Response): Promise<T> {
   if (!response.ok) throw new Error(await readApiError(response));
@@ -109,6 +191,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   lastStopNotice: null,
   pendingEmailDraft: null,
   messages: [],
+  historyCursor: null,
+  hasOlderMessages: false,
+  isOlderMessagesLoading: false,
+  olderMessagesError: null,
   isLoading: false,
   sessionId: null,
   sessions: [],
@@ -120,7 +206,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => ({
       messages: [
         ...state.messages,
-        { ...message, createdAt: message.createdAt ?? Date.now() },
+        {
+          ...message,
+          id: message.id ?? createClientMessageId(),
+          createdAt: message.createdAt ?? Date.now(),
+        },
       ],
     })),
 
@@ -204,6 +294,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       sessionId: null,
       sessions: [],
       messages: [],
+      historyCursor: null,
+      hasOlderMessages: false,
+      isOlderMessagesLoading: false,
+      olderMessagesError: null,
       draftInput: "",
       lastStopNotice: null,
       pendingEmailDraft: null,
@@ -223,6 +317,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       lastStopNotice: null,
       pendingEmailDraft: null,
       messages: [],
+      historyCursor: null,
+      hasOlderMessages: false,
+      isOlderMessagesLoading: false,
+      olderMessagesError: null,
       isLoading: false,
       sessionId: null,
       sessions: [],
@@ -265,6 +363,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       set((state) => ({
         sessionId: session.sessionId,
         messages: [],
+        historyCursor: null,
+        hasOlderMessages: false,
+        isOlderMessagesLoading: false,
+        olderMessagesError: null,
         lastStopNotice: null,
         pendingEmailDraft: null,
         sessions: [
@@ -294,7 +396,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
         sessions: state.sessions.filter(
           (session) => session.sessionId !== sessionId,
         ),
-        ...(wasActive ? { sessionId: null, messages: [] } : {}),
+        ...(wasActive
+          ? {
+              sessionId: null,
+              messages: [],
+              historyCursor: null,
+              hasOlderMessages: false,
+              isOlderMessagesLoading: false,
+              olderMessagesError: null,
+            }
+          : {}),
       }));
     } catch (error) {
       set({
@@ -306,27 +417,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
   loadSession: async (sessionId) => {
     if (get().sessionId === sessionId && get().messages.length > 0) return;
     get().stopGenerating();
+    latestOlderMessagesRequest += 1;
     const requestId = ++latestSessionLoadRequest;
     set({
       isLoading: true,
       sessionId,
       messages: [],
+      historyCursor: null,
+      hasOlderMessages: false,
+      isOlderMessagesLoading: false,
+      olderMessagesError: null,
       lastStopNotice: null,
       pendingEmailDraft: null,
     });
     try {
-      const messages = await readData<Message[]>(
-        await apiFetch(`/api/chat/history/${sessionId}`),
-      );
+      const page = await fetchHistoryPage(sessionId);
       if (
         requestId === latestSessionLoadRequest &&
         get().sessionId === sessionId
       ) {
         set({
-          messages: messages.map((message) => ({
-            ...message,
-            createdAt: message.createdAt ?? Date.now(),
-          })),
+          messages: page.items.map(mapHistoryItem),
+          historyCursor: page.nextCursor,
+          hasOlderMessages: page.hasMore,
         });
       }
     } catch (error) {
@@ -342,6 +455,59 @@ export const useChatStore = create<ChatState>((set, get) => ({
         get().sessionId === sessionId
       ) {
         set({ isLoading: false });
+      }
+    }
+  },
+
+  loadOlderMessages: async () => {
+    const {
+      sessionId,
+      historyCursor,
+      hasOlderMessages,
+      isOlderMessagesLoading,
+    } = get();
+    if (
+      !sessionId ||
+      !hasOlderMessages ||
+      isOlderMessagesLoading ||
+      historyCursor == null
+    ) {
+      return;
+    }
+    const sessionAtStart = sessionId;
+    const requestId = ++latestOlderMessagesRequest;
+    set({ isOlderMessagesLoading: true, olderMessagesError: null });
+    try {
+      const page = await fetchHistoryPage(sessionId, historyCursor);
+      if (
+        requestId !== latestOlderMessagesRequest ||
+        get().sessionId !== sessionAtStart
+      ) {
+        return;
+      }
+      set((state) => {
+        const existingIds = new Set(state.messages.map((message) => message.id));
+        const older = page.items
+          .filter((item) => !existingIds.has(item.id))
+          .map(mapHistoryItem);
+        return {
+          messages: [...older, ...state.messages],
+          historyCursor: page.nextCursor,
+          hasOlderMessages: page.hasMore,
+          isOlderMessagesLoading: false,
+          olderMessagesError: null,
+        };
+      });
+    } catch (error) {
+      if (
+        requestId === latestOlderMessagesRequest &&
+        get().sessionId === sessionAtStart
+      ) {
+        set({
+          isOlderMessagesLoading: false,
+          olderMessagesError:
+            error instanceof Error ? error.message : "加载较早消息失败",
+        });
       }
     }
   },

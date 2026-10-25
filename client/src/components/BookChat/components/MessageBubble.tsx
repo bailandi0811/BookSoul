@@ -1,5 +1,5 @@
 import { User, Copy, Check, Quote, Mail } from "lucide-react";
-import { useState } from "react";
+import { memo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { ReferenceCard } from "./ReferenceCard";
 import { type Message } from "@/store/useChatStore";
@@ -14,14 +14,16 @@ import { BookSoulMark } from "@/components/BookSoulMark";
 interface MessageBubbleProps {
   message: Message;
   referencesActive?: boolean;
-  onOpenReferences?: () => void;
+  onOpenReferences?: (messageId: string) => void;
+  animateEntry?: boolean;
 }
 
-export const MessageBubble = ({
+function MessageBubbleInner({
   message,
   referencesActive = false,
   onOpenReferences,
-}: MessageBubbleProps) => {
+  animateEntry = false,
+}: MessageBubbleProps) {
   const isUser = message.role === "user";
   const [isCopied, setIsCopied] = useState(false);
   const [isEmailComposerOpen, setIsEmailComposerOpen] = useState(false);
@@ -52,7 +54,7 @@ export const MessageBubble = ({
     message.isStreaming && displayContent.trim().length > 0;
   return (
     <motion.div
-      initial={{ opacity: 0 }}
+      initial={animateEntry ? { opacity: 0 } : false}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.16 }}
       className={`chat-message-row group flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}
@@ -265,7 +267,11 @@ export const MessageBubble = ({
               <ReferenceCard
                 references={message.references}
                 active={referencesActive}
-                onOpen={onOpenReferences}
+                onOpen={
+                  onOpenReferences
+                    ? () => onOpenReferences(message.id)
+                    : undefined
+                }
               />
             )}
             {message.externalReferences &&
@@ -296,4 +302,13 @@ export const MessageBubble = ({
       )}
     </motion.div>
   );
-};
+}
+
+export const MessageBubble = memo(MessageBubbleInner, (previous, next) => {
+  return (
+    previous.message === next.message &&
+    previous.referencesActive === next.referencesActive &&
+    previous.onOpenReferences === next.onOpenReferences &&
+    previous.animateEntry === next.animateEntry
+  );
+});

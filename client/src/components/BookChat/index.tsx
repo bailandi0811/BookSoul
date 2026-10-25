@@ -12,8 +12,11 @@ import {
 import { peekCoverFlight } from "@/lib/book-cover-flight";
 import { AppHeader } from "@/components/AppHeader";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageBubble } from "./components/MessageBubble";
 import { InputArea } from "./components/InputArea";
+import {
+  VirtualChatViewport,
+  type VirtualChatViewportHandle,
+} from "./components/VirtualChatViewport";
 import { Sidebar } from "./components/Sidebar";
 import { AssistantSettings } from "./components/AssistantSettings";
 import { EmailComposerDialog } from "./components/EmailComposerDialog";
@@ -52,6 +55,12 @@ export default function BookChat() {
   const messages = useChatStore((state) => state.messages);
   const sessionId = useChatStore((state) => state.sessionId);
   const isLoading = useChatStore((state) => state.isLoading);
+  const hasOlderMessages = useChatStore((state) => state.hasOlderMessages);
+  const isOlderMessagesLoading = useChatStore(
+    (state) => state.isOlderMessagesLoading,
+  );
+  const olderMessagesError = useChatStore((state) => state.olderMessagesError);
+  const loadOlderMessages = useChatStore((state) => state.loadOlderMessages);
   const sendMessage = useChatStore((state) => state.sendMessage);
   const startNewSession = useChatStore((state) => state.startNewSession);
   const pendingEmailDraft = useChatStore((state) => state.pendingEmailDraft);
@@ -63,6 +72,7 @@ export default function BookChat() {
   const workspaceError = useBooksStore((state) => state.workspaceError);
   const backToLibrary = useBooksStore((state) => state.backToLibrary);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const virtualChatRef = useRef<VirtualChatViewportHandle>(null);
   const layoutRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const followingLatest = useRef(true);
@@ -90,12 +100,59 @@ export default function BookChat() {
   const [isSourcesOpen, setIsSourcesOpen] = useState(() =>
     false,
   );
-  const [sourceSelection, setSourceSelection] = useState<{
-    index: number;
-    messageCount: number;
-    sessionId: string | null;
-  } | null>(null);
+  const [selectedSourceMessageId, setSelectedSourceMessageId] = useState<
+    string | null
+  >(null);
+  const [animateEntryIds, setAnimateEntryIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const prevMessagesRef = useRef(messages);
   const sidebarWidthRef = useRef(sidebarWidth);
+
+  useEffect(() => {
+    const previous = prevMessagesRef.current;
+    if (messages.length > previous.length) {
+      const prependedOlder =
+        previous.length > 0 &&
+        messages[0]?.id !== previous[0]?.id &&
+        messages[messages.length - 1]?.id ===
+          previous[previous.length - 1]?.id;
+      const replacedSession =
+        previous.length > 0 &&
+        messages.length > 0 &&
+        messages[0]?.id !== previous[0]?.id &&
+        messages[messages.length - 1]?.id !==
+          previous[previous.length - 1]?.id;
+      if (!prependedOlder && !replacedSession) {
+        setAnimateEntryIds((current) => {
+          const next = new Set(current);
+          for (let index = previous.length; index < messages.length; index++) {
+            const id = messages[index]?.id;
+            if (id) next.add(id);
+          }
+          return next;
+        });
+      } else if (replacedSession) {
+        setAnimateEntryIds(new Set());
+      }
+    } else if (messages.length < previous.length) {
+      setAnimateEntryIds(new Set());
+    }
+    prevMessagesRef.current = messages;
+  }, [messages]);
+
+  const handleOpenReferences = useCallback((messageId: string) => {
+    setSelectedSourceMessageId(messageId);
+    setIsSourcesOpen(true);
+  }, []);
+
+  const handleNearTop = useCallback(() => {
+    void loadOlderMessages();
+  }, [loadOlderMessages]);
+
+  const handleRetryOlderMessages = useCallback(() => {
+    void loadOlderMessages();
+  }, [loadOlderMessages]);
 
   useEffect(() => {
     sidebarWidthRef.current = sidebarWidth;
@@ -131,9 +188,7 @@ export default function BookChat() {
     }
     if (userMessage !== lastUserMessage.current) followingLatest.current = true;
     lastUserMessage.current = userMessage;
-    if (followingLatest.current && viewportRef.current)
-      viewportRef.current.scrollTop = viewportRef.current.scrollHeight;
-  }, [messages, isLoading]);
+  }, [messages]);
 
   useEffect(() => {
     if (!isSidebarOpen || isDesktop) return;
@@ -227,23 +282,27 @@ export default function BookChat() {
 
   if (!currentBook) return null;
 
-  let latestSourceIndex: number | null = null;
+  let latestAssistantId: string | null = null;
   for (let index = messages.length - 1; index >= 0; index--) {
     if (messages[index].role === "assistant") {
-      latestSourceIndex = index;
+      latestAssistantId = messages[index].id;
       break;
     }
   }
-  const selectedSourceIndex =
-    sourceSelection?.messageCount === messages.length &&
-    sourceSelection.sessionId === sessionId &&
-    messages[sourceSelection.index]?.role === "assistant"
-      ? sourceSelection.index
-      : latestSourceIndex;
-  const activeSourceMessage =
-    selectedSourceIndex === null ? undefined : messages[selectedSourceIndex];
+  const resolvedSourceMessageId =
+    selectedSourceMessageId &&
+    messages.some(
+      (message) =>
+        message.id === selectedSourceMessageId &&
+        message.role === "assistant",
+    )
+      ? selectedSourceMessageId
+      : latestAssistantId;
+  const activeSourceMessage = resolvedSourceMessageId
+    ? messages.find((message) => message.id === resolvedSourceMessageId)
+    : undefined;
   const activeSourceKey = activeSourceMessage
-    ? `${sessionId ?? "draft"}:${selectedSourceIndex}`
+    ? `${sessionId ?? "draft"}:${activeSourceMessage.id}`
     : "empty";
 
   if (workspaceError && !assistant && !isWorkspaceLoading) {
@@ -410,16 +469,6 @@ export default function BookChat() {
                 aria-label="书籍对话"
                 aria-live="off"
                 className="chat-viewport h-full chat-scrollbar"
-                onScroll={(event) => {
-                  const viewport = event.currentTarget;
-                  const nearBottom =
-                    viewport.scrollHeight -
-                      viewport.scrollTop -
-                      viewport.clientHeight <
-                    80;
-                  followingLatest.current = nearBottom;
-                  setShowLatest(!nearBottom);
-                }}
               >
                 <div className="chat-content">
                   {messages.length === 0 && !isLoading ? (
@@ -450,27 +499,23 @@ export default function BookChat() {
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-9 pb-4">
-                      <AnimatePresence initial={false}>
-                        {messages.map((message, index) => (
-                          <MessageBubble
-                            key={`${message.createdAt ?? index}-${index}`}
-                            message={message}
-                            referencesActive={
-                              isSourcesOpen && selectedSourceIndex === index
-                            }
-                            onOpenReferences={() => {
-                              setSourceSelection({
-                                index,
-                                messageCount: messages.length,
-                                sessionId,
-                              });
-                              setIsSourcesOpen(true);
-                            }}
-                          />
-                        ))}
-                      </AnimatePresence>
-                    </div>
+                    <VirtualChatViewport
+                      key={sessionId ?? "draft"}
+                      ref={virtualChatRef}
+                      messages={messages}
+                      viewportRef={viewportRef}
+                      followingLatestRef={followingLatest}
+                      onShowLatestChange={setShowLatest}
+                      onNearTop={handleNearTop}
+                      hasOlderMessages={hasOlderMessages}
+                      isOlderMessagesLoading={isOlderMessagesLoading}
+                      olderMessagesError={olderMessagesError}
+                      onRetryOlderMessages={handleRetryOlderMessages}
+                      selectedSourceMessageId={resolvedSourceMessageId}
+                      isSourcesOpen={isSourcesOpen}
+                      onOpenReferences={handleOpenReferences}
+                      animateEntryIds={animateEntryIds}
+                    />
                   )}
                 </div>
               </div>
@@ -482,13 +527,7 @@ export default function BookChat() {
               type="button"
               aria-label="回到最新回复"
               className="jump-to-latest inline-flex items-center gap-2"
-              onClick={() => {
-                followingLatest.current = true;
-                setShowLatest(false);
-                if (viewportRef.current)
-                  viewportRef.current.scrollTop =
-                    viewportRef.current.scrollHeight;
-              }}
+              onClick={() => virtualChatRef.current?.scrollToLatest()}
             >
               <ArrowDown size={14} /> 最新回复
             </button>

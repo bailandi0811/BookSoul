@@ -1,5 +1,5 @@
 import { beginCoverFlightFrom, type CoverSlot } from "@/lib/book-cover-flight";
-import { loadBooksViewModule, type LazyBooksView } from "@/lib/book-page-loaders";
+import { loadBooksViewModule } from "@/lib/book-page-loaders";
 import type { BooksView } from "@/store/useBooksStore";
 import { useBooksStore } from "@/store/useBooksStore";
 

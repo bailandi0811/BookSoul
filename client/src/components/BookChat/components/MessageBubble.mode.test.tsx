@@ -12,6 +12,7 @@ describe("deep evidence notice", () => {
         root.render(
           <MessageBubble
             message={{
+              id: "a1",
               role: "assistant",
               content: "超时",
               thinkingSteps: ["检索中"],
@@ -36,6 +37,7 @@ describe("deep evidence notice", () => {
         root.render(
           <MessageBubble
             message={{
+              id: "a2",
               role: "assistant",
               content: "",
               isStreaming: true,
@@ -63,6 +65,7 @@ describe("deep evidence notice", () => {
         root.render(
           <MessageBubble
             message={{
+              id: "a3",
               role: "assistant",
               content: "可见原文不足。",
               runSummary: {

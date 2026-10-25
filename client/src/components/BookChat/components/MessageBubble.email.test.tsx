@@ -35,7 +35,7 @@ describe("MessageBubble email action", () => {
     act(() => {
       root.render(
         <MessageBubble
-          message={{ role: "assistant", content: "这是阅读笔记。" }}
+          message={{ id: "a1", role: "assistant", content: "这是阅读笔记。" }}
         />,
       );
     });
@@ -62,6 +62,7 @@ describe("MessageBubble email action", () => {
       root.render(
         <MessageBubble
           message={{
+            id: "a2",
             role: "assistant",
             content: "尚未完成",
             isStreaming: true,
@@ -78,7 +79,9 @@ describe("MessageBubble email action", () => {
   it("关闭邮件草稿后恢复发送按钮焦点", () => {
     act(() =>
       root.render(
-        <MessageBubble message={{ role: "assistant", content: "测试笔记" }} />,
+        <MessageBubble
+          message={{ id: "a3", role: "assistant", content: "测试笔记" }}
+        />,
       ),
     );
     const trigger = container.querySelector<HTMLButtonElement>(
@@ -101,6 +104,7 @@ describe("MessageBubble email action", () => {
       root.render(
         <MessageBubble
           message={{
+            id: "a4",
             role: "assistant",
             content: "现实背景说明。",
             externalReferences: [

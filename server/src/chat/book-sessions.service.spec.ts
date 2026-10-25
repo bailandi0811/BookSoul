@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import {
   AssistantResponseDepth,
   AssistantTone,
@@ -145,6 +145,80 @@ describe('BookSessionsService', () => {
           { type: 'ai', data: { content: '回答' } },
         ],
       }),
+    });
+  });
+
+  it('returns the latest history page in chronological order', async () => {
+    const stored = Array.from({ length: 35 }, (_, index) => ({
+      type: index % 2 === 0 ? ('human' as const) : ('ai' as const),
+      data: { content: `message-${index}` },
+    }));
+    prisma.chatSessionRecord.findUnique.mockResolvedValue({
+      ...sessionRecord(),
+      messages: stored,
+    });
+    const page = await service.getHistoryMessages('user-a', 'session-a');
+    expect(page.items).toHaveLength(30);
+    expect(page.items[0]).toEqual({
+      id: 'session-a:5',
+      position: 5,
+      role: 'assistant',
+      content: 'message-5',
+    });
+    expect(page.items[29]).toEqual({
+      id: 'session-a:34',
+      position: 34,
+      role: 'user',
+      content: 'message-34',
+    });
+    expect(page.hasMore).toBe(true);
+    expect(page.nextCursor).toBe(5);
+  });
+
+  it('pages older messages without gaps or duplicates', async () => {
+    const stored = Array.from({ length: 35 }, (_, index) => ({
+      type: index % 2 === 0 ? ('human' as const) : ('ai' as const),
+      data: { content: `message-${index}` },
+    }));
+    prisma.chatSessionRecord.findUnique.mockResolvedValue({
+      ...sessionRecord(),
+      messages: stored,
+    });
+    const latest = await service.getHistoryMessages('user-a', 'session-a');
+    const older = await service.getHistoryMessages(
+      'user-a',
+      'session-a',
+      latest.nextCursor ?? undefined,
+    );
+    expect(older.items.map((item) => item.position)).toEqual([
+      0, 1, 2, 3, 4,
+    ]);
+    expect(older.hasMore).toBe(false);
+    expect(older.nextCursor).toBeNull();
+    const positions = [...older.items, ...latest.items].map(
+      (item) => item.position,
+    );
+    expect(positions).toEqual(Array.from({ length: 35 }, (_, index) => index));
+  });
+
+  it('rejects invalid history cursors', async () => {
+    prisma.chatSessionRecord.findUnique.mockResolvedValue(sessionRecord());
+    await expect(
+      service.getHistoryMessages('user-a', 'session-a', -1),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.getHistoryMessages('user-a', 'session-a', 99),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('returns an empty page for sessions without messages', async () => {
+    prisma.chatSessionRecord.findUnique.mockResolvedValue(sessionRecord());
+    await expect(
+      service.getHistoryMessages('user-a', 'session-a'),
+    ).resolves.toEqual({
+      items: [],
+      nextCursor: null,
+      hasMore: false,
     });
   });
 

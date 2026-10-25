@@ -35,7 +35,7 @@ describe("book-scoped chat state", () => {
       currentBookId: "fixture-new",
       sessionId: "fixture-new-session",
       activeRequestId: "new-request",
-      messages: [{ role: "assistant", content: "new answer" }],
+      messages: [{ id: "a1", role: "assistant", content: "new answer" }],
     });
     controller!.enqueue(
       new TextEncoder().encode(
@@ -45,7 +45,7 @@ describe("book-scoped chat state", () => {
     controller!.close();
     await running;
     expect(useChatStore.getState().messages).toEqual([
-      { role: "assistant", content: "new answer" },
+      expect.objectContaining({ role: "assistant", content: "new answer" }),
     ]);
     expect(memory).not.toHaveBeenCalled();
   });
@@ -114,6 +114,10 @@ describe("book-scoped chat state", () => {
     useChatStore.setState({
       currentBookId: null,
       messages: [],
+      historyCursor: null,
+      hasOlderMessages: false,
+      isOlderMessagesLoading: false,
+      olderMessagesError: null,
       draftInput: "",
       lastStopNotice: null,
       pendingEmailDraft: null,
@@ -124,6 +128,160 @@ describe("book-scoped chat state", () => {
       abortController: null,
       activeRequestId: null,
     });
+  });
+
+  it("falls back to the legacy history endpoint when pagination is unavailable", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      const path = String(url);
+      if (path.includes("/messages?")) {
+        return new Response("Cannot GET", { status: 404 });
+      }
+      if (path.includes("/api/chat/history/session-a")) {
+        return success(
+          Array.from({ length: 35 }, (_, index) => ({
+            role: index % 2 === 0 ? "user" : "assistant",
+            content: `message-${index}`,
+          })),
+        );
+      }
+      return success([]);
+    });
+    await useChatStore.getState().loadSession("session-a");
+    expect(useChatStore.getState().messages).toHaveLength(30);
+    expect(useChatStore.getState().hasOlderMessages).toBe(true);
+    expect(useChatStore.getState().historyCursor).toBe(5);
+  });
+
+  it("loads only the latest history page when opening a session", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      const path = String(url);
+      if (path.includes("/messages?")) {
+        return success({
+          items: [
+            {
+              id: "session-a:0",
+              position: 0,
+              role: "user",
+              content: "最新页",
+            },
+          ],
+          nextCursor: null,
+          hasMore: false,
+        });
+      }
+      return success([]);
+    });
+    await useChatStore.getState().loadSession("session-a");
+    expect(useChatStore.getState().messages).toEqual([
+      { id: "session-a:0", role: "user", content: "最新页" },
+    ]);
+    expect(useChatStore.getState()).toMatchObject({
+      historyCursor: null,
+      hasOlderMessages: false,
+    });
+  });
+
+  it("prepends older pages without duplicate ids", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      const path = String(url);
+      if (path.includes("before=2")) {
+        return success({
+          items: [
+            {
+              id: "session-a:0",
+              position: 0,
+              role: "user",
+              content: "更早",
+            },
+            {
+              id: "session-a:1",
+              position: 1,
+              role: "assistant",
+              content: "更早回答",
+            },
+          ],
+          nextCursor: null,
+          hasMore: false,
+        });
+      }
+      if (path.includes("/messages?")) {
+        return success({
+          items: [
+            {
+              id: "session-a:2",
+              position: 2,
+              role: "user",
+              content: "最新",
+            },
+          ],
+          nextCursor: 2,
+          hasMore: true,
+        });
+      }
+      return success([]);
+    });
+    await useChatStore.getState().loadSession("session-a");
+    await useChatStore.getState().loadOlderMessages();
+    expect(useChatStore.getState().messages.map((message) => message.id)).toEqual(
+      ["session-a:0", "session-a:1", "session-a:2"],
+    );
+  });
+
+  it("drops stale older-page responses after switching sessions", async () => {
+    let resolveOlder: (value: Response) => void = () => undefined;
+    const olderPromise = new Promise<Response>((resolve) => {
+      resolveOlder = resolve;
+    });
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      const path = String(url);
+      if (path.includes("before=1")) return olderPromise;
+      if (path.includes("/messages?")) {
+        if (path.includes("session-b")) {
+          return success({
+            items: [],
+            nextCursor: null,
+            hasMore: false,
+          });
+        }
+        return success({
+          items: [
+            {
+              id: "session-a:1",
+              position: 1,
+              role: "assistant",
+              content: "A",
+            },
+          ],
+          nextCursor: 1,
+          hasMore: true,
+        });
+      }
+      return success([]);
+    });
+    await useChatStore.getState().loadSession("session-a");
+    const loading = useChatStore.getState().loadOlderMessages();
+    await useChatStore.getState().loadSession("session-b");
+    resolveOlder(
+      success({
+        items: [
+          {
+            id: "session-a:0",
+            position: 0,
+            role: "user",
+            content: "stale",
+          },
+        ],
+        nextCursor: null,
+        hasMore: false,
+      }),
+    );
+    await loading;
+    expect(useChatStore.getState().sessionId).toBe("session-b");
+    expect(
+      useChatStore.getState().messages.some(
+        (message) => message.content === "stale",
+      ),
+    ).toBe(false);
   });
 
   it("prepares a book on a new conversation while keeping server sessions available", async () => {
@@ -139,7 +297,7 @@ describe("book-scoped chat state", () => {
     useChatStore.setState({
       currentBookId: "previous-book",
       sessionId: "previous-session",
-      messages: [{ role: "user", content: "旧消息" }],
+      messages: [{ id: "u1", role: "user", content: "旧消息" }],
     });
 
     await useChatStore.getState().prepareBook("book-a");
@@ -264,7 +422,7 @@ describe("book-scoped chat state", () => {
       isLoading: true,
       abortController: { abort } as unknown as AbortController,
       activeRequestId: "request-a",
-      messages: [{ role: "user", content: "问题", createdAt: 1 }],
+      messages: [{ id: "u1", role: "user", content: "问题", createdAt: 1 }],
     });
 
     useChatStore.getState().resetBookChat();
@@ -286,6 +444,7 @@ describe("book-scoped chat state", () => {
       isLoading: true,
       messages: [
         {
+          id: "a1",
           role: "assistant",
           content: "new answer",
           isStreaming: true,

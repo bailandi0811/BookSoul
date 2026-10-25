@@ -44,13 +44,16 @@ describe('ChatController admission', () => {
   };
 
   let chatService: { stream: jest.Mock };
-  let sessions: { resolve: jest.Mock };
+  let sessions: { resolve: jest.Mock; getHistoryMessages: jest.Mock };
   let admission: { acquire: jest.Mock };
   let controller: ChatController;
 
   beforeEach(() => {
     chatService = { stream: jest.fn() };
-    sessions = { resolve: jest.fn().mockResolvedValue(context) };
+    sessions = {
+      resolve: jest.fn().mockResolvedValue(context),
+      getHistoryMessages: jest.fn(),
+    };
     admission = { acquire: jest.fn() };
     controller = new ChatController(
       chatService as unknown as BookChatService,
@@ -249,6 +252,31 @@ describe('ChatController admission', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it('returns paginated session messages for the authenticated owner', async () => {
+    const page = {
+      items: [
+        {
+          id: 'session-a:0',
+          position: 0,
+          role: 'user' as const,
+          content: '你好',
+        },
+      ],
+      nextCursor: null,
+      hasMore: false,
+    };
+    sessions.getHistoryMessages = jest.fn().mockResolvedValue(page);
+    await expect(
+      controller.getSessionHistoryMessages('session-a', auth),
+    ).resolves.toEqual({ success: true, data: page });
+    expect(sessions.getHistoryMessages).toHaveBeenCalledWith(
+      'user-a',
+      'session-a',
+      undefined,
+      undefined,
+    );
   });
 
   it('cancels and releases an accepted run when the client disconnects', async () => {

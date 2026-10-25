@@ -56,7 +56,7 @@ export default function ReaderAssistantPanel({ bookId, onClose }: { bookId: stri
     <div className="reader-panel-messages" ref={scroller}>
       {error && <p role="alert">{error}</p>}
       {!ready && <p role="status">正在准备本书助手…</p>}
-      {ready && currentBookId === bookId && (messages.length ? messages.map((message, index) => <MessageBubble key={index} message={message} />) : <p className="reader-panel-empty">哪一段让你停了下来？<br />可以聊聊人物、情节，或刚刚读到的细节。</p>)}
+      {ready && currentBookId === bookId && (messages.length ? messages.map((message) => <MessageBubble key={message.id} message={message} />) : <p className="reader-panel-empty">哪一段让你停了下来？<br />可以聊聊人物、情节，或刚刚读到的细节。</p>)}
     </div>
     {ready && currentBookId === bookId && <InputArea />}
     <EmailComposerDialog draft={currentBookId === bookId ? draft : null} onClose={() => useChatStore.getState().closeEmailDraft()} />

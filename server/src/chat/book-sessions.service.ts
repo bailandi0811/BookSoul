@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { BookStatus, BookVisibility, Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { requireSafePathSegment } from '../auth/auth-context';
@@ -11,6 +15,22 @@ interface StoredHistoryMessage {
   type: 'human' | 'ai';
   data: { content: string };
 }
+
+export interface HistoryMessagePageItem {
+  id: string;
+  position: number;
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface HistoryMessagePage {
+  items: HistoryMessagePageItem[];
+  nextCursor: number | null;
+  hasMore: boolean;
+}
+
+const HISTORY_PAGE_DEFAULT_LIMIT = 30;
+const HISTORY_PAGE_MAX_LIMIT = 100;
 
 export interface BookChatContext {
   ownerId: string;
@@ -146,6 +166,60 @@ export class BookSessionsService {
         message.type === 'human' ? ('user' as const) : ('assistant' as const),
       content: message.data.content,
     }));
+  }
+
+  async getHistoryMessages(
+    ownerId: string,
+    sessionId: string,
+    before?: number,
+    limit = HISTORY_PAGE_DEFAULT_LIMIT,
+  ): Promise<HistoryMessagePage> {
+    await this.resolve(ownerId, sessionId);
+    const record = await this.prisma.chatSessionRecord.findUnique({
+      where: { ownerId_sessionId: { ownerId, sessionId } },
+      select: { messages: true },
+    });
+    const stored = this.asStoredMessages(record?.messages);
+    const total = stored.length;
+    const safeLimit = Math.min(
+      HISTORY_PAGE_MAX_LIMIT,
+      Math.max(1, Math.floor(limit) || HISTORY_PAGE_DEFAULT_LIMIT),
+    );
+
+    let endExclusive = total;
+    if (before !== undefined) {
+      if (!Number.isInteger(before) || before < 0) {
+        throw new BadRequestException('消息游标无效');
+      }
+      if (before > total) {
+        throw new BadRequestException('消息游标无效');
+      }
+      endExclusive = before;
+    }
+
+    if (endExclusive === 0) {
+      return { items: [], nextCursor: null, hasMore: false };
+    }
+
+    const start = Math.max(0, endExclusive - safeLimit);
+    const items = stored.slice(start, endExclusive).map((message, offset) => {
+      const position = start + offset;
+      return {
+        id: `${sessionId}:${position}`,
+        position,
+        role:
+          message.type === 'human'
+            ? ('user' as const)
+            : ('assistant' as const),
+        content: message.data.content,
+      };
+    });
+    const hasMore = start > 0;
+    return {
+      items,
+      nextCursor: hasMore ? start : null,
+      hasMore,
+    };
   }
 
   async getRecentMessages(ownerId: string, sessionId: string) {

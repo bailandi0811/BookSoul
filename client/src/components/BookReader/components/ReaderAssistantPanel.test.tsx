@@ -8,7 +8,7 @@ import type { BookView } from "@/lib/books-api";
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 it("reuses same-book chat messages and draft, and cancels on close", async () => {
   useBooksStore.setState({ currentBook: { id: "a" } as BookView });
-  useChatStore.setState({ currentBookId: "a", draftInput: "保留的草稿", sessionId: "session", messages: [{ role: "user", content: "已有问题" }] });
+  useChatStore.setState({ currentBookId: "a", draftInput: "保留的草稿", sessionId: "session", messages: [{ id: "u1", role: "user", content: "已有问题" }] });
   const stop = vi.spyOn(useChatStore.getState(), "stopGenerating");
   const container = document.createElement("div"); document.body.append(container); const root = createRoot(container);
   try {

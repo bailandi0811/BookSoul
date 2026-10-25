@@ -49,6 +49,7 @@ describe("SourcePanel", () => {
 
   it("shows only the references attached to the selected answer", () => {
     const message: Message = {
+      id: "a1",
       role: "assistant",
       content: "回答",
       references: [reference],
@@ -75,6 +76,7 @@ describe("SourcePanel", () => {
       root.render(
         <SourcePanel
           message={{
+            id: "a2",
             role: "assistant",
             content: "",
             isStreaming: true,
@@ -115,7 +117,12 @@ describe("SourcePanel", () => {
     act(() =>
       root.render(
         <SourcePanel
-          message={{ role: "assistant", content: "回答", references }}
+          message={{
+            id: "a3",
+            role: "assistant",
+            content: "回答",
+            references,
+          }}
           messageKey="answer-stream"
           onClose={() => undefined}
         />,

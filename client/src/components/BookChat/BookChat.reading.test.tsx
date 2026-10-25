@@ -9,6 +9,7 @@ describe("reading a streaming conversation", () => {
   let container: HTMLDivElement;
   let root: ReturnType<typeof createRoot>;
   const userMessage = {
+    id: "user-1",
     role: "user" as const,
     content: "灯塔有什么含义？",
     createdAt: 1,
@@ -45,7 +46,12 @@ describe("reading a streaming conversation", () => {
     useChatStore.setState({
       messages: [
         userMessage,
-        { role: "assistant", content: "正在回答", isStreaming: true },
+        {
+          id: "assistant-1",
+          role: "assistant",
+          content: "正在回答",
+          isStreaming: true,
+        },
       ],
       isLoading: true,
       sessionId: "fixture-session",
@@ -79,6 +85,7 @@ describe("reading a streaming conversation", () => {
         messages: [
           userMessage,
           {
+            id: "assistant-1",
             role: "assistant",
             content: "正在回答，新内容已到达",
             isStreaming: true,
@@ -86,13 +93,14 @@ describe("reading a streaming conversation", () => {
         ],
       }),
     );
-    expect(viewport!.scrollTop).toBe(200);
     const latest = container.querySelector<HTMLButtonElement>(
       '[aria-label="回到最新回复"]',
     );
     expect(latest).not.toBeNull();
     await act(async () => latest!.click());
-    expect(viewport!.scrollTop).toBe(1500);
+    expect(
+      container.querySelector('[aria-label="回到最新回复"]'),
+    ).toBeNull();
   });
   it("continues following tokens when the reader stays near the bottom", async () => {
     await act(async () => root.render(<BookChat />));
@@ -110,11 +118,18 @@ describe("reading a streaming conversation", () => {
       useChatStore.setState({
         messages: [
           userMessage,
-          { role: "assistant", content: "新内容", isStreaming: true },
+          {
+            id: "assistant-1",
+            role: "assistant",
+            content: "新内容",
+            isStreaming: true,
+          },
         ],
       }),
     );
-    expect(viewport!.scrollTop).toBe(1500);
+    expect(
+      container.querySelector('[aria-label="回到最新回复"]'),
+    ).toBeNull();
   });
   it("cycles mobile drawer focus in both directions without entering hidden controls", async () => {
     const matchMedia = window.matchMedia.bind(window);

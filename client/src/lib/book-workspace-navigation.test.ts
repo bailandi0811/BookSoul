@@ -10,7 +10,7 @@ afterEach(() => { vi.restoreAllMocks(); useBooksStore.getState().clearPrivateSta
 describe("book chat preparation", () => {
   it("preserves the same-book session, messages and draft", async () => {
     useBooksStore.setState({ currentBook: { id: "a" } as BookView });
-    useChatStore.setState({ currentBookId: "a", sessionId: "session", draftInput: "草稿", messages: [{ role: "user", content: "问题" }] });
+    useChatStore.setState({ currentBookId: "a", sessionId: "session", draftInput: "草稿", messages: [{ id: "u1", role: "user", content: "问题" }] });
     const prepare = vi.spyOn(useChatStore.getState(), "prepareBook");
     await ensureBookChat("a");
     expect(prepare).not.toHaveBeenCalled(); expect(useChatStore.getState().draftInput).toBe("草稿");
