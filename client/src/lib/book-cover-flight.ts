@@ -1,6 +1,10 @@
+import { holdFlightBudget, releaseFlightBudget } from "./transition-budget";
+
 const HIDDEN = "book-cover-flight-hidden";
 const FLYER = "book-cover-flyer";
-const FLIGHT_MS = 580;
+/** Main shelf-to-slot flight; slightly longer so chunk load can overlap the motion. */
+const FLIGHT_MS = 720;
+const DEPARTURE_MS = 420;
 const EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
 
 export const COVER_SLOTS = ["feature", "shelf", "overview", "reader", "chat", "chat-welcome"] as const;
@@ -31,7 +35,54 @@ export type CoverBox = {
 
 type CoverPaint = { width: number; height: number };
 
-type Flight = { bookId: string; flyer: HTMLElement; from: CoverBox; paint: CoverPaint };
+type Flight = {
+  bookId: string;
+  flyer: HTMLElement;
+  from: CoverBox;
+  paint: CoverPaint;
+  launchBox: CoverBox | null;
+  departing: boolean;
+};
+
+function departureLift(from: CoverBox): CoverBox {
+  const scale = 1.045;
+  const width = from.width * scale;
+  const height = from.height * scale;
+  const cy = from.cy - 14;
+  const cx = from.cx;
+  return {
+    ...from,
+    width,
+    height,
+    left: cx - width / 2,
+    top: cy - height / 2,
+    cx,
+    cy,
+    tilt: { ry: 0, ty: from.tilt.ty - 6, persp: from.tilt.persp },
+  };
+}
+
+function flightLaunchBox(flight: Flight) {
+  return flight.launchBox ?? flight.from;
+}
+
+function startDepartureLoop(token: number) {
+  const flight = active;
+  if (!flight || token !== flightToken) return;
+  const lift = departureLift(flight.from);
+  flight.departing = true;
+  let started: number | null = null;
+  const step = (now: number) => {
+    if (token !== flightToken || active !== flight || !flight.departing) return;
+    if (started === null) started = now;
+    const progress = Math.min(1, (now - started) / DEPARTURE_MS);
+    const box = lerpCoverBox(flight.from, lift, easeOutQuint(progress));
+    flight.launchBox = box;
+    flight.flyer.style.transform = flightTransform(box, flight.from, flight.paint);
+    if (progress < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
 
 function paintedCover(cover: HTMLElement) {
   return cover.querySelector<HTMLElement>(":scope > .book-cover") ?? cover;
@@ -239,7 +290,9 @@ function cssAttr(value: string) {
 }
 
 export function findCover(bookId: string, slot: CoverSlot, root: ParentNode = document): HTMLElement | null {
-  const element = root.querySelector(`[data-book-cover="${cssAttr(bookId)}"][data-cover-slot="${slot}"]:not(.${FLYER})`);
+  const element = root.querySelector(
+    `[data-book-cover="${cssAttr(bookId)}"][data-cover-slot="${slot}"]:not(.${FLYER}):not(.${HIDDEN})`,
+  );
   return element instanceof HTMLElement ? element : null;
 }
 
@@ -271,17 +324,16 @@ function freezeLook(source: HTMLElement, flyer: HTMLElement) {
   flyer.style.backgroundColor = root.backgroundColor;
   flyer.style.borderRadius = root.borderRadius;
   flyer.style.boxShadow = root.boxShadow;
-  const sources = [source, ...source.querySelectorAll<HTMLElement>("*")];
-  const copies = [flyer, ...flyer.querySelectorAll<HTMLElement>("*")];
-  sources.forEach((node, index) => {
-    const copy = copies[index];
-    if (!copy || copy === flyer) return;
-    const style = getComputedStyle(node);
-    copy.style.fontSize = style.fontSize;
-    copy.style.fontFamily = style.fontFamily;
-    copy.style.lineHeight = style.lineHeight;
-    copy.style.letterSpacing = style.letterSpacing;
-  });
+  for (const name of ["book-cover-title", "book-cover-imprint"]) {
+    const from = source.querySelector<HTMLElement>(`.${name}`);
+    const to = flyer.querySelector<HTMLElement>(`.${name}`);
+    if (!from || !to) continue;
+    const style = getComputedStyle(from);
+    to.style.fontSize = style.fontSize;
+    to.style.fontFamily = style.fontFamily;
+    to.style.lineHeight = style.lineHeight;
+    to.style.letterSpacing = style.letterSpacing;
+  }
 }
 
 export function peekCoverFlight() {
@@ -296,6 +348,7 @@ export function cancelCoverFlight() {
   // token bump in the landing callbacks.
   document.querySelectorAll(`.${FLYER}`).forEach((element) => element.remove());
   document.querySelectorAll(`.${HIDDEN}`).forEach((element) => element.classList.remove(HIDDEN));
+  releaseFlightBudget();
 }
 
 export function beginCoverFlight(cover: HTMLElement | null | undefined) {
@@ -321,7 +374,9 @@ export function beginCoverFlight(cover: HTMLElement | null | undefined) {
   placeFlyer(flyer, from, paint);
   document.body.append(flyer);
   cover.classList.add(HIDDEN);
-  active = { bookId, flyer, from, paint };
+  active = { bookId, flyer, from, paint, launchBox: null, departing: false };
+  holdFlightBudget();
+  startDepartureLoop(flightToken);
 }
 
 export function beginCoverFlightFrom(bookId: string, slot: CoverSlot) {
@@ -331,14 +386,17 @@ export function beginCoverFlightFrom(bookId: string, slot: CoverSlot) {
 export function landCoverFlight(target: HTMLElement) {
   const flight = active;
   if (!flight) return Promise.resolve();
+  flight.departing = false;
   active = null;
   const token = flightToken;
+  const launch = flightLaunchBox(flight);
   target.classList.add(HIDDEN);
   const to = readCoverBox(target);
   const finish = () => {
     if (token !== flightToken) return;
     target.classList.remove(HIDDEN);
     flight.flyer.remove();
+    releaseFlightBudget();
   };
   if (typeof flight.flyer.animate !== "function" || to.width < 8) {
     finish();
@@ -360,7 +418,7 @@ export function landCoverFlight(target: HTMLElement) {
       if (fresh.width >= 8) box = fresh;
       const progress = Math.min(1, (now - started) / FLIGHT_MS);
       flight.flyer.style.transform = flightTransform(
-        lerpCoverBox(flight.from, box, easeOutQuint(progress)),
+        lerpCoverBox(launch, box, easeOutQuint(progress)),
         flight.from,
         flight.paint,
       );

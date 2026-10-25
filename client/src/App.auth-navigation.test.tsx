@@ -46,7 +46,11 @@ async function submit() {
 
 async function expectScreen(selector: string, absentSelector?: string) {
   await vi.waitFor(async () => {
-    await act(async () => {});
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      });
+    });
     expect(container.querySelector(selector)).not.toBeNull();
     if (absentSelector) expect(container.querySelector(absentSelector)).toBeNull();
   });

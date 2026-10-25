@@ -23,9 +23,27 @@ vi.mock("@/lib/books-api", async (importOriginal) => ({
   ...apiMocks,
 }));
 
+const loaderMocks = vi.hoisted(() => ({
+  loadBooksViewModule: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock("@/lib/book-page-loaders", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/book-page-loaders")>()),
+  loadBooksViewModule: loaderMocks.loadBooksViewModule,
+}));
+
+import { resetTransitionBudgetForTests } from "@/lib/transition-budget";
 import { useBooksStore } from "./useBooksStore";
 import { useChatStore } from "./useChatStore";
 import { useReaderStore } from "./useReaderStore";
+
+async function actFrame() {
+  await new Promise<void>((resolve) => {
+    const finish = () => resolve();
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(finish);
+    else finish();
+  });
+}
 
 const readyBook: BookView = {
   id: "book-a",
@@ -70,6 +88,8 @@ describe("private bookshelf state", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.clearAllMocks();
+    loaderMocks.loadBooksViewModule.mockImplementation(() => Promise.resolve());
+    resetTransitionBudgetForTests();
     useBooksStore.getState().clearPrivateState();
     apiMocks.listBooks.mockResolvedValue([]);
     apiMocks.listSections.mockResolvedValue([
@@ -78,6 +98,48 @@ describe("private bookshelf state", () => {
     apiMocks.getReadingProgress.mockResolvedValue(progress);
     apiMocks.getBookAssistant.mockResolvedValue(assistant);
     vi.spyOn(useChatStore.getState(), "prepareBook").mockResolvedValue();
+  });
+
+  it("does not change view until the chunk is ready and the next frame runs", async () => {
+    let resolveChunk!: () => void;
+    loaderMocks.loadBooksViewModule.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveChunk = resolve;
+        }),
+    );
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    useBooksStore.setState({ books: [readyBook], view: "library" });
+    const opening = useBooksStore.getState().openBook(readyBook.id, "book");
+    expect(useBooksStore.getState().view).toBe("library");
+    expect(useBooksStore.getState().currentBook?.id).toBe(readyBook.id);
+    expect(frames).toHaveLength(0);
+    resolveChunk();
+    await Promise.resolve();
+    expect(frames).toHaveLength(1);
+    frames[0](0);
+    await opening;
+    expect(useBooksStore.getState().view).toBe("book");
+    expect(loaderMocks.loadBooksViewModule).toHaveBeenCalledWith("book");
+  });
+
+  it("prepares chat after fetch even if the queued frame has not run", async () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    useBooksStore.setState({ books: [readyBook], view: "library" });
+    await useBooksStore.getState().openBook(readyBook.id);
+    expect(useChatStore.getState().prepareBook).toHaveBeenCalledWith(readyBook.id);
+    expect(useBooksStore.getState().view).toBe("library");
+    expect(frames).toHaveLength(1);
+    frames[0](0);
+    expect(useBooksStore.getState().view).toBe("workspace");
   });
 
   it("loads only books returned by the authenticated API", async () => {
@@ -92,10 +154,13 @@ describe("private bookshelf state", () => {
   it("opens book space without preparing chat and preserves same-book metadata", async () => {
     useBooksStore.setState({ books: [readyBook] });
     await useBooksStore.getState().openBook(readyBook.id, "book");
+    await actFrame();
     expect(useBooksStore.getState().view).toBe("book");
     expect(useChatStore.getState().prepareBook).not.toHaveBeenCalled();
     useBooksStore.getState().backToLibrary();
     await useBooksStore.getState().openBook(readyBook.id, "book");
+    await actFrame();
+    expect(useBooksStore.getState().view).toBe("book");
     expect(apiMocks.listSections).toHaveBeenCalledTimes(1);
   });
 
@@ -113,14 +178,19 @@ describe("private bookshelf state", () => {
 
   it("prepares chat when the user changes from a still-loading reader", async () => {
     let finish!: () => void;
+    let finishSections!: (value: unknown[]) => void;
     const opening = vi.spyOn(useReaderStore.getState(), "openReader").mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    apiMocks.listSections.mockImplementationOnce(() => new Promise(resolve => { finishSections = resolve; }));
     useBooksStore.setState({ books: [readyBook] });
     const first = useBooksStore.getState().openBook("book-a", "reader");
+    await actFrame();
+    finishSections([{ id: "section-a", order: 1, title: "第一节", charCount: 120 }]);
     await vi.waitFor(() => expect(opening).toHaveBeenCalledOnce());
     await useBooksStore.getState().switchBookView("book");
     await useBooksStore.getState().switchBookView("workspace");
     expect(useChatStore.getState().prepareBook).toHaveBeenCalledWith("book-a");
     finish(); await first;
+    await actFrame();
     expect(useBooksStore.getState().view).toBe("workspace");
   });
   it("keeps a newer reading mark when an older confirmed save arrives", () => {
@@ -217,9 +287,15 @@ describe("private bookshelf state", () => {
   });
 
   it("opens a ready book and prepares only that book session scope", async () => {
+    let finishSections!: (value: unknown[]) => void;
+    apiMocks.listSections.mockImplementationOnce(() => new Promise(resolve => { finishSections = resolve; }));
     useBooksStore.setState({ books: [readyBook] });
 
-    await useBooksStore.getState().openBook("book-a");
+    const opening = useBooksStore.getState().openBook("book-a");
+    await Promise.resolve();
+    await actFrame();
+    finishSections([{ id: "section-a", order: 1, title: "第一节", charCount: 120 }]);
+    await opening;
 
     expect(useBooksStore.getState()).toMatchObject({
       view: "workspace",

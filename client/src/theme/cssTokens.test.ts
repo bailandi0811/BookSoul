@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const css = readFileSync(resolve(__dirname, "../index.css"), "utf8");
+const scenic = readFileSync(resolve(__dirname, "./scenic-ui.css"), "utf8");
+const community = readFileSync(resolve(__dirname, "../components/CommunityChat/community-chat.css"), "utf8");
 function luminance(values: number[]) {
   const [r, g, b] = values.map((value) => {
     const channel = value / 255;
@@ -28,5 +30,15 @@ describe("AI library theme readability", () => {
   it("provides reading typography and respects reduced motion", () => {
     expect(css).toContain("--font-reading:");
     expect(css).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)/);
+  });
+
+  it("paints cheaper layers while a screen is moving", () => {
+    expect(scenic).toMatch(/html\.screen-moving\s+\.scenic-background img[\s\S]*contain:\s*paint/);
+    expect(scenic).toMatch(/html\.screen-moving\s+\.scenic-background::after[\s\S]*opacity:\s*0/);
+    expect(scenic).toMatch(/html\.screen-moving(?:\.veil-live)?\s+\.scene-veil::before[\s\S]*transition:\s*none/);
+    expect(scenic).toMatch(/html\.screen-moving[\s\S]*backdrop-filter:\s*none/);
+    expect(scenic).toMatch(/html\.screen-moving\s+\.app-screen\[data-present="false"\][\s\S]*contain:\s*paint/);
+    expect(css).toMatch(/html\.screen-moving[\s\S]*\.glass[\s\S]*backdrop-filter:\s*none/);
+    expect(community).toMatch(/html\.screen-moving[\s\S]*backdrop-filter:\s*none/);
   });
 });

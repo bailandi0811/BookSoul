@@ -5,6 +5,14 @@ import App from "./App";
 import { useAuthStore } from "./store/useAuthStore";
 import { useBooksStore } from "./store/useBooksStore";
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+
+async function actFrame() {
+  await act(async () => {
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve());
+    });
+  });
+}
 describe("reset route precedence and URL cleanup", () => {
   it("captures an invalid hashchange and prevents a late me response from overwriting the account", async () => {
     const user = {
@@ -151,6 +159,9 @@ describe("session restoration recovery", () => {
           .find((button) => button.textContent?.includes("开始阅读"))!
           .click();
       });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(16);
+      });
       expect(container.textContent).toContain("正在恢复会话");
       await act(async () => vi.advanceTimersByTimeAsync(10_000));
       expect(container.querySelector('[role="alert"]')).not.toBeNull();
@@ -201,6 +212,7 @@ describe("session restoration recovery", () => {
           .find((button) => button.textContent?.includes("开始阅读"))!
           .click();
       });
+      await actFrame();
       expect(container.querySelector('[role="alert"]')).not.toBeNull();
       expect(container.querySelector("button")).not.toBeNull();
       expect(fetch).toHaveBeenCalledTimes(1);
@@ -244,6 +256,7 @@ describe("landing entry", () => {
           .find((button) => button.textContent?.includes("开始阅读"))!
           .click();
       });
+      await actFrame();
 
       await vi.waitFor(() => {
         expect(container.querySelector('input[type="email"]')).not.toBeNull();
@@ -279,6 +292,7 @@ describe("landing entry", () => {
           .find((button) => button.getAttribute("aria-label") === "继续阅读《长夜与春》")!
           .click();
       });
+      await actFrame();
 
       await vi.waitFor(() => {
         expect(container.querySelector('input[type="email"]')).not.toBeNull();
@@ -289,6 +303,7 @@ describe("landing entry", () => {
           .find((button) => button.textContent?.includes("返回首页"))!
           .click();
       });
+      await actFrame();
 
       await vi.waitFor(() => {
         expect(container.textContent).toContain("把小说放进一间记得每本进度的书房");
@@ -339,6 +354,7 @@ describe("landing entry", () => {
           .find((button) => button.textContent?.includes("开始阅读"))!
           .click();
       });
+      await actFrame();
 
       await vi.waitFor(() => {
         expect(container.querySelector(".library-room")).not.toBeNull();
@@ -385,6 +401,7 @@ describe("landing entry", () => {
           .find((button) => button.textContent?.includes("开始阅读"))!
           .click();
       });
+      await actFrame();
 
       await vi.waitFor(() => {
         expect(container.querySelector(".library-room")).not.toBeNull();
@@ -395,6 +412,7 @@ describe("landing entry", () => {
           .find((button) => button.textContent?.includes("返回首页"))!
           .click();
       });
+      await actFrame();
 
       await vi.waitFor(() => {
         expect(container.textContent).toContain("把小说放进一间记得每本进度的书房");

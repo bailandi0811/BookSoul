@@ -20,8 +20,8 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
-import { beginCoverFlightFrom } from "@/lib/book-cover-flight";
-import { preloadLibraryDestinations, preloadOverview, preloadReader } from "@/lib/book-page-loaders";
+import { preloadLibraryDestinations, preloadOverview, preloadReader, preloadChat } from "@/lib/book-page-loaders";
+import { openBookFromShelf, preloadBooksViewTarget } from "@/lib/book-shelf-navigation";
 
 const PROCESSING_STATUSES: BookStatus[] = [
   "QUEUED",
@@ -79,7 +79,6 @@ export function Entrance({ onBackHome }: { onBackHome: () => void }) {
     uploadBook,
     retryBook,
     deleteBook,
-    openBook,
   } = useBooksStore();
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -163,7 +162,7 @@ export function Entrance({ onBackHome }: { onBackHome: () => void }) {
         <aside className="library-sidebar" aria-label="阅读工作台">
           {featuredBook && (
             <section className="library-feature" aria-label="继续阅读">
-              <button type="button" className="library-book-stage" disabled={featuredBook.status !== "READY"} aria-label={`打开《${featuredBook.title}》本书空间`} onPointerEnter={preloadOverview} onFocus={preloadOverview} onClick={() => { beginCoverFlightFrom(featuredBook.id, "feature"); void openBook(featuredBook.id, "book"); }}>
+              <button type="button" className="library-book-stage" disabled={featuredBook.status !== "READY"} aria-label={`打开《${featuredBook.title}》本书空间`} onPointerDown={() => preloadBooksViewTarget("book")} onPointerEnter={preloadOverview} onFocus={preloadOverview} onClick={() => void openBookFromShelf(featuredBook.id, "feature", "book")}>
                 <BookCover
                   bookId={featuredBook.id}
                   title={featuredBook.title}
@@ -179,7 +178,7 @@ export function Entrance({ onBackHome }: { onBackHome: () => void }) {
                   <BookOpen size={15} strokeWidth={1.4} />
                 </p>
                 <h2 className="font-reading line-clamp-2">
-                  <button type="button" disabled={featuredBook.status !== "READY"} onPointerEnter={preloadOverview} onFocus={preloadOverview} onClick={() => { beginCoverFlightFrom(featuredBook.id, "feature"); void openBook(featuredBook.id, "book"); }}>{featuredBook.title}</button>
+                  <button type="button" disabled={featuredBook.status !== "READY"} onPointerDown={() => preloadBooksViewTarget("book")} onPointerEnter={preloadOverview} onFocus={preloadOverview} onClick={() => void openBookFromShelf(featuredBook.id, "feature", "book")}>{featuredBook.title}</button>
                 </h2>
                 <p className="library-feature-meta">
                   <span>
@@ -226,15 +225,19 @@ export function Entrance({ onBackHome }: { onBackHome: () => void }) {
                     {featuredBook.status === "READY" && (
                       <><button
                         type="button"
+                        onPointerDown={() => preloadBooksViewTarget("reader")}
                         onPointerEnter={preloadReader}
                         onFocus={preloadReader}
-                        onClick={() => { beginCoverFlightFrom(featuredBook.id, "feature"); void openBook(featuredBook.id, "reader"); }}
+                        onClick={() => void openBookFromShelf(featuredBook.id, "feature", "reader")}
                         className="tap-spring inline-flex items-center justify-between gap-3 rounded-xl border border-border bg-background px-4 text-xs font-medium text-foreground hover:bg-secondary"
                       >
                         <BookOpen size={16} strokeWidth={1.5} /> 继续阅读
                       </button><button
                         type="button"
-                        onClick={() => { beginCoverFlightFrom(featuredBook.id, "feature"); void openBook(featuredBook.id); }}
+                        onPointerDown={() => preloadBooksViewTarget("workspace")}
+                        onPointerEnter={preloadChat}
+                        onFocus={preloadChat}
+                        onClick={() => void openBookFromShelf(featuredBook.id, "feature", "workspace")}
                         className="tap-spring inline-flex items-center justify-between gap-3 rounded-xl bg-primary px-4 text-xs font-medium text-primary-foreground"
                       >
                         继续对话 <ArrowRight size={16} />
@@ -407,9 +410,10 @@ export function Entrance({ onBackHome }: { onBackHome: () => void }) {
                       type="button"
                       className="bookshelf-open"
                       disabled={book.status !== "READY"}
+                      onPointerDown={() => preloadBooksViewTarget("book")}
                       onPointerEnter={preloadOverview}
                       onFocus={preloadOverview}
-                      onClick={() => { beginCoverFlightFrom(book.id, "shelf"); void openBook(book.id, "book"); }}
+                      onClick={() => void openBookFromShelf(book.id, "shelf", "book")}
                       aria-label={`打开《${book.title}》本书空间`}
                     >
                       <span className="bookshelf-display">

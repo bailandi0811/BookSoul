@@ -1,10 +1,10 @@
-import { User, Copy, Check, Quote, ChevronDown, Mail } from "lucide-react";
+import { User, Copy, Check, Quote, Mail } from "lucide-react";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { ReferenceCard } from "./ReferenceCard";
 import { type Message } from "@/store/useChatStore";
 import { useBooksStore } from "@/store/useBooksStore";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useAuthStore } from "@/store/useAuthStore";
 import { createEmailDraft } from "@/lib/email-draft";
 import { EmailComposerDialog } from "./EmailComposerDialog";
@@ -13,9 +13,15 @@ import { BookSoulMark } from "@/components/BookSoulMark";
 
 interface MessageBubbleProps {
   message: Message;
+  referencesActive?: boolean;
+  onOpenReferences?: () => void;
 }
 
-export const MessageBubble = ({ message }: MessageBubbleProps) => {
+export const MessageBubble = ({
+  message,
+  referencesActive = false,
+  onOpenReferences,
+}: MessageBubbleProps) => {
   const isUser = message.role === "user";
   const [isCopied, setIsCopied] = useState(false);
   const [isEmailComposerOpen, setIsEmailComposerOpen] = useState(false);
@@ -35,18 +41,6 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
   });
 
   const displayContent = message.content;
-
-  const [isThinkingExpanded, setIsThinkingExpanded] = useState(false);
-
-  const [prevIsThinking, setPrevIsThinking] = useState(message.isThinking);
-  if (message.isThinking !== prevIsThinking) {
-    setPrevIsThinking(message.isThinking);
-    if (message.isThinking) {
-      setIsThinkingExpanded(false);
-    } else if (message.thinkingSteps && message.thinkingSteps.length > 0) {
-      setIsThinkingExpanded(false);
-    }
-  }
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content);
@@ -127,85 +121,24 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
             </div>
 
             <div className="prose-ai text-foreground">
-              {message.thinkingSteps && message.thinkingSteps.length > 0 && (
-                <div className="mb-3">
-                  <button
-                    type="button"
-                    onClick={() => setIsThinkingExpanded(!isThinkingExpanded)}
-                    aria-expanded={isThinkingExpanded}
-                    className="assistant-stage"
-                  >
-                    {message.isThinking ? (
-                      <div className="flex items-center gap-2">
-                        <BookSoulMark active />
-                        <span className="text-[13px] font-medium text-primary">
-                          正在检索已读内容
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <Check className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-[13px] font-medium text-muted-foreground">
-                          {message.responseStatus === "failed"
-                            ? "本次处理失败"
-                            : message.responseStatus === "cancelled"
-                              ? "本次处理已停止"
-                              : "已完成本次处理"}
-                        </span>
-                      </div>
-                    )}
-                    <ChevronDown
-                      className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${isThinkingExpanded ? "rotate-180" : ""}`}
-                    />
-                  </button>
-
-                  <AnimatePresence>
-                    {isThinkingExpanded && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="mt-2 space-y-2.5 rounded-r-xl border-l-2 border-primary/25 bg-secondary/50 py-2 pl-4">
-                          {message.thinkingSteps.map((step, idx) => (
-                            <motion.div
-                              key={idx}
-                              initial={{ opacity: 0, y: 5 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className="text-[13px] text-muted-foreground leading-relaxed"
-                            >
-                              {step}
-                            </motion.div>
-                          ))}
-                          {message.isThinking && (
-                            <div className="flex items-center gap-1.5 mt-2 h-4">
-                              <span
-                                className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce"
-                                style={{ animationDelay: "0ms" }}
-                              />
-                              <span
-                                className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce"
-                                style={{ animationDelay: "150ms" }}
-                              />
-                              <span
-                                className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce"
-                                style={{ animationDelay: "300ms" }}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+              {message.isThinking && displayContent.trim().length === 0 && (
+                <div className="assistant-stage" role="status">
+                  <BookSoulMark active />
+                  <span>正在查找已读原文</span>
                 </div>
               )}
 
-              {message.runSummary && !message.responseStatus && (
+              {message.responseStatus && (
+                <p role="status" className="mb-3 text-xs text-muted-foreground">
+                  {message.responseStatus === "failed"
+                    ? "本次处理失败"
+                    : "本次处理已停止"}
+                </p>
+              )}
+
+              {message.runSummary?.incomplete && !message.responseStatus && (
                 <p role="status" className="mt-2 text-xs text-muted-foreground">
-                  {message.runSummary.incomplete
-                    ? "依据有限：部分问题尚未找到充分原文"
-                    : "已完成本次检索"}
+                  依据有限：部分问题尚未找到充分原文
                 </p>
               )}
               {(!message.isThinking || displayContent.trim().length > 0) && (
@@ -218,8 +151,7 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                   {displayContent.trim().length === 0 &&
                   message.isStreaming &&
                   !message.isThinking &&
-                  (!message.thinkingSteps ||
-                    message.thinkingSteps.length === 0) ? (
+                  !message.isThinking ? (
                     <div className="flex gap-2 items-center h-6 px-1 text-muted-foreground">
                       <BookSoulMark active />
                       <span className="text-[13px]">正在组织回答</span>
@@ -330,9 +262,11 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
             </div>
 
             {message.references && message.references.length > 0 && (
-              <div className="mt-4 border-t border-border/65 pt-4">
-                <ReferenceCard references={message.references} />
-              </div>
+              <ReferenceCard
+                references={message.references}
+                active={referencesActive}
+                onOpen={onOpenReferences}
+              />
             )}
             {message.externalReferences &&
               message.externalReferences.length > 0 && (

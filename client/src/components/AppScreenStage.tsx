@@ -5,6 +5,7 @@ import {
   publishScreenShift,
   type ScreenShift,
 } from "@/lib/screen-transition";
+import { holdScreenBudget, releaseScreenBudget } from "@/lib/transition-budget";
 
 function playedDuration(duration: number) {
   // HappyDOM does not reliably advance the animation clock while the suite is busy,
@@ -110,6 +111,14 @@ function ScreenPane({
   const playEnter = !instant;
   const lockScroll = playEnter && shift.duration >= 0.05;
   useLayoutEffect(() => {
+    if (playEnter && playedDuration(shift.duration) > 0) {
+      holdScreenBudget();
+      return () => releaseScreenBudget();
+    }
+    releaseScreenBudget();
+    return undefined;
+  }, [playEnter, shift.duration]);
+  useLayoutEffect(() => {
     const node = scroller.current;
     if (!node) return;
     node.scrollTop = 0;
@@ -157,7 +166,10 @@ function ScreenPane({
       animate="center"
       exit="exit"
       onAnimationComplete={(definition) => {
-        if (definition === "center") release.current?.();
+        if (definition === "center") {
+          release.current?.();
+          releaseScreenBudget();
+        }
       }}
     >
       {children}

@@ -4,13 +4,11 @@ import { useBooksStore } from "@/store/useBooksStore";
 import {
   ArrowDown,
   BookOpen,
+  Feather,
   PanelLeftOpen,
-  Users,
-  Route,
-  Search,
+  Plus,
   ShieldCheck,
 } from "lucide-react";
-import { BookCover } from "@/components/BookCover";
 import { peekCoverFlight } from "@/lib/book-cover-flight";
 import { AppHeader } from "@/components/AppHeader";
 import { motion, AnimatePresence } from "framer-motion";
@@ -19,6 +17,8 @@ import { InputArea } from "./components/InputArea";
 import { Sidebar } from "./components/Sidebar";
 import { AssistantSettings } from "./components/AssistantSettings";
 import { EmailComposerDialog } from "./components/EmailComposerDialog";
+import { SourcePanel } from "./components/SourcePanel";
+import { Dialog } from "@/components/ui/Dialog";
 
 const SIDEBAR_WIDTH_KEY = "booksoul_sidebar_width";
 const SIDEBAR_MIN = 232;
@@ -43,30 +43,17 @@ function readSidebarWidth() {
 }
 
 const SUGGESTIONS = [
-  {
-    title: "梳理人物与关系",
-    description: "把已读内容里的人物放在一起看。",
-    prompt: "帮我梳理目前出现的主要人物和关系",
-    icon: Users,
-  },
-  {
-    title: "回顾已读情节",
-    description: "想一想，故事走到了哪里。",
-    prompt: "总结我已读范围内的重要情节",
-    icon: Route,
-  },
-  {
-    title: "看看被忽略的线索",
-    description: "从已出现的原文中寻找依据。",
-    prompt: "有哪些容易忽略的细节或伏笔？",
-    icon: Search,
-  },
+  "帮我梳理目前出现的主要人物和关系",
+  "总结我已读范围内的重要情节",
+  "这一章有哪些值得留意的细节？",
 ];
 
 export default function BookChat() {
   const messages = useChatStore((state) => state.messages);
+  const sessionId = useChatStore((state) => state.sessionId);
   const isLoading = useChatStore((state) => state.isLoading);
   const sendMessage = useChatStore((state) => state.sendMessage);
+  const startNewSession = useChatStore((state) => state.startNewSession);
   const pendingEmailDraft = useChatStore((state) => state.pendingEmailDraft);
   const closeEmailDraft = useChatStore((state) => state.closeEmailDraft);
   const currentBook = useBooksStore((state) => state.currentBook);
@@ -95,6 +82,19 @@ export default function BookChat() {
   );
   const [sidebarWidth, setSidebarWidth] = useState(readSidebarWidth);
   const [isResizing, setIsResizing] = useState(false);
+  const [isSourcesDesktop, setIsSourcesDesktop] = useState(() =>
+    typeof window === "undefined"
+      ? true
+      : window.matchMedia("(min-width: 1180px)").matches,
+  );
+  const [isSourcesOpen, setIsSourcesOpen] = useState(() =>
+    false,
+  );
+  const [sourceSelection, setSourceSelection] = useState<{
+    index: number;
+    messageCount: number;
+    sessionId: string | null;
+  } | null>(null);
   const sidebarWidthRef = useRef(sidebarWidth);
 
   useEffect(() => {
@@ -106,6 +106,16 @@ export default function BookChat() {
     const update = () => {
       setIsDesktop(media.matches);
       setIsSidebarOpen(media.matches);
+    };
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1180px)");
+    const update = () => {
+      setIsSourcesDesktop(media.matches);
+      setIsSourcesOpen(false);
     };
     media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
@@ -216,6 +226,25 @@ export default function BookChat() {
   );
 
   if (!currentBook) return null;
+
+  let latestSourceIndex: number | null = null;
+  for (let index = messages.length - 1; index >= 0; index--) {
+    if (messages[index].role === "assistant") {
+      latestSourceIndex = index;
+      break;
+    }
+  }
+  const selectedSourceIndex =
+    sourceSelection?.messageCount === messages.length &&
+    sourceSelection.sessionId === sessionId &&
+    messages[sourceSelection.index]?.role === "assistant"
+      ? sourceSelection.index
+      : latestSourceIndex;
+  const activeSourceMessage =
+    selectedSourceIndex === null ? undefined : messages[selectedSourceIndex];
+  const activeSourceKey = activeSourceMessage
+    ? `${sessionId ?? "draft"}:${selectedSourceIndex}`
+    : "empty";
 
   if (workspaceError && !assistant && !isWorkspaceLoading) {
     return (
@@ -331,10 +360,10 @@ export default function BookChat() {
               )}
               <div className="min-w-0">
                 <h1 className="font-reading truncate text-base font-semibold">
-                  {currentBook.title}
+                  和{assistant?.name ?? "书魂"}聊《{currentBook.title}》
                 </h1>
                 <p className="truncate text-[10px] text-muted-foreground mt-1">
-                  {assistant?.name ?? "阅读助手"}
+                  书内问题只依据当前可读原文回答
                 </p>
               </div>
             </div>
@@ -345,6 +374,25 @@ export default function BookChat() {
                   ? "已读全书"
                   : `第 1—${readingProgress?.spoilerCeiling ?? 1} 节`}
               </span>
+              {!isSourcesOpen && (
+                <button
+                  type="button"
+                  className="conversation-source-toggle"
+                  aria-label="打开原文依据"
+                  onClick={() => setIsSourcesOpen(true)}
+                >
+                  <BookOpen size={16} strokeWidth={1.5} />
+                </button>
+              )}
+              <button
+                type="button"
+                className="conversation-new"
+                aria-label="新对话"
+                onClick={() => void startNewSession()}
+              >
+                <Plus size={15} />
+                <span>新对话</span>
+              </button>
               <AssistantSettings compact />
             </div>
           </header>
@@ -377,56 +425,28 @@ export default function BookChat() {
                   {messages.length === 0 && !isLoading ? (
                     <div className="assistant-welcome-layout">
                       <div className="assistant-welcome w-full">
-                        <div className="welcome-volume">
-                          <div
-                            className="assistant-welcome-cover book-cover-paint-slot"
-                            data-book-cover={currentBook.id}
-                            data-cover-slot="chat-welcome"
-                          >
-                            <BookCover
-                              bookId={currentBook.id}
-                              title={currentBook.title}
-                              bookmarked={readingProgress?.mode === "IN_PROGRESS"}
-                            />
-                          </div>
-                          <div>
-                            <h2 className="font-reading mt-5 text-2xl font-semibold tracking-tight sm:text-3xl">
-                              从你的书签聊起
-                            </h2>
-                            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                              关于人物、情节，或某个让你停下来的句子。
-                              从读到的地方开始，慢慢聊。
-                            </p>
-                          </div>
+                        <div className="welcome-mark" aria-hidden="true">
+                          <Feather size={29} strokeWidth={1.25} />
+                          <BookOpen size={48} strokeWidth={1.05} />
                         </div>
-                        <p className="welcome-heading">可以从这些问题开始</p>
-                        <div className="assistant-prompts">
-                          {SUGGESTIONS.map(
-                            ({ title, description, prompt, icon: Icon }) => (
-                              <button
-                                key={title}
-                                type="button"
-                                disabled={isLoading}
-                                onClick={() => void sendMessage(prompt)}
-                                className="tap-spring"
-                              >
-                                <Icon size={22} strokeWidth={1.25} />
-                                <span>
-                                  <span className="prompt-title">{title}</span>
-                                  <span className="prompt-description">
-                                    {description}
-                                  </span>
-                                </span>
-                              </button>
-                            ),
-                          )}
-                        </div>
-                        <p className="welcome-footnote">
-                          <ShieldCheck size={13} strokeWidth={1.5} />
-                          <span>
-                            默认只聊已读范围，原文引用会附在回答里。阅读进度更新后，助手也会跟着你的书签往前走。
-                          </span>
+                        <h2 className="font-reading">从这本书开始聊起</h2>
+                        <p className="welcome-copy">
+                          我会只根据你当前可阅读的原文回答。
                         </p>
+                        <div className="assistant-prompts">
+                          {SUGGESTIONS.map((prompt) => (
+                            <button
+                              key={prompt}
+                              type="button"
+                              disabled={isLoading}
+                              onClick={() => void sendMessage(prompt)}
+                              className="tap-spring"
+                            >
+                              <span className="prompt-dot" aria-hidden="true" />
+                              <span>{prompt}</span>
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -436,6 +456,17 @@ export default function BookChat() {
                           <MessageBubble
                             key={`${message.createdAt ?? index}-${index}`}
                             message={message}
+                            referencesActive={
+                              isSourcesOpen && selectedSourceIndex === index
+                            }
+                            onOpenReferences={() => {
+                              setSourceSelection({
+                                index,
+                                messageCount: messages.length,
+                                sessionId,
+                              });
+                              setIsSourcesOpen(true);
+                            }}
                           />
                         ))}
                       </AnimatePresence>
@@ -466,11 +497,45 @@ export default function BookChat() {
             <InputArea key={currentBook.id} />
           </div>
         </div>
+        <AnimatePresence initial={false}>
+          {isSourcesDesktop && isSourcesOpen && (
+            <motion.aside
+              key="source-panel"
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 284, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              className="source-panel-shell"
+            >
+              <SourcePanel
+                message={activeSourceMessage}
+                messageKey={activeSourceKey}
+                onClose={() => setIsSourcesOpen(false)}
+              />
+            </motion.aside>
+          )}
+        </AnimatePresence>
         <EmailComposerDialog
           draft={pendingEmailDraft}
           onClose={closeEmailDraft}
         />
       </div>
+      {!isSourcesDesktop && (
+        <Dialog
+          open={isSourcesOpen}
+          title="原文依据"
+          onClose={() => setIsSourcesOpen(false)}
+          className="source-panel-dialog"
+        >
+          <SourcePanel
+            message={activeSourceMessage}
+            messageKey={activeSourceKey}
+            onClose={() => setIsSourcesOpen(false)}
+            mobile
+            showHeader={false}
+          />
+        </Dialog>
+      )}
     </div>
   );
 }

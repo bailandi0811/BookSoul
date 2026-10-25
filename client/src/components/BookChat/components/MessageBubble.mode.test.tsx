@@ -21,7 +21,34 @@ describe("deep evidence notice", () => {
         ),
       );
       expect(container.textContent).toContain("本次处理失败");
+      expect(container.textContent).not.toContain("检索中");
       expect(container.textContent).not.toContain("已完成检索");
+    } finally {
+      act(() => root.unmount());
+    }
+  });
+  it("keeps retrieval progress compact without exposing step text", () => {
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    try {
+      act(() =>
+        root.render(
+          <MessageBubble
+            message={{
+              role: "assistant",
+              content: "",
+              isStreaming: true,
+              isThinking: true,
+              thinkingSteps: ["正在查询第 4 章", "准备比较三个召回片段"],
+            }}
+          />,
+        ),
+      );
+      expect(container.textContent).toContain("正在查找已读原文");
+      expect(container.textContent).not.toContain("正在查询第 4 章");
+      expect(container.textContent).not.toContain("准备比较三个召回片段");
+      expect(container.querySelector('[aria-expanded]')).toBeNull();
     } finally {
       act(() => root.unmount());
     }

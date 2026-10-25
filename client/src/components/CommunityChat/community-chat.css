@@ -94,6 +94,10 @@
   overflow: hidden;
   backdrop-filter: blur(18px);
 }
+html.screen-moving .community-paper {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
 .community-room-top {
   padding: 15px 22px;
   display: flex;

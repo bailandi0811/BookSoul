@@ -8,6 +8,7 @@ import {
   readRotate,
   watchCoverFlight,
 } from "./book-cover-flight";
+import { isTransitionBudgetActive, resetTransitionBudgetForTests } from "./transition-budget";
 
 function stubCover(slot: string, id = "book-1", width = 120, height = 160, left = 40, top = 80) {
   const element = document.createElement("div");
@@ -38,8 +39,31 @@ function stubCover(slot: string, id = "book-1", width = 120, height = 160, left 
 
 afterEach(() => {
   cancelCoverFlight();
+  resetTransitionBudgetForTests();
   document.body.replaceChildren();
   vi.restoreAllMocks();
+});
+
+it("freezes only title and imprint styles and holds the flight budget", () => {
+  const source = stubCover("shelf");
+  source.innerHTML = `
+    <span class="book-cover-title">长夜与春</span>
+    <span class="book-cover-imprint">BookSoul Library</span>
+    <span class="book-cover-spine"></span>
+  `;
+  const spine = source.querySelector(".book-cover-spine") as HTMLElement;
+  const title = source.querySelector(".book-cover-title") as HTMLElement;
+  title.style.fontSize = "22px";
+  const computed = vi.spyOn(window, "getComputedStyle");
+  beginCoverFlight(source);
+  const flyer = document.querySelector(".book-cover-flyer") as HTMLElement;
+  expect(isTransitionBudgetActive()).toBe(true);
+  const scanned = computed.mock.calls.map((call) => (call[0] as Element).className);
+  expect(scanned.some((name) => String(name).includes("book-cover-spine"))).toBe(false);
+  expect(flyer.querySelector(".book-cover-title")).toMatchObject({ style: { fontSize: "22px" } });
+  expect(spine.isConnected).toBe(true);
+  cancelCoverFlight();
+  expect(isTransitionBudgetActive()).toBe(false);
 });
 
 it("reads a plane rotation out of a css matrix", () => {
@@ -201,6 +225,14 @@ it("swaps the flyer for the landed cover in the same frame", async () => {
   expect(target.classList.contains("book-cover-flight-hidden")).toBe(false);
   expect(flyer.isConnected).toBe(false);
   expect(document.querySelector(".book-cover-flyer")).toBeNull();
+});
+
+it("keeps flying toward book space while the library page is still on screen", () => {
+  const source = stubCover("shelf", "book-1", 140, 186, 20, 30);
+  beginCoverFlight(source);
+  watchCoverFlight("book", "book-1");
+  expect(document.querySelector(".book-cover-flyer")).not.toBeNull();
+  expect(source.classList.contains("book-cover-flight-hidden")).toBe(true);
 });
 
 it("drops the flight when the opened page has no cover to land on", () => {

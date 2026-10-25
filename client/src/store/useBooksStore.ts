@@ -19,6 +19,8 @@ import {
 import { useChatStore } from "@/store/useChatStore";
 import { assignBookCoverBindings, type CoverVariant } from "@/lib/book-cover";
 import { ensureBookChat } from "@/lib/book-workspace-navigation";
+import { loadBooksViewModule, type LazyBooksView } from "@/lib/book-page-loaders";
+import { scheduleScreenChange } from "@/lib/transition-budget";
 import { bindConfirmedReadingProgress, useReaderStore } from "./useReaderStore";
 import { useAuthStore } from "./useAuthStore";
 import type { BookUploadStage } from '@/lib/book-direct-upload';
@@ -27,6 +29,29 @@ export type BooksView = "library" | "book" | "reader" | "workspace";
 let navigationGeneration = 0;
 let metadataAbort = new AbortController();
 let uploadAbort: AbortController | null = null;
+let booksViewIntent: BooksView | null = null;
+let switchViewGeneration = 0;
+
+async function scheduleBooksViewAfterChunk(
+  generation: number,
+  target: BooksView,
+  apply: () => void,
+) {
+  if (target !== "library") {
+    try {
+      await loadBooksViewModule(target as LazyBooksView);
+    } catch {
+      // Still navigate; the lazy boundary or page can surface the error.
+    }
+  }
+  if (generation !== navigationGeneration) return;
+  scheduleScreenChange(apply);
+}
+
+/** Screen the user is navigating to before `view` commits on the next frame. */
+export function peekBooksViewIntent(): BooksView | null {
+  return booksViewIntent;
+}
 
 interface BooksState {
   view: BooksView;
@@ -219,7 +244,6 @@ export const useBooksStore = create<BooksState>((set, get) => ({
     useChatStore.getState().stopGenerating();
     if (useReaderStore.getState().bookId !== bookId) useReaderStore.getState().clearPrivateState();
     set({
-      view: target,
       currentBook: book,
       sections: [],
       readingProgress: null,
@@ -227,6 +251,8 @@ export const useBooksStore = create<BooksState>((set, get) => ({
       isWorkspaceLoading: true,
       workspaceError: null,
     });
+    booksViewIntent = target;
+    void scheduleBooksViewAfterChunk(generation, target, () => set({ view: target }));
     try {
       const [sections, readingProgress, assistant] = await Promise.all([
         listSections(bookId, metadataAbort.signal),
@@ -235,8 +261,9 @@ export const useBooksStore = create<BooksState>((set, get) => ({
       ]);
       if (!valid()) return;
       set({ sections, readingProgress, assistant, isWorkspaceLoading: false });
-      if (get().view === "workspace") await ensureBookChat(bookId);
-      else if (get().view === "reader") await useReaderStore.getState().openReader(bookId, sections);
+      const view = booksViewIntent ?? get().view;
+      if (view === "workspace") await ensureBookChat(bookId);
+      else if (view === "reader") await useReaderStore.getState().openReader(bookId, sections);
     } catch (error) {
       if (valid()) set({ workspaceError: errorMessage(error) });
     } finally {
@@ -247,7 +274,15 @@ export const useBooksStore = create<BooksState>((set, get) => ({
   switchBookView: async target => {
     const book = get().currentBook; if (!book) return;
     useChatStore.getState().stopGenerating(); void useReaderStore.getState().flushSave();
-    set({ view: target });
+    const token = ++switchViewGeneration;
+    booksViewIntent = target;
+    try {
+      await loadBooksViewModule(target);
+    } catch {
+      // Still navigate; the lazy boundary or page can surface the error.
+    }
+    if (token !== switchViewGeneration) return;
+    scheduleScreenChange(() => set({ view: target }));
     if (get().isWorkspaceLoading) return;
     if (target === "workspace") await ensureBookChat(book.id);
     else if (target === "reader") await useReaderStore.getState().openReader(book.id, get().sections);
@@ -255,9 +290,8 @@ export const useBooksStore = create<BooksState>((set, get) => ({
 
   backToLibrary: () => {
     useChatStore.getState().stopGenerating(); void useReaderStore.getState().flushSave();
-    set({
-      view: "library",
-    });
+    booksViewIntent = "library";
+    scheduleScreenChange(() => set({ view: "library" }));
   },
 
   updateProgress: async (mode, currentSectionOrder) => {
@@ -318,6 +352,7 @@ export const useBooksStore = create<BooksState>((set, get) => ({
   clearPrivateState: () => {
     uploadAbort?.abort(); uploadAbort = null;
     navigationGeneration++; metadataAbort.abort();
+    booksViewIntent = null;
     useReaderStore.getState().clearPrivateState();
     useChatStore.getState().resetBookChat();
     set({

@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { expect, it } from "vitest";
 import { AppScreenStage } from "./AppScreenStage";
 import type { ScreenShift } from "@/lib/screen-transition";
+import { holdScreenBudget, isTransitionBudgetActive, resetTransitionBudgetForTests } from "@/lib/transition-budget";
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
@@ -53,5 +54,37 @@ it("keeps the first screen settled and freezes a screen that is leaving", async 
   } finally {
     await act(async () => root.unmount());
     container.remove();
+  }
+});
+
+it("releases the screen budget when the entering pane finishes", async () => {
+  resetTransitionBudgetForTests();
+  holdScreenBudget();
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  try {
+    await act(async () => {
+      root.render(
+        <AppScreenStage screenKey="library" shift={shift}>
+          <p>书架</p>
+        </AppScreenStage>,
+      );
+    });
+    expect(isTransitionBudgetActive()).toBe(false);
+
+    holdScreenBudget();
+    await act(async () => {
+      root.render(
+        <AppScreenStage screenKey="book" shift={{ ...shift, duration: 0 }}>
+          <p>本书</p>
+        </AppScreenStage>,
+      );
+    });
+    expect(isTransitionBudgetActive()).toBe(false);
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    resetTransitionBudgetForTests();
   }
 });

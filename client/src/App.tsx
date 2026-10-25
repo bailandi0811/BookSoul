@@ -4,6 +4,7 @@ import { restoreAuthentication } from "@/lib/auth-api";
 import { useAuthStore } from "@/store/useAuthStore";
 import { AuthPage } from "@/components/auth/AuthPage";
 import { resolveAppScreen } from "@/lib/app-flow";
+import { scheduleScreenChange } from "@/lib/transition-budget";
 import { useBooksStore } from "@/store/useBooksStore";
 import { readResetRoute } from "@/lib/reset-password-route";
 import { ResetPasswordPage } from "@/components/auth/ResetPasswordPage";
@@ -14,6 +15,7 @@ import { screenShift } from "@/lib/screen-transition";
 import { AppScreenStage } from "@/components/AppScreenStage";
 import { loadBookChat, loadBookOverview, loadBookReader } from "@/lib/book-page-loaders";
 import { useUserProfileSync } from "@/components/auth/useUserProfileSync";
+import { AppScreenSuspenseFallback } from "@/components/AppScreenSuspenseFallback";
 import { BookCoverFlightHost } from "@/components/BookCoverFlight";
 import { CommunityChatHost } from "@/components/CommunityChat/CommunityChatHost";
 
@@ -73,21 +75,25 @@ function App() {
     setShift(screenShift(trackedScreen, screen, reducedMotion, peekCoverFlight() !== null));
   }
   const backToHomepage = () => {
-    useBooksStore.getState().backToLibrary();
-    setAccountRoute(false);
-    setCommunityRoute(false);
-    setTarotRoute(false);
-    setShowLogin(false);
-    setHasEnteredApp(false);
+    scheduleScreenChange(() => {
+      useBooksStore.getState().backToLibrary();
+      setAccountRoute(false);
+      setCommunityRoute(false);
+      setTarotRoute(false);
+      setShowLogin(false);
+      setHasEnteredApp(false);
+    });
     if (window.location.hash === "#account" || window.location.hash === "#community" || window.location.hash === "#tarot")
       history.replaceState(history.state, "", window.location.pathname + window.location.search);
   };
 
   useEffect(() => {
     const captureResetLink = () => {
-      setAccountRoute(window.location.hash === "#account");
-      setCommunityRoute(window.location.hash === "#community");
-      setTarotRoute(window.location.hash === "#tarot");
+      scheduleScreenChange(() => {
+        setAccountRoute(window.location.hash === "#account");
+        setCommunityRoute(window.location.hash === "#community");
+        setTarotRoute(window.location.hash === "#tarot");
+      });
       const route = readResetRoute(window.location.hash);
       if (!route.isResetRoute) return;
       restoration.current?.abort();
@@ -190,42 +196,46 @@ function App() {
             {sessionGate}
           </div>
         ) : (
-          <Suspense
-            fallback={
-              <div className="app-screen-fallback grid min-h-full place-items-center text-sm text-muted-foreground">
-                正在翻开书页…
-              </div>
-            }
-          >
+          <Suspense fallback={<AppScreenSuspenseFallback />}>
           {screen === "landing" ? (
-            <LandingPage onEnter={() => setHasEnteredApp(true)} />
+            <LandingPage onEnter={() => scheduleScreenChange(() => setHasEnteredApp(true))} />
           ) : screen === "auth" ? (
             <AuthPage
               onBackHome={backToHomepage}
               onAuthenticated={() => {
-                setShowLogin(false);
-                setHasEnteredApp(true);
-                setAccountRoute(false);
+                scheduleScreenChange(() => {
+                  setShowLogin(false);
+                  setHasEnteredApp(true);
+                  setAccountRoute(false);
+                  useBooksStore.getState().backToLibrary();
+                });
                 if (window.location.hash === "#account") history.replaceState(history.state, "", window.location.pathname + window.location.search);
-                useBooksStore.getState().backToLibrary();
               }}
             />
           ) : screen === "tarot" ? (
             <TarotPage key={userId} onBack={() => {
-              useBooksStore.getState().backToLibrary(); setHasEnteredApp(true); setTarotRoute(false);
+              scheduleScreenChange(() => {
+                useBooksStore.getState().backToLibrary();
+                setHasEnteredApp(true);
+                setTarotRoute(false);
+              });
               history.replaceState(history.state, "", window.location.pathname + window.location.search);
             }} />
           ) : screen === "community" ? (
             <CommunityChatPage onBack={() => {
-              useBooksStore.getState().backToLibrary();
-              setHasEnteredApp(true);
-              setCommunityRoute(false);
+              scheduleScreenChange(() => {
+                useBooksStore.getState().backToLibrary();
+                setHasEnteredApp(true);
+                setCommunityRoute(false);
+              });
               history.replaceState(history.state, "", window.location.pathname + window.location.search);
             }} />
           ) : screen === "account" ? (
             <AccountPage key={userId} onBack={() => {
-              useBooksStore.getState().backToLibrary();
-              setAccountRoute(false);
+              scheduleScreenChange(() => {
+                useBooksStore.getState().backToLibrary();
+                setAccountRoute(false);
+              });
               history.replaceState(history.state, "", window.location.pathname + window.location.search);
             }} />
           ) : screen === "library" ? <Entrance onBackHome={backToHomepage} /> : screen === "book" ? <BookOverview /> : screen === "reader" ? <BookReader /> : <BookChat />}
